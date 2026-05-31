@@ -6,7 +6,7 @@ _Last updated: 2026-05-31_
 
 | Bet | Phase | Owner role | Awaiting | Started | ETA |
 |---|---|---|---|---|---|
-| [CB-1](bets/CB-1/brief.md) | Story decomposition started — CB-1.1 ready | PM → Engineer | `/build CB-1.1` (lib/auth library) | 2026-05-31 | 2026-06-14 (per plan.md, low confidence) |
+| [CB-1](bets/CB-1/brief.md) | CB-1.1 + CB-1.1.1 shipped; ~5 stories remaining | PM → Engineer | `/create-story CB-1` for next story (CB-1.2: registration endpoints) | 2026-05-31 | 2026-06-14 (per plan.md, low confidence) |
 | [CB-2](bets/CB-2/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-2` promotion | 2026-05-31 | tbd at promotion |
 | [CB-3](bets/CB-3/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-3` promotion (after CB-1 + CB-2) | 2026-05-31 | tbd at promotion |
 | [CB-4](bets/CB-4/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-4` promotion (after CB-2 + CB-3) | 2026-05-31 | tbd at promotion |
@@ -18,7 +18,8 @@ _None — CB-1 brief approved 2026-05-31. Each remaining stub brief (CB-2..CB-5)
 
 ## Recently shipped
 
-- **2026-05-31** — [CB-1.1](bets/CB-1/stories/CB-1.1/story.md) story created (`status: ready` — first slice of CB-1). Scope: `lib/auth/` library only (SimpleWebAuthn wrappers + cookie + sessions + challenges) with full unit-test coverage. **Challenge-storage approach locked: encrypted signed cookie** per story DRI Decision (resolves the deferral from CB-1 brief). 10 ACs, all 6 SEC categories handled (`n/a` for UI-specific categories with reasons + AC-coverage for non-UI categories). Next: `/build CB-1.1`.
+- **2026-05-31** — [CB-1.1.1](bets/CB-1/stories/CB-1.1.1/story.md) shipped via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). Review-driven follow-up to CB-1.1: 2 AC amendments (options-object wrapper signatures + ESLint flat-config swap) + 2 missing tests (expired-challenge + happy-path WebAuthn verify) + PR template harden (DO NOT MERGE banner + honest "manually invoked" security-review language) + `.codex/config.toml` fix for Codex 0.133+. 34/34 tests passing; Codex code + security reviews clean.
+- **2026-05-31** — [CB-1.1](bets/CB-1/stories/CB-1.1/story.md) shipped via [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). `lib/auth/` library landed: SimpleWebAuthn wrappers, HMAC signed-cookie helpers, DB-backed session helpers, signed-cookie WebAuthn challenge storage. 10 ACs (AC 1 + AC 7 later amended via CB-1.1.1 per Codex findings; original text retained for audit). 31 unit tests at merge.
 - **2026-05-31** — [CB-1 brief](bets/CB-1/brief.md) promoted from stub → approved. Passkey authentication; primary metric: sign-in success rate ≥ 99%; 4 guardrails including zero unauthenticated capital-touching requests; `architecture_required: false` (foundation arch covers it).
 - **2026-05-31** — [Project Plan](foundation/plan.md) seeded (v1, `status: living`). MVP target: 2026-08-09 (10 weeks); 4-bet critical path; Day-1 parallel pair (CB-1 + CB-2). `docs/dashboard.html` auto-refreshed (218 KB, 12 artifacts).
 - **2026-05-31** — [MVP Bet Portfolio](foundation/portfolio.md) approved (`status: approved`). 5 MVP bet stubs created (CB-1..CB-5); Manual trading UI deferred to post-MVP per operator follow-up.
@@ -43,7 +44,10 @@ _None._
 ### Resolved this cycle
 
 - ~~**CB-6 (manual trading) quietly bloating MVP scope**~~ — resolved 2026-05-31 by operator follow-up during portfolio HITL; CB-6 stub deleted; entry moved to portfolio `§ Deliberately out of MVP`.
+- ~~**Merge-before-review process slip on PR #1**~~ — Compass Phase 6 (HITL merge) gate fired ~30 min before Phase 5 (Codex review) findings arrived on PR #1 (CB-1.1). Findings (3 BLOCKERs + 1 ISSUE on code; 0 on security) were honestly closed via CB-1.1.1 (2 AC amendments + 2 missing tests). PR template hardened with explicit DO NOT MERGE banner + honest "manually invoked" security-review language. Resolved 2026-05-31 via PR #2. Framework change to `compass/workflows/build.md` Phase 4 wrap-up text deferred to a future retro per operator direction.
 
 ## Health
 
-_Run `/plan` (next step) to seed `docs/foundation/plan.md` with the time-bound schedule. Throughput / bottleneck metrics populate once stubs start promoting via `/create-brief`._
+- **Stories shipped:** 2 (CB-1.1, CB-1.1.1) of ~6 expected under CB-1. ~5 stories remain on the CB-1 critical path (CB-1.2 registration endpoints, CB-1.3 authentication endpoints, CB-1.4 proxy session validation, CB-1.5 sign-out, CB-1.6 first-deploy onboarding UX).
+- **Process learning captured:** review-before-merge discipline now codified at the PR-template layer (DO NOT MERGE banner). One slip → one named follow-up → one harden, traceable end-to-end via DRI logs.
+- **Stale post-merge surfaces:** `docs/foundation/plan.md` and `docs/dashboard.html` predate the CB-1.1 + CB-1.1.1 merges. Re-run `/plan` + `/dashboard` to refresh before next decomposition. `docs/changelog.md` Unreleased section still pending a convention decision (strict per-bet vs relaxed per-PR accumulation).
