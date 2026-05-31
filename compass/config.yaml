@@ -111,7 +111,11 @@ ci_cd:
   #       notes: "EAS dev-build profile; installs on iOS sim + Pixel emulator"
   #
   # kind: web | mobile | container | other  (free-form via `other` + notes)
-  canary_artifacts: []
+  canary_artifacts:
+    - kind: web
+      url: "https://crypt-bot.kindtree.us"
+      verified_at: "2026-05-31T00:00:00Z"
+      notes: "Next.js 16 + Vercel Pro (custom domain via kindtree.us); cron `*/15` scheduled via vercel.ts; CRON_SECRET-gated /api/cron/tick stub returns { ok: true } heartbeat. Operator-verified build + landing route. Per architecture.md Stack table — web is the single deploy target."
 
 # ─── DRI logging ──────────────────────────────────────────────────────
 dri:
