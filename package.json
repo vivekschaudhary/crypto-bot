@@ -21,7 +21,7 @@
     "react-dom": "^19.0.0",
     "@simplewebauthn/server": "^11.0.0",
     "@simplewebauthn/browser": "^11.0.0",
-    "@vercel/config": "^1.0.0",
+    "@vercel/config": "^0.5.1",
     "postgres": "^3.4.0",
     "zod": "^3.23.0",
     "argon2": "^0.41.0",
