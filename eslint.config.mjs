@@ -1,26 +1,38 @@
-import { FlatCompat } from "@eslint/eslintrc";
-import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+import tseslint from "@typescript-eslint/eslint-plugin";
+import tsparser from "@typescript-eslint/parser";
 
 export default [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "dist/**",
+      "coverage/**",
+      "docs/**",
+      "compass/**",
+      "next-env.d.ts",
+    ],
+  },
+  {
+    files: ["**/*.ts", "**/*.tsx", "**/*.mjs", "**/*.cjs", "**/*.js"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    plugins: {
+      "@typescript-eslint": tseslint,
+    },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      "no-unused-vars": "off", // handled by @typescript-eslint/no-unused-vars
     },
-  },
-  {
-    ignores: ["node_modules/**", ".next/**", "dist/**", "docs/**", "compass/**"],
   },
 ];
