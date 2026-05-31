@@ -2,9 +2,10 @@
 id: CB-1.1
 bet: CB-1
 type: story
-status: ready
+status: shipped
 priority: P0
 created: 2026-05-31
+shipped: 2026-05-31
 author: PM
 design_link: n/a (no UI surface — pure library)
 area_tags: [auth, library, backend]
@@ -97,7 +98,7 @@ Note: `lib/auth/session.ts` (the scaffold stub) is replaced by `lib/auth/session
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1) — **merged 2026-05-31** — feat(CB-1.1): lib/auth library — SimpleWebAuthn wrappers + cookie + sessions + challenges. Review findings (3 BLOCKERs + 1 ISSUE on code; 0 on security) closed under follow-up story [CB-1.1.1](../CB-1.1.1/story.md) ([PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2), merged 2026-05-31).
 
 ## Tests
 

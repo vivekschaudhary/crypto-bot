@@ -2,9 +2,10 @@
 id: CB-1.1.1
 bet: CB-1
 type: story
-status: ready
+status: shipped
 priority: P0
 created: 2026-05-31
+shipped: 2026-05-31
 author: Engineer
 parent_story: CB-1.1
 design_link: n/a (no UI surface — remediation of library + docs)
@@ -75,7 +76,7 @@ Security review on the same PR returned no findings (Approve). No security-relev
 
 ## PRs
 
-- [ ] PR to be created on this branch; updated here once opened.
+- [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2) — **merged 2026-05-31** — feat(CB-1.1.1): close 4 Codex review findings on PR #1 + harden PR template. Includes the `.codex/config.toml` fix (`b83fa98`) restoring Codex 0.133+ compatibility + the P2/P3 follow-ups (`ad08cc1`) addressing Codex's review of PR #2 itself.
 
 ## Tests
 

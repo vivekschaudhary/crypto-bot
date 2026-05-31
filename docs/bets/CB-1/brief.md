@@ -123,16 +123,21 @@ n/a — single-operator product, no support pipeline. If the operator hits a sna
 
 _Decomposed one at a time via `/create-story CB-1`. Each lives under `docs/bets/CB-1/stories/<story-id>/`._
 
-**Expected decomposition** (PM forecast — not yet broken out as stories):
+### Shipped
 
-1. **`lib/auth/` library** — SimpleWebAuthn wrappers, cookie helpers, session validation helpers. Unit-testable in isolation.
+- **[CB-1.1](stories/CB-1.1/story.md) — `lib/auth/` library.** Shipped 2026-05-31 via [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). 10 ACs (AC 1 + AC 7 amended via CB-1.1.1 per Codex findings).
+- **[CB-1.1.1](stories/CB-1.1.1/story.md) — Codex review remediations for CB-1.1.** Shipped 2026-05-31 via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). 6 ACs covering: 2 AC amendments + 2 missing tests + PR template harden + Codex 0.133+ config fix.
+
+### Expected decomposition (PM forecast — remaining)
+
+1. ~~**`lib/auth/` library**~~ — **shipped** via CB-1.1 (+ CB-1.1.1 follow-ups).
 2. **Registration ceremony endpoints** — `POST /api/auth/register/begin` + `POST /api/auth/register/finish`.
 3. **Authentication ceremony endpoints** — `POST /api/auth/authenticate/begin` + `POST /api/auth/authenticate/finish`.
 4. **Sign-out endpoint + cookie clearing** — `POST /api/auth/sign-out`.
 5. **`app/proxy.ts` real session validation** — replace scaffold stub; handle both `/(dashboard)/*` redirects + `/api/coinbase|bot/*` 401s.
 6. **First-deploy onboarding UX** — landing page flow that detects zero-credentials state and walks the operator through registration in < 5 minutes.
 
-That's ~6 stories at ~2-3 days each = ~2-3 weeks, matching the brief's current stub estimate of 2 weeks. Will be refined to medium confidence by `/plan` after this brief is approved.
+Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals: 2 stories shipped same day (heavy parallelism + first-arc process work bundled). 5 forecast items remain; refine via `/plan` after the next story decomposes.
 
 ## Scan summary
 
