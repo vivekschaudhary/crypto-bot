@@ -1,31 +1,23 @@
-# Codex CLI configuration for Compass
-# Codex CLI auto-discovers AGENTS.md at repo root.
-# This file adds MCP servers and notes.
-
-[mcp.github]
-type = "http"
-url = "https://api.githubcopilot.com/mcp/"
-
-[mcp.atlassian]
-type = "http"
-url = "https://mcp.atlassian.com/v1/sse"
-
-[mcp.sentry]
-type = "http"
-url = "https://mcp.sentry.dev/mcp"
-
-[mcp.figma]
-type = "http"
-url = "https://mcp.figma.com/mcp"
-
-[model]
-default = "gpt-5"
-
+# Codex CLI configuration for Compass — project-local overrides.
+# Merged on top of ~/.codex/config.toml (user-global).
+#
+# NOTE (2026-05-31): the legacy Compass template format used
+#   [model]
+#   default = "gpt-5"
+# and [mcp.<name>] table stanzas. Codex 0.133+ rejects both with
+# "invalid type: map, expected a string in 'model'" because `model` is
+# expected as a TOP-LEVEL STRING. Keeping this file minimal so it doesn't
+# clash with the user-global config; the global config already pins model +
+# reasoning effort.
+#
 # Notes for whoever runs Codex here:
 # - Compass uses compass/ as the framework source of truth.
 # - Codex plays Reviewer and Security Reviewer ONLY.
 # - Use .codex/prompts/reviewer.md for code review.
-# - Use .codex/prompts/security-reviewer.md when diff touches auth/PII/payments/secrets/sessions/external input.
+# - Use .codex/prompts/security-reviewer.md when diff touches auth/PII/
+#   payments/secrets/sessions/external input.
 # - Disputes from Engineer go to PM (human), not back to you. Hold positions.
-# - The Codex CLI config format evolves; check `codex --help` and adjust [mcp.*] syntax if needed.
-#   Prompt files themselves remain correct regardless of CLI changes.
+# - MCP servers: add via CLI on Codex 0.133+ — the legacy [mcp.*] TOML
+#   stanzas no longer work. Example:
+#     codex mcp add github --url https://api.githubcopilot.com/mcp/
+#   Run `codex mcp list` to see what's currently registered.
