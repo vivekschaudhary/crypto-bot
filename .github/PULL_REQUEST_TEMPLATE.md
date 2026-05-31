@@ -3,7 +3,7 @@ Canonical PR template content. Copied to .github/PULL_REQUEST_TEMPLATE.md
 (GitHub doesn't follow references — so we concatenate, not link).
 -->
 
-> **⛔ DO NOT MERGE** until **Codex Code Review** has posted on this PR, **Codex Security Review** has posted (auto-triggered if the diff touches auth, PII, payments, secrets, sessions, external input, or crypto), and **all Codex BLOCKERs are resolved or formally disputed**. The Compass workflow's Phase 6 (HITL merge) cannot fire before Phase 5 (review) is complete — this PR was the slip we're hardening against (see [CB-1.1.1](docs/bets/CB-1/stories/CB-1.1.1/story.md)).
+> **⛔ DO NOT MERGE** until **Codex Code Review** has posted on this PR, **Codex Security Review** has posted **if applicable** (Engineer must manually invoke it with `.codex/prompts/security-reviewer.md` when the diff touches auth, PII, payments, secrets, sessions, external input, or crypto — there is no automation that triggers it; see `compass/workflows/build.md` step 16), and **all Codex BLOCKERs are resolved or formally disputed**. The Compass workflow's Phase 6 (HITL merge) cannot fire before Phase 5 (review) is complete — this PR was the slip we're hardening against (see [CB-1.1.1](docs/bets/CB-1/stories/CB-1.1.1/story.md)).
 
 ## Summary
 
@@ -45,7 +45,7 @@ Canonical PR template content. Copied to .github/PULL_REQUEST_TEMPLATE.md
 
 **Reviewer (Codex):** Read `AGENTS.md`, this bet's architecture and brief, then review this diff. Architect compliance check included. Post structured findings per the format in `compass/roles/reviewer.md`.
 
-**Security review:** auto-triggered if diff touches auth, PII, payments, secrets, external input, sessions, or crypto. Per `compass/roles/security-reviewer.md`.
+**Security review:** **manually invoked by Engineer** when the diff touches auth, PII, payments, secrets, external input, sessions, or crypto. No automation triggers it. Run via `codex review "$(cat .codex/prompts/security-reviewer.md) [PR context]"` and post the structured result as a PR comment. Per `compass/roles/security-reviewer.md`.
 
 ## Dispute (optional)
 

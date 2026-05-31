@@ -31,9 +31,10 @@ Security review on the same PR returned no findings (Approve). No security-relev
   - Implementation note: use `vi.useFakeTimers()` + `vi.setSystemTime()` to advance system time > 60 seconds after `mintChallenge()`, then call `consumeChallenge()` and assert `null`. Restore real timers after the case.
   - Test passes via `pnpm test`.
 
-- [ ] **AC 3 — Happy-path WebAuthn verification tests in `tests/lib/auth/webauthn.test.ts`**
+- [ ] **AC 3 — Happy-path WebAuthn verification tests in `tests/lib/auth/webauthn.verify.test.ts`** (separate file from `webauthn.test.ts`)
   - Add at least one positive verification case for `verifyRegistrationResponse()` and one for `verifyAuthenticationResponse()`, using `vi.mock("@simplewebauthn/server", ...)` to mock the underlying lib's verify functions so the test exercises **our wrapper plumbing** (RP ID derivation, expected-origin derivation, options-object passthrough). The underlying lib's cryptographic verification is its own test surface.
   - Each test asserts: (a) the wrapper returns the mocked `{ verified: true, ...info }` result unchanged, (b) the wrapper passes `expectedOrigin` and `expectedRPID` correctly derived from `APP_ORIGIN` to the underlying lib.
+  - **Why a separate file** (not `webauthn.test.ts`): `vi.mock("@simplewebauthn/server", ...)` is hoisted to module scope and affects every test in the file. The existing `webauthn.test.ts` runs `generateRegistrationOptions` / `generateAuthenticationOptions` + failure-case `verifyXResponse` against the **real** lib; adding the mock there would break those existing tests. New file isolates the mock scope cleanly.
   - Tests pass via `pnpm test`.
 
 - [ ] **AC 4 — Amend CB-1.1 AC 7 (ESLint flat-config swap) + log Engineer DRI Decision**
