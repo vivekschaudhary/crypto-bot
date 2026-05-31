@@ -21,12 +21,13 @@ This story locks the **challenge-storage approach** that the [CB-1 brief](../../
 
 ## Acceptance Criteria
 
-- [ ] **AC 1** — `lib/auth/webauthn.ts` exports four pure functions that wrap SimpleWebAuthn server:
-  - `generateRegistrationOptions(userId: string, userName: string, excludeCredentials: PublicKeyCredentialDescriptor[]): Promise<PublicKeyCredentialCreationOptionsJSON>`
-  - `verifyRegistrationResponse(response, expectedChallenge, expectedOrigin, expectedRPID): Promise<{ verified: boolean, registrationInfo?: ... }>`
-  - `generateAuthenticationOptions(allowCredentials: PublicKeyCredentialDescriptor[]): Promise<PublicKeyCredentialRequestOptionsJSON>`
-  - `verifyAuthenticationResponse(response, expectedChallenge, expectedOrigin, expectedRPID, authenticator): Promise<{ verified: boolean, authenticationInfo?: ... }>`
-  - RP ID and expected origin sourced from `lib/env` (`APP_ORIGIN`). No `process.env` reads in this file.
+- [ ] **AC 1** — `lib/auth/webauthn.ts` exports four pure functions that wrap SimpleWebAuthn server. **Amended 2026-05-31 (post-PR-#1, see Engineer DRI Decision below)** — landed signatures use an **options-object shape** (TS-idiomatic with > 2 args + mirrors the underlying lib's own opts types) rather than the originally-drafted positional shape. RP ID and `expectedOrigin` are derived internally from `lib/env` (`APP_ORIGIN`); consumers do not pass them.
+  - `generateRegistrationOptions(args: { userId: string; userName: string; excludeCredentials?: CredentialDescriptor[] }): Promise<PublicKeyCredentialCreationOptionsJSON>`
+  - `verifyRegistrationResponse(args: { response: RegistrationResponseJSON; expectedChallenge: string }): Promise<VerifiedRegistrationResponse>`
+  - `generateAuthenticationOptions(args?: { allowCredentials?: CredentialDescriptor[] }): Promise<PublicKeyCredentialRequestOptionsJSON>`
+  - `verifyAuthenticationResponse(args: { response: AuthenticationResponseJSON; expectedChallenge: string; credential: WebAuthnCredential }): Promise<VerifiedAuthenticationResponse>`
+  - Types re-derived from SimpleWebAuthn's own exported `*Opts` types (some response/credential types live in `@simplewebauthn/types` and aren't re-exported from the server index). No `process.env` reads in this file.
+  - **Original AC text** (pre-amendment, retained for audit): positional signatures `generateRegistrationOptions(userId, userName, excludeCredentials)`, `verifyRegistrationResponse(response, expectedChallenge, expectedOrigin, expectedRPID)`, `generateAuthenticationOptions(allowCredentials)`, `verifyAuthenticationResponse(response, expectedChallenge, expectedOrigin, expectedRPID, authenticator)`.
 - [ ] **AC 2** — `lib/auth/cookie.ts` exports HMAC-SHA256 sign/verify helpers:
   - `signValue(value: string, secret: string, maxAgeSeconds: number): string` — returns `<base64url-payload>.<base64url-signature>` where payload encodes value + exp timestamp
   - `verifyValue(token: string, secret: string): { value: string } | null` — returns null on tamper, expiry, or malformed input
@@ -48,7 +49,7 @@ This story locks the **challenge-storage approach** that the [CB-1 brief](../../
   - `challenges.test.ts`: mint-then-consume round trip; cross-purpose consume rejects (registration token used for auth → null); expired token rejects; tampered token rejects.
   - All tests pass via `pnpm test`.
 - [ ] **AC 6** — `pnpm typecheck` passes with `strict: true`. No `any` introduced.
-- [ ] **AC 7** — `pnpm lint` passes (existing ESLint flat config; no new ignores).
+- [ ] **AC 7** — `pnpm lint` passes. **Amended 2026-05-31 (post-PR-#1, see Engineer DRI Decision below)** — landed `eslint.config.mjs` swapped out the Next.js `next/typescript` shareable for direct `@typescript-eslint`-recommended-shape rules (`no-explicit-any: error`, `no-unused-vars` with `^_` argsIgnorePattern), and added two ignore entries (`coverage/**`, `next-env.d.ts`). Rationale: ESLint 9.39 + `@eslint/eslintrc`'s `FlatCompat` + the `next/typescript` shareable produces a circular-JSON error that blocks `pnpm lint` entirely; the swap restores `pnpm lint` to green while preserving the load-bearing TS lint rules. Backend-only repo + one stub `app/(dashboard)` page means the Next-specific React-hooks / JSX-a11y rules in the shareable were not load-bearing on this codebase yet. **Original AC text** (pre-amendment, retained for audit): "existing ESLint flat config; no new ignores."
 - [ ] **AC 8** — No new runtime dependencies beyond what's already in `package.json` (`@simplewebauthn/server`, `@simplewebauthn/browser`, `postgres`, `zod`, `argon2`, `ulidx`). If `pnpm install` reveals that `@simplewebauthn/server@^11` doesn't resolve, log it as an Issue + adjust the version pin in a follow-up commit (see Risks below).
 - [ ] **AC 9** — All env access goes through `lib/env`. No `process.env` reads inside `lib/auth/*` source files. Lint rule enforcement (custom rule) is out of scope for this story — convention enforced by code review.
 - [ ] **AC 10** — DB queries reuse the shared `db()` client from `lib/db/client.ts`. No new connection-creation code; no opening of additional pools.
@@ -146,9 +147,25 @@ _If post-merge bugs are found, story is re-opened and fixes live under `docs/bet
   - **Mitigation (required):** AC #3 documents the required attributes in source comments alongside the function definition. CB-1.2/CB-1.3 (endpoint stories) MUST verify the attributes in integration tests as part of their own AC. `/scan` post-merge will check for cookie-attribute regressions.
   - **Area (required, tag):** security / cross-story
 
+- [2026-05-31] [Engineer] **Wrapper signatures switched to options-object shape** (amends AC 1; surfaced as Codex BLOCKER #1 on PR #1; remediation tracked under CB-1.1.1 AC 1)
+  - **Rationale (required):** SimpleWebAuthn's own verify/generate types are options-object-shaped (`VerifyRegistrationResponseOpts`, `VerifyAuthenticationResponseOpts`, `GenerateRegistrationOptionsOpts`). Tech notes explicitly say "use the SimpleWebAuthn package's own exported types directly rather than redefining"; re-wrapping in a positional API would re-introduce the parallel type system the story said to avoid. Options-object is also TS-idiomatic for ≥ 3 args + tolerates back-compat additions (future opts get a new field, not a new positional). The original AC text predated the choice to wrap the lib's exact shape.
+  - **Area (required, tag):** auth / api-shape
+  - **Alternatives considered (required):** keep positional and re-derive types ourselves (rejected — fights the lib + creates a maintenance tax on every upstream API change); positional with options-object as the last param "options bag" (rejected — half-measure, the body of args is already options-shaped at the lib).
+  - **Reversibility:** medium — call sites are concentrated in CB-1.2 / CB-1.3 endpoint stories (registration + authentication). Swap would touch ~8 call sites once those land; cheap pre-CB-1.2, costlier after.
+  - **Binds (downstream):** CB-1.2..CB-1.6 consume `lib/auth/webauthn` via the options-object shape. Stories that draft against the old positional shape must update on creation.
+
+- [2026-05-31] [Engineer] **ESLint flat config swap: `next/typescript` shareable → direct `@typescript-eslint/recommended`-shape rules** (amends AC 7; surfaced as Codex ISSUE on PR #1; remediation tracked under CB-1.1.1 AC 4)
+  - **Rationale (required):** ESLint 9.39 + `@eslint/eslintrc`'s `FlatCompat` + the `next/typescript` shareable produces a "TypeError: Converting circular structure to JSON" on `pnpm lint`, blocking the AC 7 green check entirely. Direct rules preserve the load-bearing TS-linting surface (`no-explicit-any: error`, unused-vars with `^_` opt-out). Next-specific React-hooks / JSX-a11y rules in the shareable were not load-bearing on this codebase (backend-only + one stub dashboard page); when CB-1.6 introduces real UI, revisit then. New ignores (`coverage/**`, `next-env.d.ts`) are standard exclusions both Next + Vitest generate as build artifacts and should never be linted.
+  - **Area (required, tag):** tooling / lint
+  - **Alternatives considered (required):** keep `FlatCompat` + downgrade ESLint to 9.38 (rejected — chases the bug into the past + risks security advisories); use eslint-plugin-next directly without the shareable (rejected — `next/typescript` bundles parser config + rules in one knob; re-deriving piecemeal is more drift than the direct rules); disable lint until Next ships an ESLint-9-native flat-config shareable (rejected — leaves the AC 7 gate broken indefinitely + no rules running on the diff).
+  - **Reversibility:** easy — when Next.js publishes an ESLint-9-native flat-config shareable that doesn't trigger the `FlatCompat` circularity, swap back in one file (`eslint.config.mjs`).
+  - **Upgrade trigger:** watch the [Next.js ESLint flat-config tracking issue](https://github.com/vercel/next.js/issues?q=eslint+flat+config) (link kept in CB-1.1.1 story); revisit on next major Next.js release.
+
 ### Issues
 
 _None at story creation. Issues will accrue if AC #5 reveals API surface issues or AC #8 reveals dependency-version surprises._
+
+- [2026-05-31] [Engineer] **CB-1.1 was merged before Codex review posted** — Compass Phase 6 (HITL merge) gate fired ~30 min before Phase 5 (Codex review) findings arrived on PR #1. Findings were 3 BLOCKERs + 1 ISSUE (code review) + 0 findings (security review). Closed under CB-1.1.1 with AC amendments (deviations 1 + 4) + missing tests (gaps 2 + 3) + PR-template harden (process fix for future stories). **Severity:** process / medium. **Owner:** Engineer (this story's writer) + PR-template harden lands in CB-1.1.1 AC 6. **Status:** closed-by-followup.
 
 ---
 

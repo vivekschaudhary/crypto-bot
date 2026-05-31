@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Mock lib/env to provide a stable signing secret without needing real env vars.
 const FAKE_SECRET = "z".repeat(48);
@@ -11,6 +11,10 @@ import { consumeChallenge, mintChallenge } from "@/lib/auth/challenges";
 import { signValue } from "@/lib/auth/cookie";
 
 describe("lib/auth/challenges", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("round-trips a registration challenge", () => {
     const { challenge, signedToken } = mintChallenge("registration");
     expect(challenge).toMatch(/^[A-Za-z0-9_-]+$/); // base64url
@@ -52,6 +56,18 @@ describe("lib/auth/challenges", () => {
     const second = mintChallenge("registration");
     expect(first.challenge).not.toBe(second.challenge);
     expect(first.signedToken).not.toBe(second.signedToken);
+  });
+
+  it("rejects an expired token (TTL = 60s; advance system time past it)", () => {
+    // Mint, then jump system time 61 seconds forward. consumeChallenge must
+    // reject because the underlying signed payload's `exp` is now in the past.
+    // Closes CB-1.1 AC 5 gap (Codex BLOCKER #2 on PR #1).
+    const realNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(realNow);
+    const { signedToken } = mintChallenge("registration");
+    vi.setSystemTime(realNow + 61_000); // > 60s TTL
+    expect(consumeChallenge(signedToken, "registration")).toBeNull();
   });
 
   it("rejects a session-shape cookie (cross-use with sessions.ts)", () => {
