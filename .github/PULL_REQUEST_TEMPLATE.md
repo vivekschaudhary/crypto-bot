@@ -3,6 +3,8 @@ Canonical PR template content. Copied to .github/PULL_REQUEST_TEMPLATE.md
 (GitHub doesn't follow references — so we concatenate, not link).
 -->
 
+> **⛔ DO NOT MERGE** until **Codex Code Review** has posted on this PR, **Codex Security Review** has posted (auto-triggered if the diff touches auth, PII, payments, secrets, sessions, external input, or crypto), and **all Codex BLOCKERs are resolved or formally disputed**. The Compass workflow's Phase 6 (HITL merge) cannot fire before Phase 5 (review) is complete — this PR was the slip we're hardening against (see [CB-1.1.1](docs/bets/CB-1/stories/CB-1.1.1/story.md)).
+
 ## Summary
 
 <One paragraph: what changed and why.>
