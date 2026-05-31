@@ -126,7 +126,7 @@ _Decomposed one at a time via `/create-story CB-1`. Each lives under `docs/bets/
 ### Shipped
 
 - **[CB-1.1](stories/CB-1.1/story.md) — `lib/auth/` library.** Shipped 2026-05-31 via [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). 10 ACs (AC 1 + AC 7 amended via CB-1.1.1 per Codex findings).
-- **[CB-1.1.1](stories/CB-1.1.1/story.md) — Codex review remediations for CB-1.1.** Shipped 2026-05-31 via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). 6 ACs covering: 2 AC amendments + 2 missing tests + PR template harden + Codex 0.133+ config fix.
+- **[CB-1.1.1](stories/CB-1.1.1/story.md) — Codex review remediations for CB-1.1.** Shipped 2026-05-31 via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). 6 ACs covering: 2 AC amendments (AC 1 + AC 4) + 2 missing tests (AC 2 + AC 3) + pre-merge gates green (AC 5) + PR template harden (AC 6). The `.codex/config.toml` fix for Codex 0.133+ also landed in PR #2 (commit b83fa98) but was extra-scope, not one of the 6 ACs — it surfaced as a blocker to running the Codex review itself partway through the PR.
 
 ### Expected decomposition (PM forecast — remaining)
 
