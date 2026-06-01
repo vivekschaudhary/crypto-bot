@@ -47,6 +47,12 @@ describe("lib/auth/webauthn", () => {
     expect(opts.allowCredentials?.length).toBe(1);
   });
 
+  it("generateAuthenticationOptions preserves a caller-minted base64url challenge", async () => {
+    const challenge = "AQIDBAUGBwgJCgsMDQ4PEA";
+    const opts = await generateAuthenticationOptions({ challenge });
+    expect(opts.challenge).toBe(challenge);
+  });
+
   it("verifyRegistrationResponse returns verified: false for a tampered/empty response", async () => {
     // Pass an obviously-bogus response. SimpleWebAuthn either throws (which
     // we catch and treat as not-verified) or returns verified:false.

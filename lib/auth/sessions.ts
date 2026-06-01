@@ -108,23 +108,42 @@ export async function invalidateSession(sessionId: string): Promise<void> {
 
 /**
  * Atomic rotation: invalidate the current session id and create a fresh one
- * for the same user, in a single transaction. Used on every successful
- * authentication so that the prior session id has no overlap window with the
- * new one.
+ * for the same user. Used on every successful authentication so that the
+ * prior session id has no overlap window with the new one.
+ *
+ * When `txClient` is provided, the DELETE + INSERT participate in the
+ * caller's transaction — used by `/api/auth/authenticate/finish` to commit
+ * credential-counter update + session rotation atomically. When omitted,
+ * opens an internal `sql.begin` (legacy behavior; preserved for all
+ * existing callers). Same additive pattern as `createSession`'s tx
+ * parameter, established by CB-1.2's review cycle.
  */
 export async function rotateSession(
   currentSessionId: string,
   userId: string,
+  txClient?: SqlClient,
 ): Promise<{ sessionId: string; signedCookie: string }> {
-  const sql = db();
   const newSessionId = ulid();
-  await sql.begin(async (tx) => {
-    await tx`DELETE FROM auth_sessions WHERE id = ${currentSessionId}`;
-    await tx`
+
+  if (txClient) {
+    // Caller owns the transaction — run DELETE + INSERT inside it.
+    await txClient`DELETE FROM auth_sessions WHERE id = ${currentSessionId}`;
+    await txClient`
       INSERT INTO auth_sessions (id, user_id, expires_at, rotated_at)
-      VALUES (${newSessionId}, ${userId}, now() + interval '${tx.unsafe(SESSION_TTL_INTERVAL)}', now())
+      VALUES (${newSessionId}, ${userId}, now() + interval '${txClient.unsafe(SESSION_TTL_INTERVAL)}', now())
     `;
-  });
+  } else {
+    // Legacy path — open our own transaction.
+    const sql = db();
+    await sql.begin(async (tx) => {
+      await tx`DELETE FROM auth_sessions WHERE id = ${currentSessionId}`;
+      await tx`
+        INSERT INTO auth_sessions (id, user_id, expires_at, rotated_at)
+        VALUES (${newSessionId}, ${userId}, now() + interval '${tx.unsafe(SESSION_TTL_INTERVAL)}', now())
+      `;
+    });
+  }
+
   const signedCookie = signValue(newSessionId, env().SESSION_SIGNING_SECRET, SESSION_TTL_SECONDS);
   return { sessionId: newSessionId, signedCookie };
 }

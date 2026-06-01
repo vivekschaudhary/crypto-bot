@@ -38,6 +38,12 @@ function expectedOriginFromEnv(): string {
   return origin();
 }
 
+function fromBase64Url(value: string): Uint8Array {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return Uint8Array.from(Buffer.from(padded, "base64"));
+}
+
 // Re-derive the type names we use locally from the opts shapes that ARE
 // exported from @simplewebauthn/server's index (the verbose
 // AuthenticationResponseJSON / WebAuthnCredential / etc. types live in
@@ -88,13 +94,19 @@ export async function verifyRegistrationResponse(args: {
 /**
  * Generate options to pass to `navigator.credentials.get()` for passkey
  * authentication.
+ *
+ * Optional `challenge` lets the caller pre-mint the challenge via
+ * `lib/auth/challenges.mintChallenge('authentication')` so the cookie's
+ * wrapped challenge matches the browser-signed challenge (CB-1.3 pattern).
+ * When omitted, the underlying lib generates a random challenge itself.
  */
 export async function generateAuthenticationOptions(
-  args: { allowCredentials?: CredentialDescriptor[] } = {},
+  args: { allowCredentials?: CredentialDescriptor[]; challenge?: string } = {},
 ): Promise<PublicKeyCredentialRequestOptionsJSON> {
   return gao({
     rpID: rpIDFromEnv(),
     allowCredentials: args.allowCredentials,
+    challenge: args.challenge ? fromBase64Url(args.challenge) : undefined,
   });
 }
 

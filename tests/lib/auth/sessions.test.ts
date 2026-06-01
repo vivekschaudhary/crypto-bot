@@ -45,11 +45,11 @@ function makeSql() {
   }
   const sql = execute as unknown as {
     (parts: TemplateStringsArray, ...args: unknown[]): unknown;
-    begin: (fn: (tx: typeof sql) => Promise<void>) => Promise<void>;
+    begin: (fn: (tx: typeof sql) => Promise<unknown>) => Promise<unknown>;
     unsafe: (s: string) => string;
   };
   sql.begin = async (fn) => {
-    await fn(sql);
+    return fn(sql);
   };
   sql.unsafe = (s: string) => s;
   return sql;
@@ -126,5 +126,26 @@ describe("lib/auth/sessions", () => {
 
     const verified = await verifySession(newCookie);
     expect(verified).toEqual({ userId: "user-123", sessionId: newId });
+  });
+
+  it("rotateSession participates in caller's transaction when txClient is provided (CB-1.3 AC 12)", async () => {
+    // Seed an existing session that will get rotated.
+    const { sessionId: oldId } = await createSession("user-123");
+    expect(rows.find((r) => r.id === oldId)).toBeDefined();
+
+    // Run rotateSession INSIDE a caller-owned sql.begin block.
+    // The mock's structural sql type doesn't match postgres's Sql<> exactly,
+    // so cast at the boundary — the runtime behavior is what we're testing.
+    const sql = sqlClient;
+    const result = await sql.begin(async (tx) => {
+      return rotateSession(oldId, "user-123", tx as unknown as Parameters<typeof rotateSession>[2]);
+    });
+    // sql.begin returns whatever the callback returns (postgres.js semantics);
+    // the mock implements this in makeSql() above.
+    const { sessionId: newId } = result as { sessionId: string; signedCookie: string };
+
+    expect(newId).not.toBe(oldId);
+    expect(rows.find((r) => r.id === oldId)).toBeUndefined();
+    expect(rows.find((r) => r.id === newId)).toBeDefined();
   });
 });
