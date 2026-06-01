@@ -79,7 +79,7 @@ vi.mock("@/lib/db/client", () => ({
   db: () => sqlClient,
 }));
 
-import { POST } from "@/app/api/auth/register/finish/route";
+import { OPTIONS, POST } from "@/app/api/auth/register/finish/route";
 import { signValue } from "@/lib/auth/cookie";
 import { __resetRateLimits } from "@/lib/auth/rate-limit";
 
@@ -130,7 +130,7 @@ describe("POST /api/auth/register/finish", () => {
   };
 
   it("happy path: returns 200 + writes user/credential/session + sets session cookie + clears reg cookie", async () => {
-    verifyRegistrationResponseMock.mockResolvedValueOnce(goodVerifyResult);
+    verifyRegistrationResponseMock.mockResolvedValueOnce(goodVerifyResult as never);
     const res = await POST(
       makeRequest({
         cookie: goodCookie,
@@ -197,7 +197,7 @@ describe("POST /api/auth/register/finish", () => {
 
   it("returns 409 registration-disabled when a user already exists at DB time (race-safe gate)", async () => {
     users = [{ id: "existing-user", display_name: "operator" }];
-    verifyRegistrationResponseMock.mockResolvedValueOnce(goodVerifyResult);
+    verifyRegistrationResponseMock.mockResolvedValueOnce(goodVerifyResult as never);
     const res = await POST(makeRequest({ cookie: goodCookie, body: { response: { id: "AAAA" } } }));
     expect(res.status).toBe(409);
     const body = await res.json();
@@ -221,5 +221,74 @@ describe("POST /api/auth/register/finish", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe("invalid-body");
+  });
+
+  it("returns 409 registration-disabled when the DB singleton unique-index fires (race collision)", async () => {
+    // Simulate the singleton index from migration 0002: the count check passes
+    // (returns 0) but the INSERT INTO auth_users throws postgres error 23505.
+    verifyRegistrationResponseMock.mockResolvedValueOnce(goodVerifyResult as never);
+    sqlClient = (() => {
+      function execute(parts: TemplateStringsArray, ..._args: unknown[]): unknown {
+        const query = parts.join("?").trim().toUpperCase();
+        if (query.startsWith("SELECT COUNT(*)::INT AS COUNT FROM AUTH_USERS")) {
+          return Promise.resolve([{ count: 0 }]);
+        }
+        if (query.startsWith("INSERT INTO AUTH_USERS")) {
+          const err = new Error("duplicate key value violates unique constraint") as Error & { code: string };
+          err.code = "23505";
+          throw err;
+        }
+        throw new Error(`Unhandled mock query in race test: ${query}`);
+      }
+      const sql = execute as unknown as {
+        (parts: TemplateStringsArray, ...args: unknown[]): unknown;
+        begin: (fn: (tx: typeof sql) => Promise<void>) => Promise<void>;
+        unsafe: (s: string) => string;
+      };
+      sql.begin = async (fn) => {
+        await fn(sql);
+      };
+      sql.unsafe = (s: string) => s;
+      return sql;
+    })();
+
+    const res = await POST(makeRequest({ cookie: goodCookie, body: { response: { id: "AAAA" } } }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("registration-disabled");
+  });
+});
+
+describe("OPTIONS /api/auth/register/finish", () => {
+  it("returns 204 when Origin matches APP_ORIGIN (same-origin preflight)", () => {
+    const req = new Request(`${ORIGIN}/api/auth/register/finish`, {
+      method: "OPTIONS",
+      headers: { origin: ORIGIN },
+    });
+    const res = OPTIONS(req);
+    expect(res.status).toBe(204);
+    expect(res.headers.get("allow")).toContain("POST");
+  });
+
+  it("returns 403 origin-mismatch on cross-origin preflight", async () => {
+    const req = new Request(`${ORIGIN}/api/auth/register/finish`, {
+      method: "OPTIONS",
+      headers: { origin: "https://evil.example" },
+    });
+    const res = OPTIONS(req);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("origin-mismatch");
+  });
+
+  it("returns 403 origin-mismatch when both Origin and Referer are absent", async () => {
+    const req = new Request(`${ORIGIN}/api/auth/register/finish`, {
+      method: "OPTIONS",
+      headers: {},
+    });
+    const res = OPTIONS(req);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("origin-mismatch");
   });
 });

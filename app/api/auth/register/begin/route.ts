@@ -127,3 +127,24 @@ export async function POST(request: Request): Promise<Response> {
   // 8. Return options only — no userId on the wire
   return jsonResponse(200, { options }, { "set-cookie": cookie });
 }
+
+/**
+ * OPTIONS handler — per CB-1.2 AC 4. Cross-origin browsers send preflight
+ * before a POST with JSON content-type; we reject any OPTIONS whose Origin
+ * doesn't match APP_ORIGIN. Same-origin browsers don't send preflight, so
+ * legitimate flows aren't affected.
+ */
+export function OPTIONS(request: Request): Response {
+  try {
+    verifyOriginOrThrow(request);
+  } catch (err) {
+    if (err instanceof OriginMismatchError) {
+      return jsonResponse(403, { error: "origin-mismatch" });
+    }
+    throw err;
+  }
+  return new Response(null, {
+    status: 204,
+    headers: { allow: "POST, OPTIONS" },
+  });
+}

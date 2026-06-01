@@ -36,7 +36,7 @@ vi.mock("@/lib/db/client", () => ({
   db: () => sqlClient,
 }));
 
-import { POST } from "@/app/api/auth/register/begin/route";
+import { OPTIONS, POST } from "@/app/api/auth/register/begin/route";
 import { __resetRateLimits } from "@/lib/auth/rate-limit";
 
 beforeEach(() => {
@@ -109,6 +109,27 @@ describe("POST /api/auth/register/begin", () => {
     expect(body.error).toBe("rate-limited");
     expect(typeof body.retryAfterSeconds).toBe("number");
     expect(res.headers.get("retry-after")).toBeTruthy();
+  });
+
+  it("OPTIONS preflight returns 204 on same-origin", () => {
+    const req = new Request(`${ORIGIN}/api/auth/register/begin`, {
+      method: "OPTIONS",
+      headers: { origin: ORIGIN },
+    });
+    const res = OPTIONS(req);
+    expect(res.status).toBe(204);
+    expect(res.headers.get("allow")).toContain("POST");
+  });
+
+  it("OPTIONS preflight returns 403 origin-mismatch on cross-origin", async () => {
+    const req = new Request(`${ORIGIN}/api/auth/register/begin`, {
+      method: "OPTIONS",
+      headers: { origin: "https://evil.example" },
+    });
+    const res = OPTIONS(req);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("origin-mismatch");
   });
 
   it("accepts a custom deviceLabel in the request body", async () => {

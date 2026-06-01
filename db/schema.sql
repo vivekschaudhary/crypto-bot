@@ -132,3 +132,9 @@ CREATE INDEX IF NOT EXISTS idx_trade_fills_order ON trade_fills(order_id);
 CREATE INDEX IF NOT EXISTS idx_signals_tick ON signals(tick_id);
 CREATE INDEX IF NOT EXISTS idx_account_snapshots_asset_created ON account_snapshots(asset_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at);
+
+-- Singleton constraint on auth_users — enforces "at most one user row" at the
+-- DB layer. Per CB-1.2 AC 3 + migration 0002-auth-users-singleton.sql.
+-- Closes the concurrent-insert race where two /register/finish requests with
+-- different ULIDs could both pass the count(*) gate.
+CREATE UNIQUE INDEX IF NOT EXISTS auth_users_singleton ON auth_users ((TRUE));

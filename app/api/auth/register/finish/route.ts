@@ -19,11 +19,11 @@
 // Cookie attributes are constructed at this layer per architecture.md's
 // session strategy: HttpOnly + Secure + SameSite=Strict + Path=/.
 
+import { ulid } from "ulidx";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { env } from "@/lib/env";
-import { verifyValue } from "@/lib/auth/cookie";
-import { createSession } from "@/lib/auth/sessions";
+import { signValue, verifyValue } from "@/lib/auth/cookie";
 import { verifyRegistrationResponse } from "@/lib/auth/webauthn";
 import type { RegistrationResponseJSON } from "@/lib/auth/webauthn";
 import { OriginMismatchError, verifyOriginOrThrow } from "@/lib/auth/origin-check";
@@ -33,6 +33,7 @@ const REG_SESSION_COOKIE_NAME = "__compass_reg_session";
 const REG_SESSION_PATH = "/api/auth/register/finish";
 const SESSION_COOKIE_NAME = "__compass_session";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const SESSION_TTL_INTERVAL = "30 days";
 
 const FinishRequestSchema = z.object({
   // Require an object — SimpleWebAuthn's RegistrationResponseJSON is wide and
@@ -160,11 +161,16 @@ export async function POST(request: Request): Promise<Response> {
   const counter = info.credential.counter;
   const transports = info.credential.transports ?? [];
 
-  // 6. DB transaction (first-time-only gate + writes + session create)
+  // 6. DB transaction — atomic: first-time gate + user + credential + session.
+  // Per CB-1.2 AC 2 (and Codex BLOCKER on PR #5): everything must commit or
+  // rollback together. The session signing happens AFTER commit because it's
+  // pure crypto over the freshly-inserted session id; if signing somehow
+  // throws, the row exists but is orphaned (recoverable by re-attempting
+  // sign with the same id) — strictly better than the previous shape where
+  // a session-insert failure left a half-registered user.
   const sql = db();
-  const credentialUlid = (await import("ulidx")).ulid();
-  let signedCookie: string;
-  let sessionId: string;
+  const credentialUlid = ulid();
+  const sessionId = ulid();
 
   try {
     await sql.begin(async (tx) => {
@@ -183,16 +189,25 @@ export async function POST(request: Request): Promise<Response> {
         VALUES
           (${credentialUlid}, ${pendingUserId}, ${credentialIdBytes}, ${publicKeyBytes}, ${counter}, ${deviceLabel}, ${transports as string[]})
       `;
+      await tx`
+        INSERT INTO auth_sessions (id, user_id, expires_at)
+        VALUES (${sessionId}, ${pendingUserId}, now() + interval '${tx.unsafe(SESSION_TTL_INTERVAL)}')
+      `;
     });
-    const created = await createSession(pendingUserId);
-    signedCookie = created.signedCookie;
-    sessionId = created.sessionId;
   } catch (err) {
     if (err instanceof RegistrationDisabledError) {
       return jsonResponse(409, { error: "registration-disabled" });
     }
+    // The DB-layer singleton index on auth_users (migration 0002) surfaces a
+    // race-collision as a unique-violation. Translate to the same 409 the API
+    // gate uses, so callers see one consistent error code.
+    if (isUniqueViolation(err)) {
+      return jsonResponse(409, { error: "registration-disabled" });
+    }
     throw err;
   }
+
+  const signedCookie = signValue(sessionId, env().SESSION_SIGNING_SECRET, SESSION_TTL_SECONDS);
 
   // 7+8. Clear reg cookie, set session cookie, return
   return new Response(JSON.stringify({ userId: pendingUserId, sessionId }), {
@@ -210,4 +225,33 @@ class RegistrationDisabledError extends Error {
     super("registration-disabled");
     this.name = "RegistrationDisabledError";
   }
+}
+
+// Postgres unique_violation = SQLSTATE 23505. postgres.js exposes this on the
+// thrown error's `code` field. Used to translate the singleton-index race
+// collision (migration 0002 on auth_users) to the same 409 the API gate emits.
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
+}
+
+/**
+ * OPTIONS handler — per CB-1.2 AC 4. Cross-origin browsers send preflight
+ * before a POST with JSON content-type; we reject any OPTIONS whose Origin
+ * doesn't match APP_ORIGIN. Same-origin browsers don't send preflight, so
+ * legitimate flows aren't affected.
+ */
+export function OPTIONS(request: Request): Response {
+  try {
+    verifyOriginOrThrow(request);
+  } catch (err) {
+    if (err instanceof OriginMismatchError) {
+      return jsonResponse(403, { error: "origin-mismatch" });
+    }
+    throw err;
+  }
+  // Same-origin OPTIONS — uncommon but legal; respond with allowed methods.
+  return new Response(null, {
+    status: 204,
+    headers: { allow: "POST, OPTIONS" },
+  });
 }
