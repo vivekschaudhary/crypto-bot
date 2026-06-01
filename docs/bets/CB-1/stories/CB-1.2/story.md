@@ -2,9 +2,10 @@
 id: CB-1.2
 bet: CB-1
 type: story
-status: ready
+status: shipped
 priority: P0
 created: 2026-05-31
+shipped: 2026-06-01
 author: PM
 design_link: n/a (no UI surface — HTTP endpoints only; onboarding UX is CB-1.6)
 area_tags: [auth, backend, endpoints]
@@ -131,7 +132,7 @@ lib/auth/
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #5](https://github.com/vivekschaudhary/crypto-bot/pull/5) — **merged 2026-06-01** — feat(CB-1.2): passkey registration endpoints (begin + finish). Review cycle: 4 BLOCKERs surfaced + closed (atomicity, DB-singleton race, OPTIONS handler, typecheck mock cast); 1 follow-up BLOCKER on Codex re-review (canonical createSession in transaction) closed via `lib/auth/sessions.ts` additive `txClient` parameter. Codex E2E (AC 8) verified end-to-end against real Postgres + Chromium virtual authenticator.
 
 ## Tests
 

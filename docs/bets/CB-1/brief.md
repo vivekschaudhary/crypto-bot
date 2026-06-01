@@ -128,17 +128,18 @@ _Decomposed one at a time via `/create-story CB-1`. Each lives under `docs/bets/
 
 - **[CB-1.1](stories/CB-1.1/story.md) — `lib/auth/` library.** Shipped 2026-05-31 via [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). 10 ACs (AC 1 + AC 7 amended via CB-1.1.1 per Codex findings).
 - **[CB-1.1.1](stories/CB-1.1.1/story.md) — Codex review remediations for CB-1.1.** Shipped 2026-05-31 via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). 6 ACs covering: 2 AC amendments (AC 1 + AC 4) + 2 missing tests (AC 2 + AC 3) + pre-merge gates green (AC 5) + PR template harden (AC 6). The `.codex/config.toml` fix for Codex 0.133+ also landed in PR #2 (commit b83fa98) but was extra-scope, not one of the 6 ACs — it surfaced as a blocker to running the Codex review itself partway through the PR.
+- **[CB-1.2](stories/CB-1.2/story.md) — Passkey registration ceremony endpoints.** Shipped 2026-06-01 via [PR #5](https://github.com/vivekschaudhary/crypto-bot/pull/5). 12 ACs (AC 1 + AC 2 amended via Engineer DRI Decision for cookie-bound `pendingUserId` — closes story Risk #3 by design). First E2E in the codebase (Codex AC 8 — Playwright + Chromium virtual authenticator + real Postgres). Review cycle: 5 BLOCKERs across 2 rounds (atomicity, DB-singleton race, OPTIONS handler, typecheck mock cast, canonical-helper duplication) — all closed. `lib/auth/sessions.createSession` extended with optional `tx` parameter for atomic-registration (additive, backward-compatible).
 
 ### Expected decomposition (PM forecast — remaining)
 
 1. ~~**`lib/auth/` library**~~ — **shipped** via CB-1.1 (+ CB-1.1.1 follow-ups).
-2. **Registration ceremony endpoints** — `POST /api/auth/register/begin` + `POST /api/auth/register/finish`.
+2. ~~**Registration ceremony endpoints**~~ — **shipped** via CB-1.2.
 3. **Authentication ceremony endpoints** — `POST /api/auth/authenticate/begin` + `POST /api/auth/authenticate/finish`.
 4. **Sign-out endpoint + cookie clearing** — `POST /api/auth/sign-out`.
 5. **`app/proxy.ts` real session validation** — replace scaffold stub; handle both `/(dashboard)/*` redirects + `/api/coinbase|bot/*` 401s.
 6. **First-deploy onboarding UX** — landing page flow that detects zero-credentials state and walks the operator through registration in < 5 minutes.
 
-Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals: 2 stories shipped same day (heavy parallelism + first-arc process work bundled). 5 forecast items remain; refine via `/plan` after the next story decomposes.
+Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 3 stories shipped (CB-1.1, CB-1.1.1, CB-1.2). 4 forecast items remain. Per the strict-derivation `/plan` discipline (established on PR #4), `duration_weeks` stays at the brief-approval value (2 wk) until either the remaining stories visibly outpace the budget or new story.md files materially shift the count. Refresh `/plan` after CB-1.3 ships if duration looks stale.
 
 ## Scan summary
 

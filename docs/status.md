@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-05-31_
+_Last updated: 2026-06-01_
 
 ## In flight
 
 | Bet | Phase | Owner role | Awaiting | Started | ETA |
 |---|---|---|---|---|---|
-| [CB-1](bets/CB-1/brief.md) | CB-1.1 + CB-1.1.1 shipped; CB-1.2 in build (registration endpoints) | Engineer → Codex (Reviewer + E2E) | PR for CB-1.2 — Codex code review + security review + E2E (AC 8) | 2026-05-31 | 2026-06-14 (per plan.md, high confidence on CB-1) |
+| [CB-1](bets/CB-1/brief.md) | CB-1.1 + CB-1.1.1 + CB-1.2 shipped; CB-1.3 (authentication endpoints) next | PM → Engineer | `/create-story CB-1` for CB-1.3 | 2026-05-31 | 2026-06-14 (per plan.md, high confidence on CB-1) |
 | [CB-2](bets/CB-2/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-2` promotion | 2026-05-31 | tbd at promotion |
 | [CB-3](bets/CB-3/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-3` promotion (after CB-1 + CB-2) | 2026-05-31 | tbd at promotion |
 | [CB-4](bets/CB-4/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-4` promotion (after CB-2 + CB-3) | 2026-05-31 | tbd at promotion |
@@ -18,7 +18,7 @@ _None — CB-1 brief approved 2026-05-31. Each remaining stub brief (CB-2..CB-5)
 
 ## Recently shipped
 
-- **2026-05-31** — [CB-1.2 story](bets/CB-1/stories/CB-1.2/story.md) drafted (`status: ready`) — passkey registration ceremony endpoints (`POST /api/auth/register/{begin,finish}`). 12 ACs covering both routes, first-time-only gate, origin check + rate limit, cookie-attribute verification (closes CB-1.1 Risk #2), Vitest unit + integration tests, **first E2E in the codebase** (Codex AC 8 — Playwright + virtual-authenticator). 4 PM DRI Decisions, 3 Risks. Multi-device registration deferred per portfolio. Next: `/build CB-1.2`.
+- **2026-06-01** — [CB-1.2](bets/CB-1/stories/CB-1.2/story.md) shipped via [PR #5](https://github.com/vivekschaudhary/crypto-bot/pull/5). Passkey registration ceremony endpoints (`POST /api/auth/register/{begin,finish}`) with atomic transactional DB writes + first-time-only gate enforced at API + DB layers (singleton unique index, migration 0002) + origin-check + rate limit + OPTIONS preflight rejection + Engineer DRI Decision for cookie-bound `pendingUserId` (closes Risk #3 by design). 66/66 Vitest tests + **first E2E in the codebase** (Codex AC 8 — Playwright + Chromium virtual authenticator + real Postgres). Review cycle surfaced 5 BLOCKERs across 2 rounds (all closed); 1 follow-up Engineer Risk logged for observability (Sentry hookup is foundation-arch scope, not CB-1.2). `lib/auth/sessions.createSession` extended with optional `tx` parameter for atomic-registration support — additive, backward-compatible.
 - **2026-05-31** — [CB-1.1.1](bets/CB-1/stories/CB-1.1.1/story.md) shipped via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). Review-driven follow-up to CB-1.1: 2 AC amendments (options-object wrapper signatures + ESLint flat-config swap) + 2 missing tests (expired-challenge + happy-path WebAuthn verify) + PR template harden (DO NOT MERGE banner + honest "manually invoked" security-review language) + `.codex/config.toml` fix for Codex 0.133+. 34/34 tests passing; Codex code + security reviews clean.
 - **2026-05-31** — [CB-1.1](bets/CB-1/stories/CB-1.1/story.md) shipped via [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). `lib/auth/` library landed: SimpleWebAuthn wrappers, HMAC signed-cookie helpers, DB-backed session helpers, signed-cookie WebAuthn challenge storage. 10 ACs (AC 1 + AC 7 later amended via CB-1.1.1 per Codex findings; original text retained for audit). 31 unit tests at merge.
 - **2026-05-31** — [CB-1 brief](bets/CB-1/brief.md) promoted from stub → approved. Passkey authentication; primary metric: sign-in success rate ≥ 99%; 4 guardrails including zero unauthenticated capital-touching requests; `architecture_required: false` (foundation arch covers it).
@@ -49,6 +49,7 @@ _None._
 
 ## Health
 
-- **Stories shipped:** 2 (CB-1.1, CB-1.1.1) of ~6 expected under CB-1. ~5 stories remain on the CB-1 critical path (CB-1.2 registration endpoints, CB-1.3 authentication endpoints, CB-1.4 proxy session validation, CB-1.5 sign-out, CB-1.6 first-deploy onboarding UX).
+- **Stories shipped:** 3 (CB-1.1, CB-1.1.1, CB-1.2) of ~6 expected under CB-1. 4 stories remain on the CB-1 critical path (CB-1.3 authentication endpoints, CB-1.4 proxy session validation, CB-1.5 sign-out, CB-1.6 first-deploy onboarding UX). First E2E live in the codebase; passkey registration ceremony verified end-to-end against real Postgres + Chromium virtual authenticator.
 - **Process learning captured:** review-before-merge discipline now codified at the PR-template layer (DO NOT MERGE banner). One slip → one named follow-up → one harden, traceable end-to-end via DRI logs.
-- **Stale post-merge surfaces:** `docs/foundation/plan.md` and `docs/dashboard.html` predate the CB-1.1 + CB-1.1.1 merges. Re-run `/plan` + `/dashboard` to refresh before next decomposition. `docs/changelog.md` Unreleased section still pending a convention decision (strict per-bet vs relaxed per-PR accumulation).
+- **Stale post-merge surfaces:** `/plan` skipped this cycle per the strict-derivation discipline established on PR #4 — CB-1's `duration_weeks`, `confidence`, `actual_start` are unchanged by a single mid-bet story shipping (only the "First build PR merged" trigger fires once per bet). `docs/dashboard.html` regenerates on the next `/dashboard` invocation. `docs/changelog.md` Unreleased section still pending a convention decision (strict per-bet vs relaxed per-PR accumulation).
+- **New infrastructure in place:** Supabase DB has full schema applied (migrations 0001 + 0002), Playwright + Chromium installed locally, E2E harness operational. CI does not yet run `pnpm e2e` — wiring E2E into CI (with a Supabase test branch + Playwright cache) remains a candidate `/ops` change.
