@@ -88,13 +88,19 @@ export async function verifyRegistrationResponse(args: {
 /**
  * Generate options to pass to `navigator.credentials.get()` for passkey
  * authentication.
+ *
+ * Optional `challenge` lets the caller pre-mint the challenge via
+ * `lib/auth/challenges.mintChallenge('authentication')` so the cookie's
+ * wrapped challenge matches the browser-signed challenge (CB-1.3 pattern).
+ * When omitted, the underlying lib generates a random challenge itself.
  */
 export async function generateAuthenticationOptions(
-  args: { allowCredentials?: CredentialDescriptor[] } = {},
+  args: { allowCredentials?: CredentialDescriptor[]; challenge?: string } = {},
 ): Promise<PublicKeyCredentialRequestOptionsJSON> {
   return gao({
     rpID: rpIDFromEnv(),
     allowCredentials: args.allowCredentials,
+    challenge: args.challenge,
   });
 }
 
