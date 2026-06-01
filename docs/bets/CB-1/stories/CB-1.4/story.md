@@ -11,11 +11,11 @@ area_tags: [auth, backend, routing, proxy]
 dependencies: [CB-1.1, CB-1.2, CB-1.3]
 ---
 
-# CB-1.4 — Real session validation in `app/proxy.ts` (protected route gating)
+# CB-1.4 — Real session validation in `proxy.ts` (protected route gating)
 
 ## Description
 
-Replace the scaffold `TODO` stub in `app/proxy.ts` with real session validation. Every request to a protected surface — `/(dashboard)/*`, `/api/coinbase/*`, `/api/bot/*`, and any other `/api/*` route outside `/api/auth/*` and `/api/cron/*` — must load the operator's session cookie, verify it via `lib/auth/sessions.verifySession`, and either pass through (valid session) or be rejected (no/expired session). Public surfaces (landing page + `/api/auth/*` ceremonies + `/api/cron/tick`) stay open per the existing `PUBLIC_ROUTES` list.
+Replace the scaffold `TODO` stub in `proxy.ts` (at project root — see Engineer DRI Decision on location) with real session validation. Every request to a protected surface — `/(dashboard)/*`, `/api/coinbase/*`, `/api/bot/*`, and any other `/api/*` route outside `/api/auth/*` and `/api/cron/*` — must load the operator's session cookie, verify it via `lib/auth/sessions.verifySession`, and either pass through (valid session) or be rejected (no/expired session). Public surfaces (landing page + `/api/auth/*` ceremonies + `/api/cron/tick`) stay open per the existing `PUBLIC_ROUTES` list.
 
 This is the story that closes [CB-1 guardrail #1](../../brief.md) — "**Unauthenticated requests reaching capital-touching surfaces — threshold: 0**" — from a runtime-enforcement standpoint. Without this story, the foundation scaffold leaves all protected routes wide open. With it, every request that touches `auth_sessions` row state is gated.
 
@@ -65,7 +65,7 @@ This is the story that closes [CB-1 guardrail #1](../../brief.md) — "**Unauthe
   - Hit `/api/coinbase/_canary` (a non-existent route that proxy.ts sees first) with no cookie → expect 401 JSON. (If we don't want to introduce a real /api/coinbase/* surface in this story, use a stub route or a route that doesn't exist yet — proxy fires before the 404, so the test still exercises proxy-gating semantics.)
   - Codex commits with `test:` prefix per `/build` Phase 3.
 
-- [ ] **AC 9** — `pnpm typecheck` passes with `strict: true`. No `any` introduced. All env access via `lib/env` (no `process.env` reads in `app/proxy.ts`).
+- [ ] **AC 9** — `pnpm typecheck` passes with `strict: true`. No `any` introduced. All env access via `lib/env` (no `process.env` reads in `proxy.ts`).
 
 - [ ] **AC 10** — `pnpm lint` passes. No new ignore entries.
 
@@ -119,17 +119,14 @@ const PUBLIC_ROUTES = [
 
 The matcher inside `export const config = {...}` (already in scaffold) handles asset-file exclusion at the Next.js layer — those never reach `proxy.ts` in the first place. proxy.ts only sees URL-bound requests that COULD be auth-relevant.
 
-**Runtime declaration (AC 5):**
+**Runtime declaration (AC 5) — DO NOT DECLARE:**
 
 ```ts
-export const runtime = 'nodejs';
+// proxy.ts — leave the `runtime` export OUT.
+// Next.js 16 proxy.ts is Node.js-only by spec; declaring runtime throws.
 ```
 
-This is load-bearing. Without it, Next.js may pick an Edge runtime that lacks the Node-only APIs `postgres` (the postgres.js client) requires. Per the v0.3.5 framework sync's Vercel knowledge:
-
-> "Middleware supports full Node.js (not edge-only). Use Fluid Compute."
-
-So Node-on-Fluid-Compute is supported AND is the right choice for our DB-backed session check. The runtime declaration makes that explicit + future-proof against Next.js default changes.
+This is the corrected stance after PR #10's first-attempt review. Per Next.js 16.2.7 official docs (surfaced by both Codex and the fresh-Agent Claude code reviewer), setting `export const runtime = 'nodejs'` (or any value) on `proxy.ts` throws. The Node-on-Fluid-Compute runtime is the framework's implicit, immovable default for proxy.ts at root — there is no Edge variant of proxy.ts to opt out of. Declaring it locally adds zero value and breaks on patch upgrades. See the superseded DRI Decision below for the first-attempt mistake + the new Engineer Decision for the corrected stance.
 
 **Why DB-roundtrip per request is the right trade-off:**
 
@@ -155,7 +152,7 @@ _Auto-populated as PRs open._
 
 ## Tests
 
-_Engineer writes unit + integration tests under `tests/app/proxy.test.ts`._
+_Engineer writes unit + integration tests under `tests/proxy.test.ts` (at tests root, matching proxy.ts's project-root location)._
 _Codex writes E2E at `e2e/auth/proxy-gating.spec.ts` — third E2E in the codebase per AC 8._
 
 Tags:
@@ -171,7 +168,7 @@ _If post-merge bugs are found, story is re-opened and fixes live under `docs/bet
 ### Decisions
 
 - [2026-06-01] [PM] **Unauthenticated `/(dashboard)/*` redirects to `/` (landing), not a separate `/sign-in` page** (interim, until CB-1.6 lands)
-  - **Rationale (required):** there is no `/sign-in` page in the codebase yet — CB-1.6 owns first-deploy onboarding UX, which may merge sign-in into the landing page OR split it. Until CB-1.6 settles that decision, the landing page is the only safe redirect target. Adding `?next=<encoded-path>` preserves the operator's intended destination so CB-1.6's onboarding flow can honor it (a registration ceremony, sign-in ceremony, or page that detects which one to do). If CB-1.6 splits sign-in into its own page, CB-1.4's redirect target updates one line in `app/proxy.ts`.
+  - **Rationale (required):** there is no `/sign-in` page in the codebase yet — CB-1.6 owns first-deploy onboarding UX, which may merge sign-in into the landing page OR split it. Until CB-1.6 settles that decision, the landing page is the only safe redirect target. Adding `?next=<encoded-path>` preserves the operator's intended destination so CB-1.6's onboarding flow can honor it (a registration ceremony, sign-in ceremony, or page that detects which one to do). If CB-1.6 splits sign-in into its own page, CB-1.4's redirect target updates one line in `proxy.ts`.
   - **Area (required, tag):** auth / routing
   - **Alternatives considered (required):** redirect to a stub `/sign-in` page that's "coming in CB-1.6" (rejected — adds a temporary page that has to be cleaned up later); return 401 for dashboard routes too (rejected — terrible browser UX, shows a JSON error in the browser window); redirect to a query-string-less landing page (rejected — loses the `next` context that CB-1.6 needs to honor).
   - **Reversibility:** easy — one constant in proxy.ts.
