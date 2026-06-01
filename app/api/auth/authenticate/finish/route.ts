@@ -39,8 +39,19 @@ const AUTH_SESSION_PATH = "/api/auth/authenticate/finish";
 const SESSION_COOKIE_NAME = "__compass_session";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
+// Tighten beyond CB-1.2's loose object schema: require `response.id` to be a
+// non-empty string, since the handler calls Buffer.from(response.id, 'base64url')
+// before delegating to the SimpleWebAuthn verifier. Without this, a payload
+// like `{ "response": {} }` or `{ "response": { "id": {} } }` would throw at
+// the Buffer.from call and surface as a 500 instead of the typed 400 the
+// route's error contract promises. The rest of the response shape stays wide
+// (passthrough) so we don't duplicate SimpleWebAuthn's inner-shape validation.
 const FinishRequestSchema = z.object({
-  response: z.record(z.string(), z.unknown()),
+  response: z
+    .object({
+      id: z.string().min(1),
+    })
+    .passthrough(),
 });
 
 function jsonResponse(status: number, body: unknown, extraHeaders: HeadersInit = {}): Response {

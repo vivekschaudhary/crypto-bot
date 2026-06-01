@@ -284,6 +284,36 @@ describe("POST /api/auth/authenticate/finish", () => {
     const body = await res.json();
     expect(body.error).toBe("invalid-body");
   });
+
+  it("returns 400 invalid-body when response.id is missing (not just response)", async () => {
+    const { cookie } = mintAuthCookie();
+    const res = await POST(makeRequest({ cookie, body: { response: {} } }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid-body");
+    // Verifier should NOT have been called — Zod rejected at the schema boundary
+    expect(verifyAuthenticationResponseMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 invalid-body when response.id is non-string (e.g., object)", async () => {
+    const { cookie } = mintAuthCookie();
+    const res = await POST(
+      makeRequest({ cookie, body: { response: { id: { not: "a string" } } } }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid-body");
+    expect(verifyAuthenticationResponseMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 invalid-body when response.id is empty string", async () => {
+    const { cookie } = mintAuthCookie();
+    const res = await POST(makeRequest({ cookie, body: { response: { id: "" } } }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid-body");
+    expect(verifyAuthenticationResponseMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("OPTIONS /api/auth/authenticate/finish", () => {
