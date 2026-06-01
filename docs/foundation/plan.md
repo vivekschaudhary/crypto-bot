@@ -40,7 +40,7 @@ Bets waiting on dependencies, HITL approval, or external input.
 
 ## Done
 
-_No fully-shipped MVP bets yet — CB-1 has 2 story.md files shipped but the bet itself is still in flight (more stories expected per the brief's forecast)._
+_No fully-shipped MVP bets yet — CB-1 has 3 story.md files shipped (CB-1.1, CB-1.1.1, CB-1.2) but the bet itself is still in flight (4 stories remain per the brief's forecast: CB-1.3..CB-1.6)._
 
 | Bet | Title | Actual end | Duration (actual vs estimated) |
 |-----|-------|------------|-------------------------------|
@@ -51,13 +51,13 @@ Every MVP bet with all date columns. Source of truth for downstream tools.
 
 | Bet | Title | Depends on | Est. start | Est. end | Actual start | Actual end | Duration (wk) | Confidence | Last refined by |
 |-----|-------|------------|------------|----------|--------------|------------|---------------|------------|-----------------|
-| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-14 | 2026-05-31 | — | 2 | high | build-actuals |
+| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-14 | 2026-05-31 | — | 2 | high | stories |
 | [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | 2026-06-01 | 2026-06-14 | — | — | 2 | low | stub |
 | [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | [CB-1, CB-2] | 2026-06-15 | 2026-06-28 | — | — | 2 | low | stub |
 | [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | [CB-2, CB-3] | 2026-06-29 | 2026-07-19 | — | — | 3 | low | stub |
 | [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | [CB-1, CB-4] | 2026-07-20 | 2026-08-09 | — | — | 3 | low | stub |
 
-**MVP completion target:** 2026-08-09 (unchanged from v1 — duration estimates are unmoved; only CB-1's `actual_start` + `confidence` + `refined_by` updated this refresh). Confidence values: CB-1 `high` (first PR merged trigger fired per workflow estimate model), all others `low` (still stubs).
+**MVP completion target:** 2026-08-09 (unchanged from v2 — `duration_weeks` recomputed via "Stories created" trigger on CB-1.2's story.md creation: 3 × 3 days = 1.286 wk; max-rule yields 2 wk = brief-approval value; net date movement 0). v3 refresh also moves CB-1 `refined_by` from `build-actuals` → `stories` and bumps `refined_at` to 2026-06-01. Confidence values: CB-1 `high` (unchanged from v2), all others `low` (still stubs).
 
 ## Calendar view
 
