@@ -2,9 +2,10 @@
 id: CB-1.3
 bet: CB-1
 type: story
-status: ready
+status: shipped
 priority: P0
 created: 2026-06-01
+shipped: 2026-06-01
 author: PM
 design_link: n/a (no UI surface — HTTP endpoints only; onboarding UX is CB-1.6)
 area_tags: [auth, backend, endpoints]
@@ -149,7 +150,7 @@ WebAuthn spec says the authenticator's counter MUST monotonically increase acros
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #8](https://github.com/vivekschaudhary/crypto-bot/pull/8) — **merged 2026-06-01** — feat(CB-1.3): passkey authentication endpoints (begin + finish). Review cycle: 2 BLOCKERs flagged (Zod schema too loose on `response.id` + AC 8 E2E missing); BLOCKER 1 closed by Engineer (commit `7c82461`); BLOCKER 2 closed by Codex via the AC 8 E2E commit (`e56dbef`) which also added a `fromBase64Url` helper in `lib/auth/webauthn.ts` (preserves caller-minted base64url challenges through SimpleWebAuthn's round-trip) and `workers: 1` in `playwright.config.ts` (serial execution since both auth E2E specs TRUNCATE the same `auth_*` tables). Final Codex code + security reviews both clean.
 
 ## Tests
 
