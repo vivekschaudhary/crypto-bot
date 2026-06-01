@@ -68,7 +68,7 @@ function makeSql() {
     unsafe: (s: string) => string;
   };
   sql.begin = async (fn) => {
-    await fn(sql);
+    return fn(sql);
   };
   sql.unsafe = (s: string) => s;
   return sql;

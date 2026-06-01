@@ -23,7 +23,8 @@ import { ulid } from "ulidx";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { env } from "@/lib/env";
-import { signValue, verifyValue } from "@/lib/auth/cookie";
+import { verifyValue } from "@/lib/auth/cookie";
+import { createSession } from "@/lib/auth/sessions";
 import { verifyRegistrationResponse } from "@/lib/auth/webauthn";
 import type { RegistrationResponseJSON } from "@/lib/auth/webauthn";
 import { OriginMismatchError, verifyOriginOrThrow } from "@/lib/auth/origin-check";
@@ -32,8 +33,7 @@ import { RateLimitedError, consumeOrThrow } from "@/lib/auth/rate-limit";
 const REG_SESSION_COOKIE_NAME = "__compass_reg_session";
 const REG_SESSION_PATH = "/api/auth/register/finish";
 const SESSION_COOKIE_NAME = "__compass_session";
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
-const SESSION_TTL_INTERVAL = "30 days";
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days — for Set-Cookie Max-Age only; TTL/interval owned by lib/auth/sessions
 
 const FinishRequestSchema = z.object({
   // Require an object — SimpleWebAuthn's RegistrationResponseJSON is wide and
@@ -162,18 +162,16 @@ export async function POST(request: Request): Promise<Response> {
   const transports = info.credential.transports ?? [];
 
   // 6. DB transaction — atomic: first-time gate + user + credential + session.
-  // Per CB-1.2 AC 2 (and Codex BLOCKER on PR #5): everything must commit or
-  // rollback together. The session signing happens AFTER commit because it's
-  // pure crypto over the freshly-inserted session id; if signing somehow
-  // throws, the row exists but is orphaned (recoverable by re-attempting
-  // sign with the same id) — strictly better than the previous shape where
-  // a session-insert failure left a half-registered user.
+  // Per CB-1.2 AC 2: everything commits or rolls back together AND the
+  // canonical createSession() helper from lib/auth/sessions is the single
+  // source of session TTL/signing logic. Pass tx into createSession so the
+  // auth_sessions INSERT participates in the same transaction.
   const sql = db();
   const credentialUlid = ulid();
-  const sessionId = ulid();
+  let sessionResult: { sessionId: string; signedCookie: string };
 
   try {
-    await sql.begin(async (tx) => {
+    sessionResult = await sql.begin(async (tx) => {
       const rows = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM auth_users`;
       const userCount = rows[0]?.count ?? 0;
       if (userCount > 0) {
@@ -189,10 +187,7 @@ export async function POST(request: Request): Promise<Response> {
         VALUES
           (${credentialUlid}, ${pendingUserId}, ${credentialIdBytes}, ${publicKeyBytes}, ${counter}, ${deviceLabel}, ${transports as string[]})
       `;
-      await tx`
-        INSERT INTO auth_sessions (id, user_id, expires_at)
-        VALUES (${sessionId}, ${pendingUserId}, now() + interval '${tx.unsafe(SESSION_TTL_INTERVAL)}')
-      `;
+      return createSession(pendingUserId, tx);
     });
   } catch (err) {
     if (err instanceof RegistrationDisabledError) {
@@ -207,7 +202,7 @@ export async function POST(request: Request): Promise<Response> {
     throw err;
   }
 
-  const signedCookie = signValue(sessionId, env().SESSION_SIGNING_SECRET, SESSION_TTL_SECONDS);
+  const { sessionId, signedCookie } = sessionResult;
 
   // 7+8. Clear reg cookie, set session cookie, return
   return new Response(JSON.stringify({ userId: pendingUserId, sessionId }), {
