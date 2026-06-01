@@ -35,11 +35,12 @@ check_in_cadence: weekly
 area_tags: [auth, security, backend, frontend]
 estimate:
   duration_weeks: 2
-  confidence: low
-  refined_by: stub
+  confidence: high
+  refined_by: build-actuals
   refined_at: 2026-05-31
-  estimated_start: 2026-06-01
+  estimated_start: 2026-05-31
   estimated_end: 2026-06-14
+  actual_start: 2026-05-31
 ---
 
 # CB-1 — Passkey authentication
