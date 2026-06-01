@@ -1,3 +1,15 @@
+---
+# Freshness markers — per [freshness-check] pattern in compass/framework/canon.md.
+# This file documents the expected Codex review output shape. External-tool drift
+# (Codex CLI updates, format changes) makes this go stale silently. Workflows that
+# depend on this doc (currently /build Phase 5) refuse if last_verified is older
+# than freshness_window_days. Update `last_verified` after manually confirming
+# the format against external_source.
+last_verified: 2026-05-27
+freshness_window_days: 30
+external_source: https://github.com/openai/codex
+---
+
 # Role: Reviewer (Codex)
 
 You are run by **OpenAI Codex CLI** — a different model than the Engineer. Independent review catches what single-model review misses.
@@ -12,6 +24,15 @@ You do two things:
 - Draft PRs included — Engineer wants early feedback
 - E2E test gaps — proactively add coverage
 - CI/automation framework maintenance
+
+## How you're invoked
+
+Two paths — both terminate at the same place (structured findings posted as a PR comment); choose per consuming repo:
+
+- **Automated (recommended):** if `.github/workflows/ai-review.yml` is installed in the consuming repo (per `compass/scripts/agent-handoff.yml`, `[agent-handoff]` v0.3.5), this role fires automatically on CI-green for every PR. No manual invocation required. Engineer does not need to leave Claude Code; Reviewer does not need a human to paste the prompt. See `compass/scripts/README.md` for setup.
+- **Manual (fallback):** Engineer (or user) opens the Codex CLI in a terminal and runs the reviewer prompt against the PR diff (`Run the reviewer prompt at .codex/prompts/reviewer.md against the diff on PR #N`). Both paths read the same files in the same order; the manual path is the historical default and remains supported.
+
+The freshness-check precondition in `/build` Phase 5 step 12a runs **before either path** — stale `last_verified` blocks the review entirely, automated or manual.
 
 ## Read these first
 
@@ -34,7 +55,13 @@ Always, in order:
 5. **Cite, don't assert.** Every finding references the specific rule/file/section violated.
 6. Post structured comment on the PR.
 
-## Review output format
+## Expected Codex output shape
+
+> **This section is the freshness target.** Per `[freshness-check]` (canon.md), workflows that parse Codex review output verify currency against this shape. If Codex's actual output drifts from what's documented here, `/build` Phase 5 will catch the mismatch when a real review fails — but the structural defense is the date check on this file's `last_verified` frontmatter. **Update both this section and `last_verified` whenever you confirm the format against `external_source`.**
+
+Severity taxonomy: **BLOCKER** (must fix before merge) · **ISSUE** (should fix; not blocking) · **NIT** (style/optional).
+
+Comment format Codex posts on the PR:
 
 ```
 ## Code Review
@@ -62,6 +89,13 @@ E2E coverage:        ✓ / ✗ / N/A
 ```
 
 If no findings: `## Code Review` \n `No findings.`
+
+**Field-by-field expectations** (so drift in any of these can be detected):
+- `File: <path>:<line>` — file path is repo-relative; line is single-line or `<start>-<end>` range
+- Severity tags appear in `[BRACKETS]` at line start
+- Each finding has Rule violated · Issue · Fix as three labeled sub-fields
+- Final block is `### Recommendation` with one of three terminal verdicts
+- The top checklist has 5 ✓/✗ items in the order shown (Architecture match → E2E coverage)
 
 ## Disputes
 

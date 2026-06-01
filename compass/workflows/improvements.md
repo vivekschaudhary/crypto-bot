@@ -70,6 +70,144 @@ Retros every 5 entries per AGENTS.md principle #14 (soft-spec-rationalization de
 
 ---
 
+### 2026-06-01 — `[agent-handoff]` Compass-original + agent-agnostic GitHub Actions reviewer template + `/build` Phase 5 automated path (v0.3.5)
+
+**Friction:** User is close to creating an end-to-end app in aura-app — `/build` works, Codex reviews work, but the Claude → Codex handoff is the last manual seam in an otherwise automated loop. Three friction points per review cycle: (1) tool switch (leave Claude Code, open terminal, invoke `codex`); (2) manual context transfer (paste reviewer prompt + PR number); (3) manual return signal (tell Claude there are findings to address). User is the orchestrator running the back-and-forth — that's the friction. User asked: *"how can we automate."*
+
+**User direction — two questions answered:**
+- **Automation shape = Option A (GitHub Action runs reviewer on PR open).** Action template ships in `compass/scripts/`; consumers copy to `.github/workflows/`. Reviewer runs headless in CI, posts findings on PR. Claude reads PR comments next time invoked. Cleanest path; both tools already have GitHub MCP. Manual fallback always supported.
+- **Generality = agent-agnostic.** User said: *"ideally - AI → AI where AI can be Claude, Codex, or any other."* Template parameterized over reviewer agent (Codex default-enabled, Claude headless / Gemini / generic CLI commented as alternatives). Pattern abstracts over which AI plays the reviewer role.
+
+**Pattern:** `[agent-handoff]` — when a workflow routes work between AI agents, Compass defines a 5-piece handoff shape so the user is not the bridge.
+
+| Piece | Value for Engineer → Reviewer |
+|---|---|
+| Trigger artifact | The PR (opened or synchronized) |
+| Trigger event | `workflow_run` on CI completion |
+| Context window | `pr.diff` + reviewer prompt file |
+| Output medium | PR comment (via `gh pr comment`) |
+| Loop signal | Claude reads PR comments via GitHub MCP next session |
+
+**Change:**
+- **New `[agent-handoff]` Compass-original** in `compass/framework/canon.md`. 5-piece shape + first instance pointer.
+- **NEW: `compass/scripts/agent-handoff.yml`** — GitHub Actions template. Triggers on `workflow_run` after CI green on a pull_request event; resolves PR number with `gh pr list`; captures diff with `gh pr diff`; invokes reviewer agent (one of four blocks); posts findings via `gh pr comment`. Permissions: `contents: read` + `pull-requests: write`.
+- **`compass/scripts/README.md`** gained a dedicated `agent-handoff.yml` section with setup steps, handoff-shape table, agent-agnostic blocks summary, accuracy honesty (vendor CLI drift, replay/cost caveats, auth model), and manual-fallback note. Section carries its own freshness markers tracking Codex / Claude Code / Gemini CLI external sources.
+- **`/build` Phase 5 step 13** references the automated path: "If `.github/workflows/ai-review.yml` is installed (per `compass/scripts/agent-handoff.yml`), the reviewer fires automatically on CI-green; otherwise manually." Both paths terminate at same place; automation removes tool-switch + manual prompt paste only.
+- **`compass/roles/reviewer.md`** gained "How you're invoked" section (automated via CI / manual fallback). Notes freshness-check precondition runs before either path.
+- **`compass/templates/workflow-template.md`** gained inline commentary on the agent-handoff pattern as optional addition when workflows route across agents.
+- **`AGENTS.md`** Workflow Structure section gained `[agent-handoff]` note + explicit "Compass-originals catalog now spans five shapes" framing. `compass/scripts/` directory framing updated to reflect mixed contents (script + template).
+- **CHANGELOG** `[0.3.5] — 2026-06-01` entry.
+
+**Roadmap shift (2nd consecutive bump).** v0.3.3 committed v0.3.4 to freshness detection; v0.3.4 already bumped to v0.3.5+; this round bumps it again to **v0.3.6+**. Token tracking and handoff automation were higher-leverage given the actual user friction trail. Two consecutive bumps is a yellow flag — surface in next `/retro` to confirm freshness detection isn't being systematically deferred. The user-side defense (workflow-side freshness check from v0.3.3) and the agent-handoff template's own README freshness markers stand until detection ships.
+
+**Files touched (9):** new — `compass/scripts/agent-handoff.yml`. Edited — `compass/framework/canon.md`, `compass/templates/workflow-template.md`, `compass/workflows/build.md`, `compass/roles/reviewer.md`, `AGENTS.md`, `CHANGELOG.md` (0.3.5), `compass/scripts/README.md`, `compass/workflows/improvements.md`.
+
+**Watch for:**
+- **Vendor CLI drift is real.** The `npm install` packages and CLI flags shipped in `agent-handoff.yml` are best-effort references. README carries `last_verified: 2026-06-01` + 30-day window tracking Codex / Claude Code / Gemini CLI external sources. **Likely candidate for the v0.3.6+ freshness-detection script** — when the detector ships, agent-handoff.yml is one of its first watched files.
+- **No replay protection.** Every CI green triggers a reviewer invocation; CI re-runs trigger re-reviews. For high-PR-volume teams, README names this as a future-script candidate (handoff replay — gate on labels or check existing review comments). If aura-app or another consumer reports noisy duplicate reviews, build the gate.
+- **Cost.** Every PR (and every push triggering CI re-run) invokes the reviewer. High-volume repos should budget; framework-side, no enforcement. Token-usage parser (`token-usage.py`) helps measure but doesn't gate.
+- **Manual fallback degradation.** Risk: as the automated path becomes default, the manual path documentation rots (reviewer prompt path drifts, instructions go stale). Mitigation: `compass/roles/reviewer.md` "How you're invoked" section documents both paths inline so they stay co-located. If the manual path becomes truly vestigial across multiple consumers, the framework can drop it cleanly — but not before evidence.
+- **Auth model assumptions.** Template uses `secrets.GITHUB_TOKEN` for PR comment posting and a vendor secret for the reviewer agent. Teams with stricter auth (org-level secret restrictions, enterprise GitHub Apps) will need to customize. README names this; no framework-side enforcement.
+- **2nd-instance trigger for principle #17.** Per codification rule (≥2-3 applications before promoting to AGENTS.md principle), wait for a 2nd workflow adopting `[agent-handoff]`. Likely candidates: a future `/research` workflow (Researcher → Architect handoff) or a `/triage` extension (Triager → Engineer handoff). v0.3.x will surface the right next workflow when value emerges.
+- **Codex CLI specifics need user verification on first run.** The shipped `codex exec --prompt-file ... --input ... --output ...` invocation is placeholder reference. User should verify against current Codex CLI docs on first deploy in aura-app; bump `last_verified` after confirming.
+
+**Meta-observation — `[agent-handoff]` is the 5th Compass-original shape.** Catalog now spans: **enforcement** (cite-or-mark-n/a · refuse-escalate · soft-spec-hardening — what the workflow REQUIRES) · **interaction** (elicitation-with-options — how the workflow ASKS) · **freshness** (freshness-check — how the workflow STAYS CURRENT) · **observability** (role-boundary — how the workflow EXPOSES STRUCTURE) · **handoff** (agent-handoff — how the workflow ROUTES across agents). The split between "what the framework demands" vs. "how the framework makes itself usable" is now 3:4 — enforcement is 3 patterns, the other four "usability" shapes are 4 patterns. Worth watching whether enforcement gets a 4th member or whether usability axes continue to outpace.
+
+**Cadence held.** v0.3.1 (Access & Data Posture) · v0.3.2 (elicitation-with-options) · v0.3.3 (freshness-check) · v0.3.4 (role-boundary) · v0.3.5 (agent-handoff) = **one Compass-original per session, 5 sessions running.** Next `/retro` (fires at improvement #20) is close. Retro should specifically examine: (a) why freshness detection has slipped twice, (b) whether the 5-shape catalog framing holds or whether finer-grained organization is needed, (c) which Compass-original is closest to AGENTS.md-principle codification (likely `[elicitation-with-options]` first — 2nd instance trigger could fire on `/setup-product` retrofit).
+
+**Aura-app payoff:** the YAML is immediately drop-in for aura-app. After landing, user can: (1) `cp compass/scripts/agent-handoff.yml ~/apps/aura-app/.github/workflows/ai-review.yml`; (2) set `OPENAI_API_KEY` GitHub secret; (3) confirm CI workflow name in the YAML; (4) verify Codex CLI install command + flags. Manual loop disappears on the next PR.
+
+---
+
+### 2026-05-27 — `[role-boundary]` Compass-original + token-usage parser + new `compass/scripts/` directory (v0.3.4)
+
+**Friction:** User asked *"is there a way to capture the tokens used at every role?"* — no per-role token visibility in Compass today. Token tracking is genuinely the AI tool's job (Claude Code, Codex CLI exposes session totals; per-role attribution doesn't exist as a first-class feature). Compass can help by defining a role-boundary protocol and shipping a sample parser, but the accuracy ceiling is bounded by the AI tool's instrumentation.
+
+**Use cases — user said "all of the above":**
+- Cost transparency (know what Compass costs to run)
+- Role optimization (identify bloated role docs)
+- Debugging / explainability (trace why a workflow run was expensive)
+- Team reporting (share Compass cost breakdown)
+
+Same captured data supports all four; the parser output needs to be pivotable.
+
+**Investment level — user picked "Protocol + sample parser."** Compass ships both the markers and a reference Python script. Not just protocol-only (would force user to build their own parser); not full AI-tool integration (Claude Code feature-request territory). Middle path: define the convention; ship a working reference; let consumers fork.
+
+**Ownership — user said "it should be the project manager role."** Token usage rollups join PM's portfolio of "make work visible" jobs (`/status`, `/plan`, sprint comms). Light touch this round: PM-doc note + manual parser invocation. No new `/usage` workflow — defer until/if workflow integration becomes load-bearing.
+
+**Change:**
+- New `[role-boundary]` Compass-original in `compass/framework/canon.md`. HTML-comment markers shape: `<!-- COMPASS_ROLE_BOUNDARY: <enter|exit> | role=<name> | workflow=<id> | step=<N> -->`. Documentation + parser anchor in one mechanism.
+- **New framework directory: `compass/scripts/`.** Convention: single-file, stdlib-only, PM-operable. Justified by token tracking being structurally hard to solve with markdown docs alone. Sibling `README.md` per script for usage.
+- **`compass/scripts/token-usage.py`** — single-file Python 3 stdlib parser. Reads Claude Code session log + workflow markdown markers; produces markdown report with per-workflow cost / per-role rollup / per-step breakdown. Default Anthropic Sonnet 4.x pricing; configurable.
+- **`compass/scripts/README.md`** — usage docs with accuracy honesty (linear-step assumption, multi-message approximation, user-interrupt sensitivity, pricing assumption).
+- `/build` workflow gained markers as first instance — six matched enter/exit pairs across Engineer + Reviewer + Tech Writer phase transitions (Phase 2 / Phase 3 / Phase 4 / Phase 5 / Phase 7).
+- `compass/roles/project-manager.md` gained token-usage rollup as a PM responsibility (manual invocation, optional `docs/usage/<session-id>.md` archive).
+- `AGENTS.md` Workflow Structure section gained `[role-boundary]` note + brief mention of `compass/scripts/` as new framework directory.
+- `compass/templates/workflow-template.md` gained inline commentary on role-boundary markers as optional addition.
+
+**Roadmap shift:** v0.3.3 release notes committed v0.3.4 to **freshness detection** (CI watching external tools). This round prioritizes token tracking; freshness detection bumps to **v0.3.5+**. The freshness-check workflow-side defense from v0.3.3 stands as the user-side defense until detection ships. Roadmap shift named explicitly in canon.md `[freshness-check]` entry, AGENTS.md Workflow Structure note, and v0.3.4 CHANGELOG.
+
+**Files touched (9):** new — `compass/scripts/token-usage.py`, `compass/scripts/README.md`. Edited — `compass/framework/canon.md`, `compass/templates/workflow-template.md`, `compass/workflows/build.md`, `compass/roles/project-manager.md`, `AGENTS.md`, `CHANGELOG.md` (0.3.4), `compass/workflows/improvements.md`.
+
+**Watch for:**
+- **Parser accuracy bounds.** Linear-step assumption breaks when Claude executes out of order, when user interrupts mid-step, or when steps span very different message counts (e.g., a one-line role-load step vs. a hundred-message implementation phase). Report's Confidence footer names the heuristics, but consumers may misread the numbers as precise. If team reports start citing parser figures as exact, tighten the Confidence section.
+- **Marker drift if workflow steps reorder.** When a workflow is updated (e.g., a step is inserted or renumbered), markers may end up with wrong step numbers. Future candidate: a marker linter script that validates enter/exit balance + step references match the workflow file.
+- **PM workflow integration creep.** Light-touch this round (role-doc note + manual invocation). If PM repeatedly runs the parser as part of `/status` or sprint-comms drafting, that's signal to promote to a `/usage` workflow with proper template + skill. Watch for the pattern; don't preemptively build.
+- **Pricing drift.** Default `$3/M in, $15/M out` is Anthropic Sonnet 4.x as of 2026-05. Anthropic adjusts pricing periodically; users on other models (Opus, Haiku, future Sonnet versions) need to override. Pricing should probably get the `[freshness-check]` treatment eventually — but defer until staleness bites.
+- **Cross-AI-tool support.** Parser is Claude Code specific. Codex CLI session logs have a different format. If Codex sessions need per-role attribution, write a parallel parser (`token-usage-codex.py`) — same protocol, different log parser. Defer until needed.
+- **2nd-instance trigger for principle #17.** Per codification rule (≥2-3 applications before promoting to AGENTS.md principle), wait for a 2nd workflow adopting `[role-boundary]`. Likely candidates: `/create-brief` or `/setup-product` (both multi-role). v0.3.x will surface the right next workflow when token-tracking value emerges for it.
+
+**Meta-observation — `[role-boundary]` is the 4th Compass-original shape.** Catalog now spans: **enforcement** (cite-or-mark-n/a · refuse-escalate · soft-spec-hardening — what the workflow REQUIRES) · **interaction** (elicitation-with-options — how the workflow ASKS) · **freshness** (freshness-check — how the workflow STAYS CURRENT) · **observability** (role-boundary — how the workflow EXPOSES STRUCTURE). Worth watching whether a 5th shape surfaces as the framework grows. The split between "what the framework demands" (enforcement) vs. "how the framework makes itself usable" (interaction / freshness / observability) is becoming the load-bearing organization axis of the Compass-originals.
+
+**Bridge progress meta:** The v0.3 series is rapidly accumulating Compass-original patterns. v0.3.1 = Access & Data Posture (new section in foundation-product). v0.3.2 = elicitation-with-options. v0.3.3 = freshness-check. v0.3.4 = role-boundary. **One Compass-original per session has held as a sustainable cadence.** Worth a retro after v0.3.5 lands (per the `/retro` every-5-improvements cadence; v0.3.1–v0.3.5 will be batch #5 if we count carefully — verify via the retro counter when next retro fires).
+
+---
+
+### 2026-05-27 — `[freshness-check]` Compass-original + Codex format as first application (v0.3.3, pull-bridge round 1)
+
+**Friction:** User ran `/build` → Codex review failed because **Codex's review format had changed** and Compass's docs about the format had gone stale. The workflow's parser expected the old format; new format didn't match; review silently broke. This is **the second time external-tool drift bit a workflow** (first was aura-app's various library version mismatches surfaced in v0.2.5; that round patched specific things but didn't establish a pattern).
+
+**Diagnosis — class problem, not Codex-specific.** Same drift surface hits:
+- **MCP connector APIs** (Sentry / GitHub / Linear / Atlassian) — schemas evolve; `/scan`, `/measure`, `/status` MCP calls go stale
+- **Library / framework versions** (Expo SDK, Next.js, React, library options in `/setup-foundation-architecture` elicitation) — already flagged in v0.3.2 watch-for
+- **Vendor capability claims** (cloud SDK options, regional availability) — `/scan` PROD_READY-09 catches some but not formats
+- **Cloud platform conventions** (Vercel patterns, AWS service options) — drift silently
+
+Compass had **no structural mechanism** to catch stale external references. The "Source freshness" confidence signal in `/scan` (scanner.md) is spiritually right but applies only to per-bet artifacts, not to Compass's own docs that reference external tools.
+
+**User direction:** *"compass should always check for latest changes and update the user or the doc … it should ideally be a push from compass to the repo owners."* Push is the right long-term shape but requires infrastructure Compass doesn't have today:
+1. **Detection** — something watches external tools for changes
+2. **Distribution** — something delivers updates to consuming repos (today: repos copy `compass/` + `.claude/` at setup; no update channel)
+
+**Path picked (Path A — pull-bridge):**
+- **v0.3.3 (this round):** workflow-side check. Workflow reads `last_verified` date on Compass doc; refuses if stale. Immediate unblock.
+- **v0.3.4:** framework-side detection. CI on Compass repo watches Codex/MCP/library/Vercel changelogs; auto-updates Compass docs + bumps `last_verified`.
+- **v0.4+:** distribution. Compass framework updates auto-propagate to consuming repos as PRs (per user pick: *"pushed doc updates"*).
+
+Each step delivers value; final state is the push model the user described.
+
+**Change:**
+- New `[freshness-check]` entry in `compass/framework/canon.md` (Compass-original). Pattern: docs that reference external tools get `last_verified` + `freshness_window_days` + `external_source` frontmatter; workflows add a Precondition that refuses if stale. Missing `last_verified` = infinitely stale.
+- `compass/roles/reviewer.md` gained the freshness frontmatter (last_verified: 2026-05-27, freshness_window_days: 30, external_source: OpenAI Codex GitHub). Existing "Review output format" section renamed to **"Expected Codex output shape"** with explicit field-by-field expectations — gives `[freshness-check]` something semantically verifiable in future rounds.
+- `compass/workflows/build.md` Phase 5 gained step 12a — freshness-check Precondition. Before Codex review, read reviewer.md frontmatter; refuse if stale with pointer to external source + file to update. Per Principle #16 — refuse + escalate.
+- `AGENTS.md` Workflow Structure section gained note about `[freshness-check]` as the second Compass-original interaction-class pattern (after `[elicitation-with-options]`).
+
+**Files touched (6):** `compass/framework/canon.md`, `compass/roles/reviewer.md`, `compass/workflows/build.md`, `AGENTS.md`, `CHANGELOG.md` (0.3.3), `compass/workflows/improvements.md`.
+
+**Watch for:**
+- **The freshness markers themselves go stale.** Recursive problem — `last_verified: 2026-05-27` on reviewer.md is only as fresh as the user's discipline to update it after manually verifying against `external_source`. v0.3.4 detection solves this systematically; v0.3.3 relies on user discipline at re-verification time.
+- **Threshold tuning.** 30 days default for fast-moving tools (Codex). If actual Codex format changes are less frequent, 30 days = unnecessary refusal noise. If more frequent, 30 days = misses drift between checks. Tune based on actual drift cadence once observed across 2-3 verifications.
+- **Date-only check is mechanical but blind.** Even within freshness window, the format could have changed and we wouldn't know. v0.3.4 detection (semantic verification by watching external source) is the real fix; v0.3.3 just gates on date, which is the cheapest mechanical check.
+- **Refusal fatigue.** If `/build` refuses every 30 days waiting for re-verification, that's friction. The mitigation is v0.3.4 detection — once CI auto-bumps `last_verified` when nothing has changed, the refusal only fires when actual drift is detected. Until then, the user pays the manual-verify cost periodically.
+- **Backfill burden across other Compass docs.** Every doc that references external tools eventually needs the markers. v0.3.3 backfills only reviewer.md. Future sessions backfill MCP / library / Vercel / cloud-platform references one at a time as each becomes a load-bearing concern.
+- **2nd-instance trigger for principle #17.** Per codification rule (≥2 applications before promoting), the next workflow adopting `[freshness-check]` (likely an MCP-dependent workflow like `/scan` or `/measure` with API schema staleness) makes this an AGENTS.md cross-cutting principle.
+
+**Meta-observation:** `[freshness-check]` is the **second interaction-class Compass-original** (after `[elicitation-with-options]`). Both surface a class of failure (decision rationalization; format drift) and provide structural defense (curated options; date-gated precondition). The framework's Compass-original catalog now spans three shapes: **enforcement** (cite-or-mark-n/a, refuse-escalate, soft-spec-hardening — what the workflow REQUIRES), **interaction** (elicitation-with-options — how the workflow ASKS), and **freshness** (freshness-check — how the workflow STAYS CURRENT). Worth watching whether a 4th shape surfaces (e.g., capture / validation / observation) as the framework grows.
+
+**Bridge progress meta:** v0.3.3 is **round 1 of 3** toward the push model. The bridge framing is documented in canon.md and CHANGELOG so future-Compass (and future contributors) know where v0.3.4 / v0.4 are heading. This is the first time Compass has shipped a multi-version roadmap inline with the first round — worth noting as a deliberate communication pattern.
+
+---
+
 ### 2026-05-27 — `/setup-foundation-architecture` hardened + elicitation-with-options pattern (v0.3.2)
 
 **Friction / trigger:** Second workflow translation in the v0.3 cycle per cadence. User picked `/setup-foundation-architecture` (had been pending since v0.3.0-alpha established the template). Additionally, user requested NEW behavior beyond just hardening: **interactive elicitation** — workflow should ASK the user about each architectural decision, present 3 widely-used product/tool options, and let user pick. Replaces the v0.2.x pattern of "draft with smart defaults, ask user to approve" (which the agent in practice mostly skipped — same soft-spec-rationalization shape the framework keeps catching).
