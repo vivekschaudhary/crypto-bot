@@ -36,8 +36,8 @@ area_tags: [auth, security, backend, frontend]
 estimate:
   duration_weeks: 2
   confidence: high
-  refined_by: build-actuals
-  refined_at: 2026-05-31
+  refined_by: stories
+  refined_at: 2026-06-01
   estimated_start: 2026-05-31
   estimated_end: 2026-06-14
   actual_start: 2026-05-31
@@ -139,7 +139,9 @@ _Decomposed one at a time via `/create-story CB-1`. Each lives under `docs/bets/
 5. **`app/proxy.ts` real session validation** — replace scaffold stub; handle both `/(dashboard)/*` redirects + `/api/coinbase|bot/*` 401s.
 6. **First-deploy onboarding UX** — landing page flow that detects zero-credentials state and walks the operator through registration in < 5 minutes.
 
-Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 3 stories shipped (CB-1.1, CB-1.1.1, CB-1.2). 4 forecast items remain. Per the strict-derivation `/plan` discipline (established on PR #4), `duration_weeks` stays at the brief-approval value (2 wk) until either the remaining stories visibly outpace the budget or new story.md files materially shift the count. Refresh `/plan` after CB-1.3 ships if duration looks stale.
+Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 3 story.md files exist (CB-1.1, CB-1.1.1, CB-1.2), all shipped. 4 forecast items remain.
+
+**Plan v3 refreshed 2026-06-01.** CB-1.2's story.md creation fired the "Stories created" trigger per the `/plan` estimate model. Per the [adaptive-decomposition resolution rule](../../foundation/plan.md#decisions) (new in v3), `duration_weeks = max(stories-based, brief-approval) = max(3 × 3 days, 2 wk) = max(1.3 wk, 2 wk) = 2 wk` — unchanged. The max() rule prevents the literal stories-based count from shrinking the estimate below the brief's upfront scope ceiling while four forecast stories remain undecomposed.
 
 ## Scan summary
 
