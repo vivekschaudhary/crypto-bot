@@ -13,6 +13,7 @@
 //   - New session id on each successful authentication; prior id invalidated
 //     immediately (see rotateSession).
 
+import postgres from "postgres";
 import { ulid } from "ulidx";
 import { env } from "@/lib/env";
 import { db } from "@/lib/db/client";
@@ -27,13 +28,32 @@ type SessionRow = {
 };
 
 /**
+ * Tagged-template SQL client — covers both the top-level `Sql<>` client
+ * returned by `db()` and the `TransactionSql<>` passed into `sql.begin`'s
+ * callback. Both share the tagged-template call + `.unsafe`; postgres.js
+ * keeps them as distinct TS types because TransactionSql lacks lifecycle
+ * methods (CLOSE, END, etc.), so a union is required to accept either.
+ */
+type SqlClient = postgres.Sql<Record<string, never>> | postgres.TransactionSql<Record<string, never>>;
+
+/**
  * Create a new session for `userId`. Inserts an auth_sessions row and returns
  * `{ sessionId, signedCookie }`. Caller is responsible for setting the cookie
  * with HttpOnly + Secure + SameSite=Strict + Path=/.
+ *
+ * When `txClient` is provided, the INSERT participates in the caller's
+ * transaction (used by /api/auth/register/finish for atomic registration —
+ * user + credential + session must commit together; closes CB-1.2 Codex
+ * BLOCKER #1's underlying spec gap by keeping the canonical helper as the
+ * single source of session TTL/signing logic). When omitted, uses the shared
+ * top-level client (legacy behavior; preserved for all existing callers).
  */
-export async function createSession(userId: string): Promise<{ sessionId: string; signedCookie: string }> {
+export async function createSession(
+  userId: string,
+  txClient?: SqlClient,
+): Promise<{ sessionId: string; signedCookie: string }> {
   const sessionId = ulid();
-  const sql = db();
+  const sql = txClient ?? db();
   await sql`
     INSERT INTO auth_sessions (id, user_id, expires_at)
     VALUES (${sessionId}, ${userId}, now() + interval '${sql.unsafe(SESSION_TTL_INTERVAL)}')
