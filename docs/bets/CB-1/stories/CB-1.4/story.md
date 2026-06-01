@@ -15,7 +15,7 @@ dependencies: [CB-1.1, CB-1.2, CB-1.3]
 
 ## Description
 
-Replace the scaffold `TODO` stub in `proxy.ts` (at project root — see Engineer DRI Decision on location) with real session validation. Every request to a protected surface — `/(dashboard)/*`, `/api/coinbase/*`, `/api/bot/*`, and any other `/api/*` route outside `/api/auth/*` and `/api/cron/*` — must load the operator's session cookie, verify it via `lib/auth/sessions.verifySession`, and either pass through (valid session) or be rejected (no/expired session). Public surfaces (landing page + `/api/auth/*` ceremonies + `/api/cron/tick`) stay open per the existing `PUBLIC_ROUTES` list.
+Replace the scaffold `TODO` stub in `proxy.ts` (at project root — see Engineer DRI Decision on location) with real session validation. Every request to a protected surface — `/(dashboard)/*`, `/api/coinbase/*`, `/api/bot/*`, and any other `/api/*` route outside `/api/auth/*` and `/api/cron/*` — must load the operator's session cookie, verify it via `lib/auth/sessions.verifySession`, and either pass through (valid session) or be rejected (no/expired session). Public surfaces (landing page + `/api/auth/*` ceremony begin/finish + `/api/cron/tick`) stay open per the `PUBLIC_EXACT` + `PUBLIC_PREFIXES` split (per AC 4 — the flat `PUBLIC_ROUTES` model from the scaffold is replaced with explicit exact-match vs trailing-`/`-prefix categories).
 
 This is the story that closes [CB-1 guardrail #1](../../brief.md) — "**Unauthenticated requests reaching capital-touching surfaces — threshold: 0**" — from a runtime-enforcement standpoint. Without this story, the foundation scaffold leaves all protected routes wide open. With it, every request that touches `auth_sessions` row state is gated.
 
@@ -99,23 +99,29 @@ CB-1.4 is the routing-layer implementation of that invariant.
 ```ts
 // from lib/auth/sessions
 verifySession(signedCookie): Promise<{ userId: string; sessionId: string } | null>
-// Bumps expires_at on hit (sliding expiry). See DRI question in AC 12 for
-// whether this side-effect is acceptable on every proxy invocation.
+// Bumps expires_at on hit (sliding expiry). AC 12 resolves this: the
+// side-effect IS intentional per the architecture's session strategy.
+// No `{ readonly: true }` flag added; no library extension this round.
 ```
 
-No new library code expected in this story (per the AC 12 directive to use the canonical helper). The only `lib/auth/sessions.ts` change that might land is the optional `readonly` flag if the Engineer concludes the sliding-expiry side-effect is too expensive at proxy-frequency.
+No library code changes in this story. AC 12 explicitly closes the question of whether to extend `lib/auth/sessions` with a `{ readonly: true }` flag for proxy-frequency reads — the architecture's sliding-expiry intent is preserved; the stolen-cookie self-renewal trade-off is mitigated by future sign-out (CB-1.5) and post-MVP session-revocation UX. `lib/auth/sessions.ts` is unchanged in this story.
 
-**Public routes list (already in scaffold; preserved unchanged):**
+**Public routes — split into exact-match + intentional-prefix categories (AC 4 amendment after security review):**
 
 ```ts
-const PUBLIC_ROUTES = [
+const PUBLIC_EXACT = new Set<string>([
   "/",                          // landing
-  "/api/auth/register",         // ceremony entry points
-  "/api/auth/authenticate",
-  "/api/auth/recovery",
-  "/api/cron/tick",             // CRON_SECRET-gated, not session-gated
+  "/api/cron/tick",             // CRON_SECRET-gated, not session-gated; no sub-paths
+]);
+
+const PUBLIC_PREFIXES: readonly string[] = [
+  "/api/auth/register/",        // ceremony entry points — /begin, /finish under here
+  "/api/auth/authenticate/",
+  "/api/auth/recovery/",        // future; deferred per portfolio
 ];
 ```
+
+The PR #10 first-attempt used a flat list with `pathname.startsWith(${p}/)` against every entry — which would have classified `/api/cron/tick/admin` as public (silent privilege-escalation surface for any future cron sub-path). The split closes that surface: `PUBLIC_EXACT` paths require character-for-character match; `PUBLIC_PREFIXES` paths require trailing `/` and only match true sub-paths.
 
 The matcher inside `export const config = {...}` (already in scaffold) handles asset-file exclusion at the Next.js layer — those never reach `proxy.ts` in the first place. proxy.ts only sees URL-bound requests that COULD be auth-relevant.
 
@@ -142,7 +148,7 @@ The architecture explicitly mandates "cookie alone is not trusted — DB row is 
 - Real `/sign-in` page (separate from landing) — CB-1.6 may merge into landing or split
 - Session-revocation UI (e.g., "sign out of all devices") — post-MVP
 - Per-request observability (Sentry, request-id propagation, structured logging) — same observability follow-up as CB-1.2 / CB-1.3
-- Optional `readonly` flag on `verifySession` — only added if Engineer concludes sliding-expiry on every protected request is too expensive (AC 12)
+- Optional `readonly` flag on `verifySession` — **explicitly NOT added** per AC 12. Sliding-expiry on every proxy invocation is the architecture's intended design ("every verified request bumps expires_at"). The stolen-cookie self-renewal risk is acknowledged (LOW severity from PR #10 security review) and mitigated by future sign-out (CB-1.5) + post-MVP session-revocation UX. If write amplification ever becomes a real bottleneck, that's its own follow-up story with proper benchmarking — not a speculative flag.
 
 **Testing approach** — Vitest for unit + integration with a mocked DB layer (sessions.test.ts pattern). Codex's Playwright for E2E. proxy.ts is exercised by constructing `NextRequest` objects with various cookie + path combinations — same testing surface used by Next.js's own proxy tests.
 
@@ -219,13 +225,13 @@ _If post-merge bugs are found, story is re-opened and fixes live under `docs/bet
 - [2026-06-01] [PM] **Sliding-expiry side-effect of `verifySession` fires on every protected request — possibly excessive DB write load**
   - **Likelihood (required):** medium (every page nav / image preload / API call triggers a write; for n=1 operator the write rate is bounded but it IS a write-amplification)
   - **Impact (required):** low-medium (Postgres write throughput is not the bottleneck at MVP load; could become one at SaaS scale or if the operator's session is repeatedly bumped during long working sessions with many resources loaded per page)
-  - **Mitigation (required):** AC 12 calls out this question explicitly — Engineer decides at implementation whether to add an optional `{ readonly: true }` flag to `verifySession` so proxy reads can skip the bump. If they do, the bump still fires on authenticated route handlers that explicitly opt into the slide. If they don't, the writes are bounded by the n=1 operator's actual activity (Postgres handles this fine).
-  - **Area (required, tag):** performance / library-extension
+  - **Mitigation (required):** AC 12 closed this question — sliding-expiry on every proxy invocation IS preserved (matches the architecture's documented session strategy). No `{ readonly: true }` flag added. Writes are bounded by the n=1 operator's actual activity; Postgres handles this fine at MVP load. If write amplification ever becomes a measured bottleneck (P90 write-throughput > 80% of pool capacity, sustained), evaluate either (a) a real fix via a separate story with benchmarking, OR (b) revisit the architecture's slide-on-every-verified-request stance with the foundation amend process. Not a current concern.
+  - **Area (required, tag):** performance / architecture-trade-off
 
 - [2026-06-01] [PM] **Proxy gating runs on EVERY non-asset request — bugs here cascade across the entire app**
   - **Likelihood (required):** low (the canonical helper does the load-bearing work; proxy.ts is thin glue per AC 12)
   - **Impact (required):** high if it bites — a bug that lets unauthenticated requests through breaks the bet's primary guardrail; a bug that blocks authenticated requests makes the app unusable
-  - **Mitigation (required):** AC 7's test coverage is intentionally broad (public-route passthrough, dashboard-redirect, API-401, valid-session-passthrough, header-enrichment, URL-encoding). AC 8's E2E exercises the full request lifecycle in a real browser. AC 12's "use canonical helper" rule prevents the proxy from reinventing the validation logic.
+  - **Mitigation (required):** AC 7's test coverage is intentionally broad (public-route passthrough with verifySession-not-called assertions, dashboard-redirect, API-401, valid-session passthrough with Next.js sentinel-header forwarding + anti-leak checks, `?next` safety, PUBLIC_ROUTES tightening, cookie length cap, URL-encoding). AC 8's E2E exercises the full request lifecycle in a real browser. AC 12's "use canonical helper" rule prevents the proxy from reinventing the validation logic.
   - **Area (required, tag):** security / coverage
 
 ### Issues
