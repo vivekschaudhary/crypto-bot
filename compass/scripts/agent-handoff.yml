@@ -1,0 +1,142 @@
+# Compass — Agent Handoff GitHub Action template
+# Per [agent-handoff] (compass/framework/canon.md, v0.3.5).
+#
+# Automates the Engineer → Reviewer handoff. When CI passes on a PR, this
+# workflow runs the reviewer agent against the diff and posts findings as
+# a PR comment. The sending agent (Claude) reads the comment back via
+# GitHub MCP next session — no terminal switch, no manual prompt paste.
+#
+# ─────────────────────────────────────────────────────────────────────────
+# SETUP IN YOUR CONSUMING REPO
+# ─────────────────────────────────────────────────────────────────────────
+#   1. Copy this file to .github/workflows/ai-review.yml in your repo.
+#   2. Set the CI workflow name in `workflows:` below to YOUR CI workflow's
+#      `name:` value (the human-readable name, not the file name).
+#   3. Add ONE of these secrets (matching the reviewer block you enable):
+#         OPENAI_API_KEY      (Option A — Codex)
+#         ANTHROPIC_API_KEY   (Option B — Claude headless)
+#         GOOGLE_API_KEY      (Option C — Gemini)
+#         <your provider>     (Option D — generic)
+#   4. Pick ONE reviewer block below; leave the others commented out.
+#   5. Verify the reviewer CLI install command + invocation flags against
+#      current vendor docs. The values below are best-effort references;
+#      CLI flags drift. (External-tool drift candidate per [freshness-check]
+#      in canon.md — sibling README tracks last_verified.)
+#
+# ─────────────────────────────────────────────────────────────────────────
+# HANDOFF SHAPE (per [agent-handoff] in canon.md)
+# ─────────────────────────────────────────────────────────────────────────
+#   • Trigger artifact ─ the PR (opened or synchronized)
+#   • Trigger event    ─ workflow_run on CI completion
+#   • Context window   ─ pr.diff + .{reviewer}/prompts/reviewer.md
+#   • Output medium    ─ PR comment (posted via gh pr comment)
+#   • Loop signal      ─ Claude reads PR comments via GitHub MCP next session
+#
+# ─────────────────────────────────────────────────────────────────────────
+
+name: AI Review
+
+on:
+  workflow_run:
+    workflows: ["CI"]              # <-- CHANGE to YOUR CI workflow name
+    types: [completed]
+
+jobs:
+  review:
+    # Run only after CI succeeded on a pull_request event.
+    # Per compass/workflows/build.md Phase 5 step 13: review starts AFTER CI green.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write         # required to post the review comment
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0           # full history needed for accurate diff
+
+      - name: Resolve PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh pr list \
+                 --head "${{ github.event.workflow_run.head_branch }}" \
+                 --state open \
+                 --json number --jq '.[0].number')
+          if [ -z "$PR" ]; then
+            echo "No open PR found for branch — exiting cleanly."
+            exit 0
+          fi
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+
+      - name: Capture PR diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr diff ${{ steps.pr.outputs.number }} > pr.diff
+
+      # ─────────────────────────────────────────────────────────────────────
+      # REVIEWER AGENT — enable EXACTLY ONE block.
+      # Each block: install CLI · invoke with reviewer prompt + diff · write review.md.
+      # ─────────────────────────────────────────────────────────────────────
+
+      # ── Option A: Codex (OpenAI) ─────────────────────────────────────────
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+        # VERIFY: install command + package name per https://github.com/openai/codex
+      - name: Run Codex review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          codex exec \
+            --prompt-file .codex/prompts/reviewer.md \
+            --input pr.diff \
+            --output review.md
+        # VERIFY: codex CLI flags against current docs. Placeholder names;
+        # actual headless-mode flags may differ. Treat as a starting point.
+
+      # ── Option B: Claude Code headless (Anthropic) ───────────────────────
+      # - name: Install Claude Code CLI
+      #   run: npm install -g @anthropic-ai/claude-code
+      # - name: Run Claude review
+      #   env:
+      #     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      #   run: |
+      #     claude \
+      #       --no-interactive \
+      #       --prompt-file .claude/prompts/reviewer.md \
+      #       --input pr.diff > review.md
+
+      # ── Option C: Gemini (Google) ────────────────────────────────────────
+      # - name: Install Gemini CLI
+      #   run: npm install -g @google/gemini-cli
+      # - name: Run Gemini review
+      #   env:
+      #     GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      #   run: |
+      #     gemini \
+      #       --prompt-file .gemini/prompts/reviewer.md \
+      #       --input pr.diff > review.md
+
+      # ── Option D: Generic CLI (any agent with stdin/stdout) ──────────────
+      # - name: Run generic reviewer
+      #   env:
+      #     YOUR_API_KEY: ${{ secrets.YOUR_API_KEY }}
+      #   run: |
+      #     cat <reviewer-prompt>.md pr.diff | <agent-cli> > review.md
+
+      # ─────────────────────────────────────────────────────────────────────
+
+      - name: Post review as PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -s review.md ]; then
+            gh pr comment ${{ steps.pr.outputs.number }} --body-file review.md
+          else
+            echo "Reviewer produced no output — skipping comment."
+          fi

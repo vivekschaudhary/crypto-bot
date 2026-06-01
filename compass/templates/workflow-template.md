@@ -117,6 +117,33 @@ version: 0.3.0-alpha             # workflow's own hardening version; bump on nex
   approve — that's the rationalization surface principle #14 closes.
   First instance: `/setup-foundation-architecture` v0.3.2 (anchor + 4
   cascading layer elicitations).
+
+  ROLE-BOUNDARY MARKERS: when a workflow step loads a role or transitions
+  to a different role, add structured HTML-comment markers around the
+  step per the [role-boundary] Compass-original (see canon.md). Shape:
+
+      <!-- COMPASS_ROLE_BOUNDARY: enter | role=<name> | workflow=<id> | step=<N> -->
+      ...step content...
+      <!-- COMPASS_ROLE_BOUNDARY: exit | role=<name> | workflow=<id> | step=<N> -->
+
+  The markers are anchors for the reference parser at
+  `compass/scripts/token-usage.py`, which attributes Claude Code session
+  tokens to roles. Add markers when role transitions are meaningful
+  (multi-role workflows like /build, /setup-product, /create-brief);
+  optional for single-role workflows. PM-owned by convention.
+
+  AGENT-HANDOFF: when a workflow routes work between AI agents (e.g.,
+  Engineer implements → Reviewer reviews), document the handoff per the
+  [agent-handoff] Compass-original (see canon.md) using the 5-piece shape:
+  trigger artifact · trigger event · context window · output medium ·
+  loop signal. If the handoff can be automated via CI (the common case
+  for PR-based review), note the path: "if .github/workflows/ai-review.yml
+  is installed (per compass/scripts/agent-handoff.yml), <reviewer> fires
+  automatically on CI-green; otherwise <reviewer> is invoked manually."
+  The manual path stays documented as fallback — automation is opt-in per
+  consuming repo. Vendor CLI flags drift; sibling README of the template
+  tracks `last_verified` per [freshness-check]. First instance: /build
+  Phase 5 (Engineer → Codex via PR + GitHub Actions).
 -->
 
 ### 1. <Step title>
