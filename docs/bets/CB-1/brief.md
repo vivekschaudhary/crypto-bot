@@ -129,19 +129,20 @@ _Decomposed one at a time via `/create-story CB-1`. Each lives under `docs/bets/
 - **[CB-1.1](stories/CB-1.1/story.md) — `lib/auth/` library.** Shipped 2026-05-31 via [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). 10 ACs (AC 1 + AC 7 amended via CB-1.1.1 per Codex findings).
 - **[CB-1.1.1](stories/CB-1.1.1/story.md) — Codex review remediations for CB-1.1.** Shipped 2026-05-31 via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). 6 ACs covering: 2 AC amendments (AC 1 + AC 4) + 2 missing tests (AC 2 + AC 3) + pre-merge gates green (AC 5) + PR template harden (AC 6). The `.codex/config.toml` fix for Codex 0.133+ also landed in PR #2 (commit b83fa98) but was extra-scope, not one of the 6 ACs — it surfaced as a blocker to running the Codex review itself partway through the PR.
 - **[CB-1.2](stories/CB-1.2/story.md) — Passkey registration ceremony endpoints.** Shipped 2026-06-01 via [PR #5](https://github.com/vivekschaudhary/crypto-bot/pull/5). 12 ACs (AC 1 + AC 2 amended via Engineer DRI Decision for cookie-bound `pendingUserId` — closes story Risk #3 by design). First E2E in the codebase (Codex AC 8 — Playwright + Chromium virtual authenticator + real Postgres). Review cycle: 5 BLOCKERs across 2 rounds (atomicity, DB-singleton race, OPTIONS handler, typecheck mock cast, canonical-helper duplication) — all closed. `lib/auth/sessions.createSession` extended with optional `tx` parameter for atomic-registration (additive, backward-compatible).
+- **[CB-1.3](stories/CB-1.3/story.md) — Passkey authentication ceremony endpoints.** Shipped 2026-06-01 via [PR #8](https://github.com/vivekschaudhary/crypto-bot/pull/8). 12 ACs (AC 1 + AC 2 amended via Engineer DRI Decision for canonical-helper challenge cookie — uses `lib/auth/challenges.mintChallenge`/`consumeChallenge` rather than inline `signValue`). User-exists precondition + counter-replay guard with Apple platform-authenticator 0/0 exception + atomic transaction (counter UPDATE + rotate-or-create session). Library extensions: `rotateSession` + `generateAuthenticationOptions` accept optional pass-through args; new `fromBase64Url` helper. Second E2E (Codex AC 8 — `e2e/auth/authenticate.spec.ts`; `playwright.config.ts` switched to `workers: 1` for serial DB access across both auth specs). Review cycle: 2 BLOCKERs (Zod schema too loose + AC 8 missing) — both closed. Final Codex code + security reviews clean.
 
 ### Expected decomposition (PM forecast — remaining)
 
 1. ~~**`lib/auth/` library**~~ — **shipped** via CB-1.1 (+ CB-1.1.1 follow-ups).
 2. ~~**Registration ceremony endpoints**~~ — **shipped** via CB-1.2.
-3. **Authentication ceremony endpoints** — `POST /api/auth/authenticate/begin` + `POST /api/auth/authenticate/finish`.
+3. ~~**Authentication ceremony endpoints**~~ — **shipped** via CB-1.3.
 4. **Sign-out endpoint + cookie clearing** — `POST /api/auth/sign-out`.
 5. **`app/proxy.ts` real session validation** — replace scaffold stub; handle both `/(dashboard)/*` redirects + `/api/coinbase|bot/*` 401s.
 6. **First-deploy onboarding UX** — landing page flow that detects zero-credentials state and walks the operator through registration in < 5 minutes.
 
-Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 3 story.md files exist (CB-1.1, CB-1.1.1, CB-1.2), all shipped. 4 forecast items remain.
+Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 4 story.md files exist (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3), all shipped. 3 forecast items remain.
 
-**Plan v3 refreshed 2026-06-01.** CB-1.2's story.md creation fired the "Stories created" trigger per the `/plan` estimate model. Per the [adaptive-decomposition resolution rule](../../foundation/plan.md#decisions) (new in v3), `duration_weeks = max(stories-based, brief-approval) = max(3 × 3 days, 2 wk) = max(1.3 wk, 2 wk) = 2 wk` — unchanged. The max() rule prevents the literal stories-based count from shrinking the estimate below the brief's upfront scope ceiling while four forecast stories remain undecomposed.
+**Plan v4 refreshed 2026-06-01.** CB-1.3's story.md creation fired the "Stories created" trigger per the `/plan` estimate model. Per the [adaptive-decomposition resolution rule](../../foundation/plan.md#decisions), `duration_weeks = max(stories-based, brief-approval) = max(4 × 3 days, 2 wk) = max(1.71 wk, 2 wk) = 2 wk` — still unchanged. The max() rule continues to backstop the brief's upfront scope ceiling while three forecast stories remain undecomposed. **Watch:** at story count 5, the math flips: max(5 × 3 days, 2 wk) = max(2.14 wk, 2 wk) = ~2.1 wk → `duration_weeks` would legitimately bump to 3.
 
 ## Scan summary
 
