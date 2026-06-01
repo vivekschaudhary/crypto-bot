@@ -1,10 +1,10 @@
 ---
 id: PROJECT-PLAN
 type: plan
-version: 2
+version: 3
 status: living
 created: 2026-05-31
-last_refreshed: 2026-05-31
+last_refreshed: 2026-06-01
 parent: FOUNDATION-PRODUCT
 ---
 
@@ -12,13 +12,13 @@ parent: FOUNDATION-PRODUCT
 
 > Living, time-bound schedule for the MVP bet wedge. Derived from per-bet artifacts; refreshed by `/plan`. Never hand-edited — re-run `/plan` to refresh.
 
-**Last refreshed:** 2026-05-31 (version 2 — refresh after CB-1.1 + CB-1.1.1 + post-merge bookkeeping landed)
+**Last refreshed:** 2026-06-01 (version 3 — refresh after CB-1.2 story.md created + CB-1.2 shipped via PR #5)
 
 ## Currently in flight
 
 | Bet | Title | Phase | Actual start | Estimated end | Owner |
 |-----|-------|-------|--------------|---------------|-------|
-| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | Stories shipping — 2 story.md files exist (CB-1.1 + CB-1.1.1, both shipped); next is CB-1.2 (registration endpoints) | 2026-05-31 | 2026-06-14 | Engineer (Claude) → Codex review |
+| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | Stories shipping — 3 story.md files exist (CB-1.1 + CB-1.1.1 + CB-1.2, all shipped); next is CB-1.3 (authentication endpoints) | 2026-05-31 | 2026-06-14 | PM → Engineer (`/create-story CB-1` for CB-1.3) |
 
 ## Next up (unblocked, not yet started)
 
@@ -40,7 +40,7 @@ Bets waiting on dependencies, HITL approval, or external input.
 
 ## Done
 
-_No fully-shipped MVP bets yet — CB-1 has 2 story.md files shipped but the bet itself is still in flight (more stories expected per the brief's forecast)._
+_No fully-shipped MVP bets yet — CB-1 has 3 story.md files shipped (CB-1.1, CB-1.1.1, CB-1.2) but the bet itself is still in flight (4 stories remain per the brief's forecast: CB-1.3..CB-1.6)._
 
 | Bet | Title | Actual end | Duration (actual vs estimated) |
 |-----|-------|------------|-------------------------------|
@@ -51,13 +51,13 @@ Every MVP bet with all date columns. Source of truth for downstream tools.
 
 | Bet | Title | Depends on | Est. start | Est. end | Actual start | Actual end | Duration (wk) | Confidence | Last refined by |
 |-----|-------|------------|------------|----------|--------------|------------|---------------|------------|-----------------|
-| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-14 | 2026-05-31 | — | 2 | high | build-actuals |
+| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-14 | 2026-05-31 | — | 2 | high | stories |
 | [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | 2026-06-01 | 2026-06-14 | — | — | 2 | low | stub |
 | [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | [CB-1, CB-2] | 2026-06-15 | 2026-06-28 | — | — | 2 | low | stub |
 | [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | [CB-2, CB-3] | 2026-06-29 | 2026-07-19 | — | — | 3 | low | stub |
 | [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | [CB-1, CB-4] | 2026-07-20 | 2026-08-09 | — | — | 3 | low | stub |
 
-**MVP completion target:** 2026-08-09 (unchanged from v1 — duration estimates are unmoved; only CB-1's `actual_start` + `confidence` + `refined_by` updated this refresh). Confidence values: CB-1 `high` (first PR merged trigger fired per workflow estimate model), all others `low` (still stubs).
+**MVP completion target:** 2026-08-09 (unchanged from v2 — `duration_weeks` recomputed via "Stories created" trigger on CB-1.2's story.md creation: 3 × 3 days = 1.286 wk; max-rule yields 2 wk = brief-approval value; net date movement 0). v3 refresh also moves CB-1 `refined_by` from `build-actuals` → `stories` and bumps `refined_at` to 2026-06-01. Confidence values: CB-1 `high` (unchanged from v2), all others `low` (still stubs).
 
 ## Calendar view
 
@@ -78,7 +78,7 @@ Critical path: CB-2 → CB-3 → CB-4 → CB-5 (10 weeks). CB-1 finishes on the 
 
 ## Refinement log
 
-Each time a date moves, write a line here naming the **triggering artifact** (specific file path or PR URL). v2 refresh records only artifact-derived movements.
+Each time a date moves, write a line here naming the **triggering artifact** (specific file path or PR URL).
 
 | Date | Bet | Field changed | From | To | Triggered by |
 |------|-----|---------------|------|-----|--------------|
@@ -86,15 +86,18 @@ Each time a date moves, write a line here naming the **triggering artifact** (sp
 | 2026-05-31 | CB-1 | estimated_start | 2026-06-01 | 2026-05-31 | Actuals override planned schedule — actual_start (above) preceded the planned Monday start; per the same workflow estimate model. Source: [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). |
 | 2026-05-31 | CB-1 | confidence | low | high | "First build PR merged" trigger row in [`compass/workflows/plan.md`](../../compass/workflows/plan.md) estimate model → `confidence: high`. Source: [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). |
 | 2026-05-31 | CB-1 | refined_by | stub | build-actuals | Latest applicable trigger per [`compass/workflows/plan.md`](../../compass/workflows/plan.md) estimate model is "First build PR merged" → enum value `build-actuals`. Source: [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). |
-| 2026-05-31 | CB-1 | estimated_end | — | 2026-06-14 | Recomputed from `actual_start + duration_weeks` per estimate model. `actual_start = 2026-05-31` (above); `duration_weeks` stays at brief-approval value 2 (no new story.md files have been created since brief approval — only CB-1.1 + CB-1.1.1 exist, both at brief-promotion time; "Stories created" trigger has not fired with new artifacts since approval). Net date movement: 0 days (was 2026-06-14 in v1 seed, still 2026-06-14). Logged for audit completeness. Source: [`docs/bets/CB-1/brief.md`](../bets/CB-1/brief.md) `estimate` frontmatter. |
+| 2026-05-31 | CB-1 | estimated_end | — | 2026-06-14 | Recomputed from `actual_start + duration_weeks` per estimate model. `actual_start = 2026-05-31`; `duration_weeks` stays at brief-approval value 2. v2-era reasoning. Net date movement: 0 days. |
+| 2026-06-01 | CB-1 | story.md count | 2 | 3 | New story.md file: [`docs/bets/CB-1/stories/CB-1.2/story.md`](../bets/CB-1/stories/CB-1.2/story.md) created during `/create-story CB-1` (commit landed via [PR #5](https://github.com/vivekschaudhary/crypto-bot/pull/5)). Fires the "Stories created" row of the estimate model. Surfaced by Codex code-review of PR #6: prior v2 refresh claimed this trigger wouldn't fire mid-bet — incorrect; trigger fires per literal reading. |
+| 2026-06-01 | CB-1 | refined_by | build-actuals | stories | Latest-applicable trigger advanced from "First build PR merged" (fired once at PR #1) to "Stories created" (fires on each new story.md file; latest fire was CB-1.2's creation). Per workflow estimate model enum order. |
+| 2026-06-01 | CB-1 | duration_weeks | 2 | 2 | Recomputed via "Stories created" trigger: 3 story.md files × 3 days each = 9 days = 1.286 weeks. Per [v3 DRI Decision below](#decisions) ("adaptive-decomposition resolution rule"), `duration_weeks = max(stories-based, brief-approval) = max(1.3, 2) = 2`. Net date movement: 0 days. Triggering artifact: [`docs/bets/CB-1/stories/CB-1.2/story.md`](../bets/CB-1/stories/CB-1.2/story.md). |
 
-_v1 seed-run entries (2026-05-31) preserved in git history at version 1._
+_v1 + v2 seed-run entries (2026-05-31) preserved in git history at version 1 and 2._
 
-_No downstream dates moved this refresh — CB-1's `estimated_end` is unchanged, so CB-3/4/5 estimated_start values stay at v1 seed values._
+_No downstream dates moved this refresh — CB-1's `estimated_end` is unchanged, so CB-3/4/5 estimated_start values stay at v1/v2 values._
 
 ## Risks to plan
 
-- **Future CB-1 story.md creations may extend its duration.** The brief's "Expected decomposition" forecasts ~6 stories; only CB-1.1 + CB-1.1.1 are real artifacts so far. When CB-1.2 onwards land as story.md files, the "Stories created" trigger fires and `duration_weeks` will be recomputed from actual count × per-story size. The 2-week brief-approval estimate may not survive that recomputation. Honest forecast: medium chance the duration extends to 3 weeks (1-week slip) when 4-5 stories exist; this risk is not yet a refinement because the triggering artifacts don't exist.
+- **Future CB-1 story.md creations may extend its duration past the brief-approval ceiling.** The brief forecasts ~6 stories total; 3 story.md files exist (CB-1.1, CB-1.1.1, CB-1.2). Per the adaptive-decomposition resolution rule (DRI Decision below), `duration_weeks = max(stories-based, brief-approval)`. Today: max(3 × 3 days, 2 wk) = max(1.3 wk, 2 wk) = 2 wk. **When story count reaches 5+**: max(5 × 3 days, 2 wk) = max(2.14 wk, 2 wk) = ~2.1 wk → duration_weeks bumps to 3. **When story count reaches 7+** (unlikely but possible): max(3 wk, 2 wk) = 3 wk firmly. Track at each `/create-story CB-1` invocation; refresh `/plan` if the max() changes the integer-rounded `duration_weeks`.
 - **Stub estimates remain low-confidence for CB-2/3/4/5** — all still 2/3-week stubs. Promotion via `/create-brief <bet-id>` will refine. Expect ± 1 week per bet at medium-confidence stage; cumulative ± 2-3 weeks on the 10-week MVP target until briefs land.
 - **Solo-developer cadence is the wallclock binding constraint** (unchanged from v1) — these dates assume the operator works on the project at a sustained pace. Vacation, day-job pressure, or context-switch tax pushes everything proportionally.
 - **CB-4 (bot runtime) carries the highest single-bet extension risk** (unchanged from v1) — most surface area; may bump to 4 weeks at brief promotion. Documented as the bet most likely to slip the MVP target.
@@ -116,6 +119,13 @@ _No downstream dates moved this refresh — CB-1's `estimated_end` is unchanged,
   - **Area (required, tag):** scheduling / contract-compliance
   - **Alternatives considered (required):** allow concatenation with `+` separator (rejected — drifts the schema downstream tools will read); add a parallel `prior_refined_by` array field (rejected — schema bloat for a use case the refinement log already covers); leave it ambiguous (rejected — flagged in review).
   - **Reversibility:** trivial.
+
+- [2026-06-01] [Project Manager] **Adaptive-decomposition resolution rule: `duration_weeks = max(stories-based, brief-approval)`** — closes the framework gap where mid-bet story counts under-represent the bet
+  - **Rationale (required):** the `/plan` workflow's estimate model assumes upfront story decomposition (story count is monotonically informative). This project's brief explicitly uses adaptive decomposition ("decomposed one at a time via `/create-story CB-1`") — so at any mid-bet moment, the story.md count UNDER-represents the bet's true scope because not-yet-decomposed stories don't exist as files yet. Strict-derivation reading on PR #4 partially handled this by checking "did the count change?" (and finding it hadn't). But once a new story.md is created mid-bet (CB-1.2's case here), strict-derivation says: recompute = 3 × 3 days = 1.3 wk, which is SHORTER than the brief-approval estimate of 2 wk despite KNOWING 4 more stories are forecast. That's wrong. The honest fix: take `max(stories-based, brief-approval)` as the working duration. The brief-approval estimate is the PM's upfront scope ceiling; story-files-so-far is the implementation floor; their max is a conservative bound that aligns with reality without authoring future dates.
+  - **Area (required, tag):** scheduling / framework-adaptation
+  - **Alternatives considered (required):** apply strict-derivation literally and let `duration_weeks` shrink to 1.3 wk = 1 wk (rejected — knowingly under-estimates a bet with explicit remaining forecast); project forward from the brief's 6-story forecast as if those stories already existed (rejected — that's PR #4's authoring trap); freeze `duration_weeks` at the brief-approval value until the bet ships (rejected — wouldn't reflect legitimate refinement when story count exceeds the forecast); add a `manual_override` field to frontmatter (rejected — bypasses the derive discipline entirely).
+  - **Reversibility:** easy — the rule is documented here + applied at each `/plan` refresh; future cycles either keep it, refine it, or replace it with something better.
+  - **Surfaced by:** Codex code review of PR #6 (the post-CB-1.2-merge bookkeeping PR), which correctly flagged that this v3 refresh's draft prose claimed `/plan` could be skipped — but the `/plan` workflow's literal rule does fire on each new story.md, even if the resulting duration math collapses to the brief-approval value via this max() rule.
 
 ### Risks
 
