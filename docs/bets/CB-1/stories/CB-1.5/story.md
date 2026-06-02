@@ -2,9 +2,10 @@
 id: CB-1.5
 bet: CB-1
 type: story
-status: in-review
+status: shipped
 priority: P0
 created: 2026-06-02
+shipped: 2026-06-02
 author: PM
 design_link: n/a (no UI surface — single HTTP endpoint; sign-out trigger UI lives in CB-1.6's onboarding/dashboard surface)
 area_tags: [auth, backend]
@@ -152,7 +153,7 @@ The codebase convention from CB-1.2 / CB-1.3 / CB-1.4 is `200` with a typed JSON
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #15](https://github.com/vivekschaudhary/crypto-bot/pull/15) — **merged 2026-06-02** (squash merge commit `be2611f`) — feat(CB-1.5): sign-out endpoint (POST /api/auth/sign-out). 3-commit review cycle across 2 rounds: round 1 surfaced 1 BLOCKER (`docs/status.md` internal-consistency drift from CB-1.5 in-review state — same class as PR #11's v4-era Health note; closed via `ec1b188`); round 2 clean. **Codex security review: no findings.** Engineer DRI Decisions in-flight: (1) extracted `SESSION_COOKIE_NAME` / `SESSION_TTL_SECONDS` / `buildSessionCookie` / `clearSessionCookie` to `lib/auth/cookie.ts` as single source of truth shared with `authenticate/finish/route.ts`; (2) typed-405 pattern introduced via explicit GET/PUT/PATCH/DELETE/HEAD handlers (existing routes use Next.js default 405 — retrofit deferred as P3 Issue). Codex AC 8 E2E `e2e/auth/sign-out.spec.ts` (4 tests; sign-out → 200 + Set-Cookie clear → dashboard 302 with `?next=` → second sign-out 401) committed as `a07e969`. **Supplemental fresh-Agent Claude security read** (PR comment): 4 LOWs (rate-limit Origin-key, OPTIONS no-rate-limit, sliding-expiry waste, 401-not-clearing-cookie) — Codex didn't elevate any to findings. Triggered a 5-PR retrospective A/B (workflow `wzkhajv1x`) comparing fresh-Agent Claude vs Codex across CB-1.1 through CB-1.4 security reviews; verdict `mixed-but-leans-supports`, Codex stays binding. Memory saved at [project_security_reviewer_ab](../../../../../.claude/projects/-Users-vivekchaudhary-apps-crypto-app/memory/project_security_reviewer_ab.md).
 
 ## Tests
 
