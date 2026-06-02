@@ -2,9 +2,10 @@
 id: CB-1.4
 bet: CB-1
 type: story
-status: ready
+status: shipped
 priority: P0
 created: 2026-06-01
+shipped: 2026-06-01
 author: PM
 design_link: n/a (no UI surface — routing-layer enforcement; redirect target visible via existing landing page in CB-1.6)
 area_tags: [auth, backend, routing, proxy]
@@ -154,7 +155,7 @@ The architecture explicitly mandates "cookie alone is not trusted — DB row is 
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #10](https://github.com/vivekschaudhary/crypto-bot/pull/10) — **merged 2026-06-01** — feat(CB-1.4): real session validation in proxy.ts (defense-in-depth). **5-commit review cycle across 4 rounds** — the most-reviewed CB-1 story to date, surfacing the inherent complexity of proxy-layer auth work (CVE-2025-29927 lineage + Next.js 16 spec details + Vercel routing-middleware skill guidance). Round 1 surfaced 4 BLOCKERs (file location, runtime export, headers-on-response CRITICAL, DRI contradiction) + 1 HIGH (open-redirect) + 2 MEDIUM (PUBLIC_ROUTES prefix trap, cookie length cap) + 1 LOW (sliding-expiry); rewrite `2306273` closed all of them. Rounds 2 + 3 surfaced cascading prose drift in story tech notes, risk mitigations, library-API comments, sibling story docs + (dashboard)/page.tsx — closed across `6b5a874`, `1957eb4`, `e3c9de6`. AC 8 E2E landed via `4cc39a3` (Codex-authored Playwright spec covering all three scenarios + the anti-leak verification that the CRITICAL bug stayed closed end-to-end). Both Codex AND Claude fresh-Agent reviewers ran in A/B for rounds 1-3; complementary blind spots validated the multi-model independent-review discipline.
 
 ## Tests
 

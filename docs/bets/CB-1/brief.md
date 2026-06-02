@@ -34,12 +34,12 @@ measurement_window_days: 30
 check_in_cadence: weekly
 area_tags: [auth, security, backend, frontend]
 estimate:
-  duration_weeks: 2
+  duration_weeks: 3
   confidence: high
   refined_by: stories
   refined_at: 2026-06-01
   estimated_start: 2026-05-31
-  estimated_end: 2026-06-14
+  estimated_end: 2026-06-21
   actual_start: 2026-05-31
 ---
 
@@ -130,19 +130,20 @@ _Decomposed one at a time via `/create-story CB-1`. Each lives under `docs/bets/
 - **[CB-1.1.1](stories/CB-1.1.1/story.md) — Codex review remediations for CB-1.1.** Shipped 2026-05-31 via [PR #2](https://github.com/vivekschaudhary/crypto-bot/pull/2). 6 ACs covering: 2 AC amendments (AC 1 + AC 4) + 2 missing tests (AC 2 + AC 3) + pre-merge gates green (AC 5) + PR template harden (AC 6). The `.codex/config.toml` fix for Codex 0.133+ also landed in PR #2 (commit b83fa98) but was extra-scope, not one of the 6 ACs — it surfaced as a blocker to running the Codex review itself partway through the PR.
 - **[CB-1.2](stories/CB-1.2/story.md) — Passkey registration ceremony endpoints.** Shipped 2026-06-01 via [PR #5](https://github.com/vivekschaudhary/crypto-bot/pull/5). 12 ACs (AC 1 + AC 2 amended via Engineer DRI Decision for cookie-bound `pendingUserId` — closes story Risk #3 by design). First E2E in the codebase (Codex AC 8 — Playwright + Chromium virtual authenticator + real Postgres). Review cycle: 5 BLOCKERs across 2 rounds (atomicity, DB-singleton race, OPTIONS handler, typecheck mock cast, canonical-helper duplication) — all closed. `lib/auth/sessions.createSession` extended with optional `tx` parameter for atomic-registration (additive, backward-compatible).
 - **[CB-1.3](stories/CB-1.3/story.md) — Passkey authentication ceremony endpoints.** Shipped 2026-06-01 via [PR #8](https://github.com/vivekschaudhary/crypto-bot/pull/8). 12 ACs (AC 1 + AC 2 amended via Engineer DRI Decision for canonical-helper challenge cookie — uses `lib/auth/challenges.mintChallenge`/`consumeChallenge` rather than inline `signValue`). User-exists precondition + counter-replay guard with Apple platform-authenticator 0/0 exception + atomic transaction (counter UPDATE + rotate-or-create session). Library extensions: `rotateSession` + `generateAuthenticationOptions` accept optional pass-through args; new `fromBase64Url` helper. Second E2E (Codex AC 8 — `e2e/auth/authenticate.spec.ts`; `playwright.config.ts` switched to `workers: 1` for serial DB access across both auth specs). Review cycle: 2 BLOCKERs (Zod schema too loose + AC 8 missing) — both closed. Final Codex code + security reviews clean.
+- **[CB-1.4](stories/CB-1.4/story.md) — Real session validation in `proxy.ts` (defense-in-depth).** Shipped 2026-06-01 via [PR #10](https://github.com/vivekschaudhary/crypto-bot/pull/10). 12 ACs covering route-class branching (302 redirect for dashboard / 401 JSON for API), `?next=<encoded>` open-redirect-safe emit, PUBLIC_EXACT + PUBLIC_PREFIXES split (closes prefix-startswith trap), cookie length cap, Next.js cloned-request-headers + sentinel forwarding (anti-leak), no `runtime` declaration. AC 8 E2E covers all three scenarios + the critical anti-leak check. **5-commit review cycle across 4 rounds** — round 1 surfaced 4 BLOCKERs + HIGH + 2 MEDIUM + 1 LOW; rounds 2–3 surfaced cascading prose drift in tech notes, risk mitigations, library API comments, sibling story forward-references, dashboard placeholder text. Both Codex AND Claude fresh-Agent reviewers ran A/B for rounds 1–3; complementary blind spots validated the multi-model independent-review discipline. Library code unchanged this story (no `lib/auth/sessions` extension; sliding-expiry side-effect preserved per architecture intent). Closes CB-1 guardrail #1.
 
 ### Expected decomposition (PM forecast — remaining)
 
 1. ~~**`lib/auth/` library**~~ — **shipped** via CB-1.1 (+ CB-1.1.1 follow-ups).
 2. ~~**Registration ceremony endpoints**~~ — **shipped** via CB-1.2.
 3. ~~**Authentication ceremony endpoints**~~ — **shipped** via CB-1.3.
-4. **Sign-out endpoint + cookie clearing** — `POST /api/auth/sign-out`.
-5. **`proxy.ts` real session validation** (at project root) — replace scaffold stub; handle both `/(dashboard)/*` redirects + `/api/coinbase|bot/*` 401s.
+4. ~~**`proxy.ts` real session validation**~~ — **shipped** via CB-1.4 (renumbered: originally forecast item #5; story shipped before sign-out, so renumbered to match shipping order).
+5. **Sign-out endpoint + cookie clearing** — `POST /api/auth/sign-out`. (Originally forecast item #4.)
 6. **First-deploy onboarding UX** — landing page flow that detects zero-credentials state and walks the operator through registration in < 5 minutes.
 
-Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 4 story.md files exist (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3), all shipped. 3 forecast items remain.
+Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 5 story.md files exist (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3, CB-1.4), all shipped. 2 forecast items remain.
 
-**Plan v4 refreshed 2026-06-01.** CB-1.3's story.md creation fired the "Stories created" trigger per the `/plan` estimate model. Per the [adaptive-decomposition resolution rule](../../foundation/plan.md#decisions), `duration_weeks = max(stories-based, brief-approval) = max(4 × 3 days, 2 wk) = max(1.71 wk, 2 wk) = 2 wk` — still unchanged. The max() rule continues to backstop the brief's upfront scope ceiling while three forecast stories remain undecomposed. **Watch:** at story count 5, the math flips: max(5 × 3 days, 2 wk) = max(2.14 wk, 2 wk) = ~2.1 wk → `duration_weeks` would legitimately bump to 3.
+**Plan v5 refreshed 2026-06-01.** CB-1.4's story.md creation fired the "Stories created" trigger per the `/plan` estimate model. The watch-threshold from v3/v4 hit: `duration_weeks = max(stories-based, brief-approval) = max(5 × 3 days, 2 wk) = max(2.143 wk, 2 wk) = 2.143 wk → rounds up to 3 wk`. First time the max() rule legitimately moves the duration above the brief-approval ceiling. **MVP target slips one week** (2026-08-09 → 2026-08-16) via the downstream cascade (CB-3 estimated_start 2026-06-15 → 2026-06-22 because CB-1 becomes binding-dep; cascades through CB-4 and CB-5). This is the first honest forward-projection of the cumulative-slippage risk the v1 seed run flagged.
 
 ## Scan summary
 
