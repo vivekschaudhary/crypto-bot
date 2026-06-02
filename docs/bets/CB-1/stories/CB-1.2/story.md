@@ -122,7 +122,7 @@ lib/auth/
 **Out of scope (deferred to subsequent stories or post-MVP):**
 - Authentication ceremony (`/api/auth/authenticate/{begin,finish}`) — CB-1.3
 - Sign-out (`/api/auth/sign-out`) — CB-1.5
-- `app/proxy.ts` real session-validation integration — CB-1.4
+- `proxy.ts` (at project root) real session-validation integration — CB-1.4
 - First-deploy onboarding UX page that drives this flow — CB-1.6
 - Multi-device passkey registration — **deferred post-MVP** per portfolio. The first-time-only gate (AC 3) intentionally blocks multi-device; that gate gets relaxed when multi-device returns post-MVP.
 - Backup recovery code issuance — deferred post-MVP per portfolio (same reason as multi-device).

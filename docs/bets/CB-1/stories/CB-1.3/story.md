@@ -18,7 +18,7 @@ dependencies: [CB-1.1, CB-1.2]
 
 Symmetric companion to CB-1.2: two `POST` route handlers that perform the WebAuthn authentication ceremony for a registered operator. After this story, the operator can sign in on a new browser session by hitting `/api/auth/authenticate/begin` → running `navigator.credentials.get()` → POSTing to `/api/auth/authenticate/finish` and ending with a freshly-issued session cookie. The architecture's invariant **"sessions rotate on each successful passkey authentication"** is honored — any pre-existing session id is invalidated and a new one is issued in the same transaction.
 
-This story is **endpoint-only** — no UI in scope. CB-1.6 owns the onboarding/sign-in page that calls these endpoints. CB-1.4 wires `app/proxy.ts` to actually enforce sessions on protected routes. CB-1.5 owns sign-out.
+This story is **endpoint-only** — no UI in scope. CB-1.6 owns the onboarding/sign-in page that calls these endpoints. CB-1.4 wires `proxy.ts` (at project root) to actually enforce sessions on protected routes. CB-1.5 owns sign-out.
 
 ## Acceptance Criteria
 
@@ -141,7 +141,7 @@ WebAuthn spec says the authenticator's counter MUST monotonically increase acros
 
 **Out of scope (deferred to subsequent stories or post-MVP):**
 - Sign-out (`/api/auth/sign-out`) — CB-1.5
-- `app/proxy.ts` real session validation on protected routes — CB-1.4
+- `proxy.ts` (at project root) real session validation on protected routes — CB-1.4
 - First-deploy onboarding UX page (driving these endpoints from a browser) — CB-1.6
 - Multi-device authentication — deferred post-MVP per portfolio (in MVP, only one credential row exists)
 - Backup recovery code redemption — `/api/auth/recovery/*` endpoints; deferred post-MVP

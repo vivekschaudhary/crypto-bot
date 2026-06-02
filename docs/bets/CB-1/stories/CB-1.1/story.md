@@ -16,7 +16,7 @@ dependencies: []
 
 ## Description
 
-Establish the testable library foundation that every other CB-1 story will consume. Build pure-function (plus thin-DB-query) helpers in `lib/auth/` covering: SimpleWebAuthn server wrappers (registration + authentication option generation and verification), signed-cookie helpers (HMAC-SHA256 sign/verify), session management against the `auth_sessions` table (create / verify / invalidate / rotate), and short-lived WebAuthn challenge storage (signed-cookie approach — see DRI Decision below). No endpoints in this story; no UI. Just a tested, typed library that downstream stories (`/api/auth/register/*`, `/api/auth/authenticate/*`, `app/proxy.ts` integration) can import.
+Establish the testable library foundation that every other CB-1 story will consume. Build pure-function (plus thin-DB-query) helpers in `lib/auth/` covering: SimpleWebAuthn server wrappers (registration + authentication option generation and verification), signed-cookie helpers (HMAC-SHA256 sign/verify), session management against the `auth_sessions` table (create / verify / invalidate / rotate), and short-lived WebAuthn challenge storage (signed-cookie approach — see DRI Decision below). No endpoints in this story; no UI. Just a tested, typed library that downstream stories (`/api/auth/register/*`, `/api/auth/authenticate/*`, `proxy.ts` integration at project root) can import.
 
 This story locks the **challenge-storage approach** that the [CB-1 brief](../../brief.md) deferred to story-level DRI: **encrypted signed cookie** (stateless, auto-expiring, Vercel-serverless-friendly). Rationale captured below.
 
@@ -91,7 +91,7 @@ Note: `lib/auth/session.ts` (the scaffold stub) is replaced by `lib/auth/session
 
 **Out of scope (deferred to subsequent stories):**
 - Route handlers (`app/api/auth/register/*`, `app/api/auth/authenticate/*`, `app/api/auth/sign-out`) — Story CB-1.2 / CB-1.3
-- `app/proxy.ts` real session-validation integration — Story CB-1.4
+- `proxy.ts` (at project root) real session-validation integration — Story CB-1.4
 - Sign-out endpoint + cookie clearing at the HTTP layer — Story CB-1.5
 - First-deploy onboarding UX — Story CB-1.6
 - `device_label` UX (auto-detect vs prompt) — deferred to authenticate-ceremony story per CB-1 brief Open Questions
