@@ -26,7 +26,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { env } from "@/lib/env";
-import { verifyValue } from "@/lib/auth/cookie";
+import { SESSION_COOKIE_NAME, buildSessionCookie, verifyValue } from "@/lib/auth/cookie";
 import { consumeChallenge } from "@/lib/auth/challenges";
 import { createSession, rotateSession } from "@/lib/auth/sessions";
 import { verifyAuthenticationResponse } from "@/lib/auth/webauthn";
@@ -36,8 +36,8 @@ import { RateLimitedError, consumeOrThrow } from "@/lib/auth/rate-limit";
 
 const AUTH_SESSION_COOKIE_NAME = "__compass_auth_session";
 const AUTH_SESSION_PATH = "/api/auth/authenticate/finish";
-const SESSION_COOKIE_NAME = "__compass_session";
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+// SESSION_COOKIE_NAME and the session-cookie attribute set are sourced from
+// `@/lib/auth/cookie` (single source of truth shared with /api/auth/sign-out).
 
 // Tighten beyond CB-1.2's loose object schema: require `response.id` to be a
 // non-empty string, since the handler calls Buffer.from(response.id, 'base64url')
@@ -80,10 +80,9 @@ function parseCookieHeader(header: string | null, name: string): string | null {
 function clearAuthSessionCookie(): string {
   return `${AUTH_SESSION_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Path=${AUTH_SESSION_PATH}; Max-Age=0`;
 }
-
-function buildSessionCookie(signedCookie: string): string {
-  return `${SESSION_COOKIE_NAME}=${signedCookie}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_SECONDS}`;
-}
+// buildSessionCookie now lives in @/lib/auth/cookie (imported above) so the
+// issuance attribute set and the sign-out clear attribute set share a single
+// source of truth — see CB-1.5 AC 12 + the cookie-attribute parity test.
 
 type CredRow = {
   id: string;

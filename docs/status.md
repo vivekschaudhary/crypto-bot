@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-06-01_
+_Last updated: 2026-06-02_
 
 ## In flight
 
 | Bet | Phase | Owner role | Awaiting | Started | ETA |
 |---|---|---|---|---|---|
-| [CB-1](bets/CB-1/brief.md) | 5 stories shipped (CB-1.1 + CB-1.1.1 + CB-1.2 + CB-1.3 + CB-1.4); CB-1.5 (sign-out) next | PM → Engineer | `/create-story CB-1` for CB-1.5 | 2026-05-31 | 2026-06-21 (per plan v5; duration_weeks bumped 2 → 3 per adaptive-decomposition rule) |
+| [CB-1](bets/CB-1/brief.md) | 5 stories shipped (CB-1.1 + CB-1.1.1 + CB-1.2 + CB-1.3 + CB-1.4); [CB-1.5](bets/CB-1/stories/CB-1.5/story.md) in code review on [PR #15](https://github.com/vivekschaudhary/crypto-bot/pull/15) — sign-out endpoint (`status: in-review`) | Engineer → Codex | Codex code review + Codex security review on PR #15 → HITL merge | 2026-05-31 | 2026-06-21 (per plan v5; duration_weeks bumped 2 → 3 per adaptive-decomposition rule) |
 | [CB-2](bets/CB-2/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-2` promotion | 2026-05-31 | tbd at promotion |
 | [CB-3](bets/CB-3/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-3` promotion (after CB-1 + CB-2) | 2026-05-31 | tbd at promotion |
 | [CB-4](bets/CB-4/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-4` promotion (after CB-2 + CB-3) | 2026-05-31 | tbd at promotion |
@@ -14,7 +14,9 @@ _Last updated: 2026-06-01_
 
 ## Awaiting human approval
 
-_None — CB-1 brief approved 2026-05-31. Each remaining stub brief (CB-2..CB-5) requires its own HITL approval after `/create-brief <bet-id>` promotion._
+- **[PR #15](https://github.com/vivekschaudhary/crypto-bot/pull/15) — CB-1.5 sign-out endpoint.** Engineer Phase 4 complete; story status: `in-review`. Awaiting **Codex code review** (per `compass/roles/reviewer.md`) + **Codex security review** (REQUIRED — diff touches auth + sessions + cookies, per the PR template's manual-invoke note). HITL merge gate fires after all BLOCKERs closed, security CRITICALs zero, and CI green.
+
+Each remaining stub brief (CB-2..CB-5) requires its own HITL approval after `/create-brief <bet-id>` promotion.
 
 ## Recently shipped
 
@@ -51,7 +53,7 @@ _None._
 
 ## Health
 
-- **Stories shipped:** 5 (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3, CB-1.4) of ~6 expected under CB-1. 2 stories remain on the CB-1 critical path (CB-1.5 sign-out, CB-1.6 first-deploy onboarding UX). All three passkey ceremonies + the proxy gate (register, authenticate, proxy-gating) now have end-to-end E2E coverage against real Postgres + Chromium virtual authenticator. CB-1 guardrail #1 ("zero unauthenticated capital-touching requests") is now structurally enforced at the routing layer.
+- **Stories shipped:** 5 (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3, CB-1.4) of ~6 expected under CB-1. **6 story.md files exist** as of 2026-06-02 — CB-1.5 in code review on [PR #15](https://github.com/vivekschaudhary/crypto-bot/pull/15), status `in-review` (sign-out endpoint; Engineer Phase 4 closed; Codex review + security review the next gates). 1 story remains in the CB-1 forecast after CB-1.5 (CB-1.6 first-deploy onboarding UX). All three passkey ceremonies + the proxy gate (register, authenticate, proxy-gating) now have end-to-end E2E coverage against real Postgres + Chromium virtual authenticator. CB-1 guardrail #1 ("zero unauthenticated capital-touching requests") is now structurally enforced at the routing layer; CB-1.5 ships the explicit-revocation write path that pairs with that read-side enforcement (PR open, not yet merged).
 - **Process learning captured:** review-before-merge discipline now codified at the PR-template layer (DO NOT MERGE banner). One slip → one named follow-up → one harden, traceable end-to-end via DRI logs.
 - **`/plan` v5 refreshed 2026-06-01** — **first MVP-target slip.** CB-1.4's story.md creation fires the "Stories created" trigger and the watch-threshold from v3/v4 hits. Per the [adaptive-decomposition resolution rule](foundation/plan.md#decisions), `duration_weeks = max(5 × 3 days, 2 wk) = max(2.143 wk, 2 wk) = 2.143 wk → rounds up to 3 wk`. CB-1 `estimated_end` 06-14 → 06-21; CB-1 becomes binding-dep for CB-3 (critical-path shift); downstream cascade pushes CB-3/4/5 each +7 days; **MVP target 2026-08-09 → 2026-08-16**. **Forward-watch:** at story count 7+, math stays at 3 wk firmly; at 9+, bumps to 4 wk (MVP would slip again to 2026-08-23). Standing convention from PR #6: every `/plan` refresh sweeps internal consistency across all sections (Currently-in-flight, ## Done, Blocked binding-dep, Full schedule, MVP-target paragraph, Calendar, Refinement log, Risks watch). PR #11 ran this sweep + Codex caught the one v4-era hold-out here at status.md:56 (now closed).
 - **`docs/dashboard.html`** regenerates on the next `/dashboard` invocation. **`docs/changelog.md`** Unreleased section still pending a convention decision (strict per-bet vs relaxed per-PR accumulation).
