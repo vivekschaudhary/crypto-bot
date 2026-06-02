@@ -82,3 +82,32 @@ export function verifyValue(token: string, secret: string): { value: string } | 
   if (exp <= nowSeconds()) return null;
   return { value: v };
 }
+
+// Session-cookie attribute helpers.
+// Per architecture.md § Foundational Identity & Access Posture / Session strategy:
+//   - Cookie attributes: HttpOnly + Secure + SameSite=Strict + Path=/
+//   - 30-day sliding expiry (TTL applied at issuance; verifySession bumps the
+//     DB row's expires_at on every authenticated request)
+//
+// These helpers are the single source of truth for the session cookie's name +
+// attribute set. `buildSessionCookie` (issuance, at authenticate/finish) and
+// `clearSessionCookie` (revocation, at sign-out) MUST share an identical
+// attribute set except for value + Max-Age — any divergence and the browser
+// keeps the original cookie alongside an unrelated cleared one, defeating
+// the revocation. Extracting both helpers here makes that drift structurally
+// impossible (per CB-1.5 AC 7 / AC 12).
+//
+// NOTE: `proxy.ts` (project root) currently duplicates SESSION_COOKIE_NAME as
+// a local const due to CB-1.5's AC 5 constraint ("NO modifications to
+// proxy.ts" this story). A future story should consolidate.
+
+export const SESSION_COOKIE_NAME = "__compass_session";
+export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+export function buildSessionCookie(signedValue: string): string {
+  return `${SESSION_COOKIE_NAME}=${signedValue}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_SECONDS}`;
+}
+
+export function clearSessionCookie(): string {
+  return `${SESSION_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`;
+}
