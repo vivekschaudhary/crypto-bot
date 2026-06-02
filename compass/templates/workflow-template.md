@@ -144,6 +144,22 @@ version: 0.3.0-alpha             # workflow's own hardening version; bump on nex
   consuming repo. Vendor CLI flags drift; sibling README of the template
   tracks `last_verified` per [freshness-check]. First instance: /build
   Phase 5 (Engineer → Codex via PR + GitHub Actions).
+
+  MECHANICAL-OUTPUT-VERIFICATION: when a workflow includes a build, deploy,
+  or framework-discovery step, the Postcondition is inspection of the
+  build OUTPUT (or runtime artifact), not just the build PROCESS exit
+  code. Per [mechanical-output-verification] (see canon.md, v0.3.6).
+  Source intent and build output can diverge silently — the build process
+  can complete cleanly while the runtime configuration drops what the
+  source declared. Inspect the artifact that actually runs. Framework
+  examples: Next.js (.next/server/*-manifest.json), Vercel (.vercel/output/
+  functions/), Expo (prebuild native config). General principle: when
+  runtime config is data-driven (manifests, bundle indexes, config JSON
+  written by the build), reading source ≠ reading runtime — inspect the
+  latter. Closes the `polished-but-broken` anti-pattern (tests pass +
+  build green + narrative coherent + behavior wrong). 4th enforcement-
+  class Compass-original. Applied in /build Phase 2 step 7 + Codex review
+  Step 0 (compass/roles/reviewer.md).
 -->
 
 ### 1. <Step title>

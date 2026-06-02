@@ -45,15 +45,24 @@ Always, in order:
 
 ## Review process
 
+0. **Framework-registration check (load-bearing).** Per `[mechanical-output-verification]` (canon.md, v0.3.6). For changes that touch **framework-discovered surfaces** — file-based routing, middleware auto-registration, plugin discovery, asset bundling, anything where the framework picks up source files via convention rather than explicit import — **VERIFY THE BUILD OUTPUT FIRST**, before reading tests, before reading source. Ask: **"is this actually deployed by the framework?"** rather than "do the tests pass?":
+   - **Next.js (middleware/routing/pages):** inspect `.next/server/middleware-manifest.json`, `routes-manifest.json`, `app-paths-manifest.json`, `prerender-manifest.json` — confirm the source declaration actually compiled into runtime config. Missing entries = framework silently dropped the file.
+   - **Vercel Functions:** check `.vercel/output/functions/` — confirm declared functions exist in output directory; missing = function won't deploy.
+   - **Expo (native config):** after `expo prebuild`, confirm generated Info.plist / AndroidManifest.xml / entitlements match `app.config.ts` declarations.
+   - **General principle:** when runtime configuration is data-driven (manifests, bundle indexes, config JSON written by the build), reading source ≠ reading runtime. **Inspect the runtime.**
+   - **If the build output is wrong, the tests are misleading.** A green test suite that imports a source file directly (`import proxy from "@/app/proxy"`) can pass even when the framework never registers the file — this is the `direct-import-test-suspicious` failure mode. Flag as BLOCKER if the feature relies on framework discovery.
+   - **REQUIRED** for routing-layer / discovery-layer / framework-convention changes. **OPTIONAL** for pure logic changes (isolated business logic, refactors with no framework-discovery surface).
+
 1. Wait for CI green — review starts AFTER CI passes
 2. Read diff carefully, file by file
 3. For each file: does it match bet architecture? Project conventions? Are tests adequate? Edge cases? Is copy verbatim?
-4. Categorize findings:
-   - **BLOCKER** — violates approved architecture, missing required tests, security issue, contract drift, copy mismatch, broken AC coverage
+4. **Review-time freshness (per `[freshness-check]` canon.md — review-time application).** When the story or DRI Decision names a runtime behavior or file convention as **load-bearing** (e.g., "Next.js middleware uses request headers", "Vercel Functions support `pg_uuidv7` in this region", "Expo passkey API requires Associated Domains entitlement"), VERIFY the claim against the current primary docs of the named tool/framework — **do not trust the story-as-written**. Story claims about framework behavior can go stale between when the story was written and when the diff is reviewed. If the claim is wrong, the review must surface it as a BLOCKER regardless of how cleanly the implementation follows the (incorrect) story. This is the freshness-check pattern applied at review time, not just doc-load time.
+5. Categorize findings:
+   - **BLOCKER** — violates approved architecture, missing required tests, security issue, contract drift, copy mismatch, broken AC coverage, **framework-registration failure (Step 0), or load-bearing framework claim that doesn't match current primary docs (Step 4)**
    - **ISSUE** — should fix but not blocking (code quality, edge case missed)
    - **NIT** — style, naming, optional improvements
-5. **Cite, don't assert.** Every finding references the specific rule/file/section violated.
-6. Post structured comment on the PR.
+6. **Cite, don't assert.** Every finding references the specific rule/file/section violated.
+7. Post structured comment on the PR.
 
 ## Expected Codex output shape
 
@@ -144,3 +153,7 @@ If diff touches auth, payments, PII, secrets, external input, sessions → also 
 - Softening BLOCKERs to ISSUEs to seem reasonable
 - Praising code (your job is to find issues)
 - Letting PR size make you skim
+- **`polished-but-broken`** (v0.3.5, formalized in `[mechanical-output-verification]` v0.3.6) — tests pass + build succeeds + narrative coherent + principles cited + behavior wrong. The diff structurally checks out at every surface level while the actual runtime behavior diverges from intent. **Mechanical inspection of the build output closes the gap** (per Step 0 + Step 4 above). When you see a diff where every check passes but the framework registration / runtime artifact has not been verified, treat it as suspect — do Step 0 first.
+- **`direct-import-test-suspicious`** (v0.3.6, from CB-1.4 Codex retrospective) — when a feature depends on **framework discovery** (file-based routing, middleware auto-registration, plugin loading, asset bundling), direct imports in tests are suspect. The test passes because `import X from "@/path/X"` works in module-resolution; the framework never registers the file at runtime. Test passes; feature is broken. **Flag as BLOCKER or ISSUE** depending on whether the feature is genuinely covered by an integration test that exercises the framework's discovery mechanism (e.g., HTTP request through the actual routing layer, not direct function call).
+- **Story-claim-trust without primary-doc verification** (v0.3.6) — accepting a story or DRI Decision's framework-behavior claim at face value when the claim is load-bearing for the implementation. Story claims drift. Per Step 4, verify load-bearing claims against current primary docs before accepting them as the basis for review.
+- **Narrow-bug focus** (v0.3.6, from CB-1.4 Codex retrospective) — finding a real bug at functional-test layer while missing higher-altitude issues (framework registration, runtime legality, request semantics ordering). **Review at the correct abstraction level first.** Step 0 names this explicitly — framework legality before functional correctness for routing-layer / discovery-layer changes.

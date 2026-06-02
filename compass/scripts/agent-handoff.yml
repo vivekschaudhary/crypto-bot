@@ -18,6 +18,16 @@
 #         GOOGLE_API_KEY      (Option C — Gemini)
 #         <your provider>     (Option D — generic)
 #   4. Pick ONE reviewer block below; leave the others commented out.
+#      ⚠ Codex is default-enabled. This is STRUCTURAL CORRECTNESS, not
+#        ergonomic preference. See AGENTS.md "Tool division of labor" —
+#        same-model reviewer + same-model author share aesthetic priors;
+#        a different-model reviewer (Codex on Claude's work) catches what
+#        a same-model reviewer misses. Empirically validated during
+#        aura-app CB-1.4 (2026-06-01): same diff through both reviewers,
+#        Codex outperformed. The Claude-headless block is documented as
+#        a FALLBACK for teams without Codex access, NOT an equivalent
+#        alternative — choosing same-model review for cost reasons
+#        re-introduces the blind-spot overlap the split exists to close.
 #   5. Verify the reviewer CLI install command + invocation flags against
 #      current vendor docs. The values below are best-effort references;
 #      CLI flags drift. (External-tool drift candidate per [freshness-check]
