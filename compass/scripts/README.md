@@ -137,14 +137,84 @@ If the template isn't installed, the Engineer → Reviewer handoff stays manual 
 
 ---
 
+---
+
+## `check-freshness.py` — `[freshness-check]` pull-bridge round 2 (v0.3.7)
+
+Walks `compass/` for files with `last_verified:` frontmatter; queries each file's `external_source` (GitHub API or HTTP Last-Modified); auto-bumps where the external source is unchanged since `last_verified`; flags where it has changed; errors when it can't tell.
+
+**Closes the 3-slip commitment** (v0.3.3 promised round 2 for v0.3.4; slipped to v0.3.5+, v0.3.6+, finally landed v0.3.7).
+
+### What it produces
+
+- **Auto-bumped** files (safe — external unchanged) — `last_verified` updated to today
+- **Flagged** files (external changed — needs human review) — Compass doc may be stale; verify against external source
+- **Errors** (network / parse failure) — no action taken; surface to human
+- Markdown report at stdout + (optionally) a file via `--out`
+
+### Usage
+
+```bash
+# Dry-run (preview only — does not mutate files)
+python compass/scripts/check-freshness.py
+
+# Apply mode (mutates files in-place)
+python compass/scripts/check-freshness.py --apply
+
+# Write report to a file (in addition to stdout)
+python compass/scripts/check-freshness.py --apply --out report.md
+
+# Override "today" for deterministic CI testing
+python compass/scripts/check-freshness.py --today 2026-06-01
+```
+
+### Exit codes
+
+- `0` — every checked file is fresh or safely auto-bumped (no human attention needed)
+- `1` — at least one file flagged or errored (human review needed; CI uses this to open PR/Issue)
+- `2` — usage error (e.g., bad `--root` path)
+
+### Detection strategies
+
+| External source pattern | Signal used | Accuracy |
+|---|---|---|
+| `https://github.com/<owner>/<repo>` | Latest release `published_at` (primary) · latest tag commit date (fallback) · latest commit date on default branch (last-resort) | High for releases, medium for tags, noisy for commits |
+| Any other URL | HTTP `Last-Modified` header (HEAD, fallback GET) | Variable — many doc sites don't return it accurately |
+| Anything else | Flag + error | — |
+
+### Accuracy honesty
+
+This is **HTTP-level** detection, not semantic. The script knows when external source timestamps changed, not whether the actual content matters:
+- A doc page may change cosmetically without affecting Compass; the script flags it anyway.
+- A CLI tool may publish a release that doesn't change its surface; the script flags it anyway.
+- **Auto-bump only happens when external is UNCHANGED** — the directional bias is "safer to flag than to silently mark stale docs fresh."
+- **Network errors flag** rather than bump.
+
+For semantic verification (did the Codex CLI surface ACTUALLY change?), an LLM is required — not stdlib. Round 2 ships HTTP-level detection only; semantic-level detection is a future candidate (would likely need MCP servers like the Anthropic/OpenAI MCPs that LLMs already use for current-state queries).
+
+### Automated execution
+
+`.github/workflows/freshness-check.yml` runs the script weekly (Mondays 06:00 UTC) on the Compass repo itself. On any week with bumps OR flags, it opens a PR (if bumps applied) or an Issue (if flags only). Manual trigger via Actions UI also supported.
+
+**Round 3 (v0.4+):** distribution — Compass framework updates auto-propagate to consuming repos as PRs. Multi-consumer reality (multiple consumer projects at different framework versions, observed in v0.3.7 cycle) strengthens the case but is still deferred.
+
+### When to use this
+
+- **Automatic (preferred):** GitHub Actions runs the script weekly; humans review the resulting PR/Issue.
+- **Manual:** any time you've updated a Compass doc that references an external tool, run `python compass/scripts/check-freshness.py --apply` locally before committing — the script bumps `last_verified` correctly without requiring you to remember.
+- **Pre-release:** before a Compass version bump, run the script to verify all freshness markers are current.
+
+---
+
 ## Future scripts + templates
 
 Reference implementations may join this directory as Compass evolves. Candidates:
 
-- **Freshness detector** (v0.3.6+) — CI script that watches external-tool sources (Codex changelog, MCP schemas, library release notes, Vercel deploys, AND the CLIs referenced by `agent-handoff.yml`) and auto-bumps `last_verified` markers on Compass docs. Slipped from v0.3.4 → v0.3.5+ → v0.3.6+ as token tracking and handoff automation took priority.
 - **Multi-session aggregator** — wraps `token-usage.py` across many session logs for team-level reporting
 - **Marker linter** — validates `COMPASS_ROLE_BOUNDARY` markers in workflows are well-formed (enter/exit balance, valid role names, no orphans)
 - **Handoff replay** — for repos with high PR volume, gates `agent-handoff.yml` invocation on labels or checks existing comments to avoid duplicate reviews
 - **Cross-agent codex parser** — `token-usage-codex.py` for attributing Codex CLI session tokens (parallel to `token-usage.py` for Claude Code; same protocol, different log format)
+- **Semantic freshness extension** — LLM-driven content-level check for files flagged by `check-freshness.py` (round 2.5 — narrows the false-positive rate when external sources change cosmetically without affecting Compass)
+- **Consumer version sync** (v0.4+) — Compass framework updates auto-propagate to consuming repos as PRs. Pull-bridge round 3.
 
 Add scripts here when problems are structurally hard to solve with markdown docs alone. **Keep them single-file and minimal-dependency** — same discipline as `token-usage.py` (stdlib-only Python) and `agent-handoff.yml` (vanilla GitHub Actions).

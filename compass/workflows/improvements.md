@@ -13,7 +13,7 @@ Retros every 5 entries per AGENTS.md principle #14 (soft-spec-rationalization de
 - **Retro #003** (v0.2.3 → v0.2.7): [retros/2026-05-26-retro-003-v0.2.3-to-v0.2.7.md](retros/2026-05-26-retro-003-v0.2.3-to-v0.2.7.md)
 - **Retro #004** (v0.2.8 → v0.3.5 + same-day extensions): [retros/2026-06-01-retro-004-v0.2.8-to-v0.3.5.md](retros/2026-06-01-retro-004-v0.2.8-to-v0.3.5.md) — fired at #22, **2 cycles overdue** (promised after #20); names retro-cadence-rationalization as drift signal; surfaces `[mechanical-output-verification]` as codification-ready (2 instances).
 
-**Next retro fires after improvement #25.** (v0.3.5 is #22; 3 more entries needed. **Hard line — if it slips again, retro rationalization is no longer one-off.**)
+**Next retro fires after improvement #25.** (v0.3.5 is #22; v0.3.6 = #23; v0.3.7 = #24. **1 more entry needed.** Hard line still in effect — if retro slips again, retro rationalization is no longer one-off.)
 
 ## Template
 
@@ -68,6 +68,53 @@ Retros every 5 entries per AGENTS.md principle #14 (soft-spec-rationalization de
 **Watch for:**
 - Other workflows with "MUST engage" roles that don't enforce *what* the engagement produces (Architect on every PR — what's the deliverable?).
 - Researcher may now over-rotate and produce thin evidence across all three categories just to clear the gate. If that happens, tighten on *quality of evidence* (citations, primary sources) rather than just presence.
+
+---
+
+### 2026-06-01 — Freshness detection shipped (pull-bridge round 2 — 3-slip commitment closure) (v0.3.7)
+
+**Friction:** Three consecutive roadmap slips. v0.3.3 committed freshness detection to v0.3.4; v0.3.4 bumped to v0.3.5+; v0.3.5 bumped to v0.3.6+; v0.3.6 CHANGELOG set hard line: 4th slip triggers re-examination of whether v0.3.3 workflow-side defense is sufficient. User picked v0.3.7 = freshness detection. **The hard line worked** — it created structural pressure that overcame the rationalization-toward-higher-leverage-substantive-releases pattern.
+
+**This is not a new Compass-original.** v0.3.7 is infrastructure shipping a previously-named pattern's round-2 mechanism. First v0.3.x release without a new Compass-original — the cadence "one Compass-original per session" broke here for legitimate reason. Whether infrastructure releases should count separately is a question for next `/retro`.
+
+**Change:**
+
+- **NEW: `compass/scripts/check-freshness.py`** — single-file Python 3 stdlib script. Walks `compass/` for files with `last_verified:` frontmatter; queries each `external_source`:
+  - GitHub repo URLs → GitHub API releases > tags > commits (decreasing accuracy)
+  - Generic URLs → HTTP HEAD/GET for `Last-Modified` header
+  - Comparison: external ≤ `last_verified` → auto-bump (safe); external > `last_verified` → flag (manual review); error → flag-with-error
+  - Flags: `--apply` (mutate), `--today` (deterministic CI), `--out` (write report), `--root` (override).
+  - Exit 0 = all safe; exit 1 = flags or errors (signals CI to open PR/Issue).
+- **NEW: `.github/workflows/freshness-check.yml`** — runs script weekly (Mondays 06:00 UTC) on Compass repo. Bumps → opens PR. Flags only → opens Issue. Everything fresh → no action. **First time `.github/workflows/` is being used in the Compass framework repo itself.**
+- **`compass/scripts/README.md`** gained dedicated `check-freshness.py` section (usage / exit codes / detection strategies / accuracy honesty / automation / when-to-use).
+- **`compass/framework/canon.md` `[freshness-check]` entry** — round 2 status: "deferred" → "shipped v0.3.7" with mechanism described.
+- **`AGENTS.md` Workflow Structure freshness note** — round 2 status: shipped.
+
+**First-run validation surfaced real value immediately.** Dry-run on Compass repo (`python compass/scripts/check-freshness.py`) flagged `compass/roles/reviewer.md` because Codex GitHub had a release published 2026-06-01 (same day as ship); `last_verified` was 2026-05-27. **This is the precise scenario the v0.3.3 workflow-side defense was designed for** — but it would have caught it at next `/build` invocation, not in the framework repo. Round 2 catches it at the source, before any consumer-side workflow needs to refuse. First detection event in the framework's history. **Codex review format may genuinely need re-verification** — surface as Compass-side action item independent of v0.3.7.
+
+**Multi-consumer reality named during planning.** aura-app (at framework v0.2.x) + crypto-app (at framework v0.3.x active) with no sync mechanism between them — manual copy at consumer bootstrap, then drift indefinitely. **This is the round-3 distribution problem from v0.3.3's original framing.** Round 2 detects in the framework repo; round 3 propagates to consumers. Still deferred because round 3 requires real distribution infrastructure (auto-PR to consuming repos, version markers in consumer `compass/config.yaml`, sync tooling). v0.4+ candidate. Multi-consumer reality strengthens motivation but doesn't yet override the cadence.
+
+**Honest scope reminder.** Detection is HTTP-level — timestamp comparison, not content semantic analysis:
+- A doc page may change cosmetically without affecting Compass; the script flags it anyway.
+- A CLI tool may publish a release that doesn't change its surface; the script flags it anyway.
+- Auto-bump only happens when external is UNCHANGED (directional bias toward "flag rather than silently mark fresh").
+- Network errors flag rather than bump.
+- Semantic-level detection (did the Codex CLI surface ACTUALLY change?) requires LLM + structured-output prompting — round 2.5+ territory if false-positive flagging becomes noisy.
+
+**Files touched (6):** new — `compass/scripts/check-freshness.py`, `.github/workflows/freshness-check.yml`. Edited — `compass/scripts/README.md`, `compass/framework/canon.md`, `AGENTS.md`, `CHANGELOG.md`, `compass/workflows/improvements.md`.
+
+**Watch for:**
+- **First-week false-positive rate.** When the workflow runs Monday 2026-06-08, how many of the flagged files are *genuinely* stale vs cosmetically-changed external sources? If false-positive rate > 50%, prioritize round 2.5 (semantic verification of flagged files via LLM). If < 25%, current accuracy bounds are acceptable.
+- **GitHub API rate limits.** Unauthenticated calls cap at 60/hour. Compass currently has 1 file with freshness markers; even 100 files would be fine. If consumer-side adoption scales the marker-count significantly, the workflow may need to switch to authenticated calls (`secrets.GITHUB_TOKEN` is already passed for `gh` CLI; just need to add as `Authorization: token` header in the script). Defer until needed.
+- **`.github/workflows/` directory introduction.** First time Compass repo has CI. Future workflows may follow (release tagging? doc preview? scanner runs?) — but each addition should justify itself against the "Compass is a framework, not an app" framing. Single-purpose workflows only.
+- **Hard-line declarations as pattern.** The v0.3.6 CHANGELOG's "4th slip triggers re-examination" line created structural pressure that actually delivered. Worth examining in next `/retro`: is this a recurring shape (explicit slip-counters + hard-line declarations as soft-spec-hardening applied to roadmap commitments)? If yes, formalize as a Compass-original (`[hard-line-declaration]`?) — but wait for 2nd structurally-distinct instance per codification rule.
+- **First detection event coincidence?** Codex GitHub released on the same day Compass shipped detection. Coincidence, OR signal about external-tool change velocity in the v0.3.x cycle? If Codex / Vercel / Next.js / Anthropic CLIs release frequently (>weekly), the freshness window of 30 days in reviewer.md may be too long — should probably be 7-14 days for fast-moving tools. Monitor 4-week flag rate before adjusting.
+- **Multi-consumer drift continues until round 3.** aura-app stays at v0.2.x until consumer actively pulls or round 3 ships. If a 3rd consumer project appears (likely as Compass adoption broadens), the case for round 3 becomes overwhelming — schedule v0.4 explicitly then.
+- **Infrastructure-release tracking.** v0.3.7 broke the "one Compass-original per session" cadence for legitimate infrastructure reasons. Next retro should examine whether infrastructure releases (mechanism-shipping for previously-named patterns) should be tracked separately from substance releases (new Compass-originals). Counter-correction candidate: add `release_type: infrastructure | compass-original | mixed` field to CHANGELOG entries.
+
+**Meta-observation — the hard-line worked.** v0.3.6 CHANGELOG named the 4th-slip consequence explicitly; v0.3.7 shipped before that consequence triggered. This is the framework's discipline applied to its own roadmap: **soft commitments to future-self get rationalized away unless structurally hardened** (per Principle #14 applied recursively). The hard-line declaration is itself a structural hardening — mechanically visible, in-CHANGELOG, with a named consequence. **First instance of this pattern observably working.** Worth a name for retro consideration: `[hard-line-declaration]` or `[explicit-slip-counter]` — defer codification until 2nd instance.
+
+**Cadence note.** v0.3.1 (Access & Data Posture) · v0.3.2 (elicitation-with-options) · v0.3.3 (freshness-check) · v0.3.4 (role-boundary) · v0.3.5 (agent-handoff + same-day extension) · v0.3.6 (mechanical-output-verification codified) · v0.3.7 (INFRASTRUCTURE — freshness detection shipped) = **7 sessions, 6 Compass-originals + 1 infrastructure release.** The cadence held for 6 consecutive sessions before its first legitimate break. Next retro fires after improvement #25 (this is #24; 1 more entry needed).
 
 ---
 
