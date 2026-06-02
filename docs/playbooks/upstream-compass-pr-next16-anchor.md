@@ -1,8 +1,8 @@
 # Upstream Compass PR — Next 16 anchor correction for `[mechanical-output-verification]`
 
-**Status:** ready to fire after crypto-bot PR #12 merges.
+**Status:** MERGED upstream 2026-06-02 as https://github.com/vivekschaudhary/compass/pull/1 (squash merge commit `73748cb` on `compass-framework/main`; original branch was `fix/mechanical-output-next16-anchor` at commit `24257f5`). Follow-up — when the next compass-framework sync into crypto-bot picks up the merged commit, the local inline credit parentheticals in the four patched files (`AGENTS.md`, `compass/framework/canon.md`, `compass/roles/reviewer.md`, `compass/workflows/build.md`) should be removed in that sync commit because the correction is now canonical upstream. See "How to fire" section below.
 **Target repo:** `vivekschaudhary/compass` (the compass-framework remote).
-**Source commit:** `43dce7f` on crypto-bot branch `chore/sync-compass-framework-v0.3.6`.
+**Source commit:** `43dce7f` on crypto-bot branch `chore/sync-compass-framework-v0.3.6` (since merged via PR #12).
 
 ## Why this PR exists
 
