@@ -83,7 +83,7 @@ If the operator registers a single passkey via WebAuthn (using [SimpleWebAuthn](
 - **Session rotation on authentication** — each successful authenticate ceremony issues a new session ID; the prior session ID is invalidated immediately (no overlap window).
 - **30-day sliding expiry** — every authenticated request bumps `auth_sessions.expires_at`.
 - **`lib/auth/` library** — SimpleWebAuthn wrapper functions, cookie sign/verify helpers, session validation middleware helpers. Pure functions + thin DB queries; testable in isolation.
-- **`app/proxy.ts` integration** — replace scaffold stub with real session validation; redirect unauthenticated requests on `/(dashboard)/*` and reject unauthenticated calls to `/api/coinbase/*` + `/api/bot/*` with 401.
+- **`proxy.ts` integration** (at project root per Next.js 16 contract) — replace scaffold stub with real session validation; redirect unauthenticated requests on `/(dashboard)/*` and reject unauthenticated calls to `/api/coinbase/*` + `/api/bot/*` with 401.
 - **Sign-out flow** — `POST /api/auth/sign-out` invalidates the current `auth_sessions` row + clears the cookie.
 
 ### Out of scope (deferred per portfolio + product bet)
@@ -137,7 +137,7 @@ _Decomposed one at a time via `/create-story CB-1`. Each lives under `docs/bets/
 2. ~~**Registration ceremony endpoints**~~ — **shipped** via CB-1.2.
 3. ~~**Authentication ceremony endpoints**~~ — **shipped** via CB-1.3.
 4. **Sign-out endpoint + cookie clearing** — `POST /api/auth/sign-out`.
-5. **`app/proxy.ts` real session validation** — replace scaffold stub; handle both `/(dashboard)/*` redirects + `/api/coinbase|bot/*` 401s.
+5. **`proxy.ts` real session validation** (at project root) — replace scaffold stub; handle both `/(dashboard)/*` redirects + `/api/coinbase|bot/*` 401s.
 6. **First-deploy onboarding UX** — landing page flow that detects zero-credentials state and walks the operator through registration in < 5 minutes.
 
 Original estimate ~6 stories at ~2-3 days each = ~2-3 weeks. Actuals after 2 calendar days: 4 story.md files exist (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3), all shipped. 3 forecast items remain.

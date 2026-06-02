@@ -8,7 +8,7 @@ export default function DashboardPage() {
       <h1>Dashboard</h1>
       <p>Bot status, balances, trade log, manual overrides — coming via story tickets.</p>
       <p style={{ marginTop: "2rem", color: "#666", fontSize: "0.875rem" }}>
-        Authenticated route group. Session-gated by <code>app/proxy.ts</code> once auth flows ship.
+        Authenticated route group. Session-gated by <code>proxy.ts</code> (at project root) per CB-1.4.
       </p>
     </main>
   );
