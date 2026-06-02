@@ -5,7 +5,7 @@
 # depend on this doc (currently /build Phase 5) refuse if last_verified is older
 # than freshness_window_days. Update `last_verified` after manually confirming
 # the format against external_source.
-last_verified: 2026-05-27
+last_verified: 2026-06-01
 freshness_window_days: 30
 external_source: https://github.com/openai/codex
 ---
