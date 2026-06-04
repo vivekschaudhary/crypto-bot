@@ -17,6 +17,7 @@ import type { JSX } from "react";
 import { db } from "@/lib/db/client";
 import { verifySession } from "@/lib/auth/sessions";
 import { isSafeNextPath } from "@/lib/auth/safe-next";
+import { LandingCTA } from "@/app/landing-cta";
 
 const SESSION_COOKIE_NAME = "__compass_session";
 
@@ -97,9 +98,7 @@ export default async function HomePage({
         <div style={headerStyle}>crypto-bot · operator console</div>
         <hr style={dividerStyle} />
         <p style={bodyStyle}>This instance hasn&apos;t been set up yet.</p>
-        <a href="/setup" style={ctaStyle}>
-          Set up your passkey
-        </a>
+        <LandingCTA href="/setup" label="Set up your passkey" style={ctaStyle} />
       </main>
     );
   }
@@ -109,9 +108,7 @@ export default async function HomePage({
     <main style={cardStyle}>
       <div style={headerStyle}>crypto-bot · operator console</div>
       <hr style={dividerStyle} />
-      <a href={signInHref} style={ctaStyle}>
-        Sign in
-      </a>
+      <LandingCTA href={signInHref} label="Sign in" style={ctaStyle} />
     </main>
   );
 }

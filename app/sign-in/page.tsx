@@ -66,14 +66,10 @@ export default async function SignInPage({
   const params = await searchParams;
   // Consumer-side ?next= revalidation. Silently drop on invalid; null is the
   // honest signal to the client that no safe redirect target was provided.
+  // Per copy.md § Cross-surface strings: no rejection error is rendered to
+  // the user — the legitimate operator never crafts a malicious value, and
+  // any rejection-visible UI would only inform an adversary.
   const safeNext = safeNextOrNull(params.next);
-  if (params.next !== undefined && safeNext === null) {
-    // Dev-only diagnostic per copy.md note. console.warn never reaches a
-    // legit operator in prod (it's a browser-console signal for debugging).
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(`[sign-in] dropped unsafe ?next=${JSON.stringify(params.next)}`);
-    }
-  }
 
   // 1. Active-session gate
   const cookieStore = await cookies();

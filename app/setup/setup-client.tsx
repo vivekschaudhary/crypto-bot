@@ -27,15 +27,19 @@ type ErrorKey =
   | "network";
 
 // Copy strings — verbatim per copy.md § /setup error messages.
-const ERROR_COPY: Record<ErrorKey, string> = {
+// `registration-disabled` is split into a prefix + a CTA-link suffix so the
+// "Go to sign in." trailing copy renders as a real link rather than as
+// duplicated plain text (per copy.md § error table CTA annotation).
+const ERROR_COPY: Record<Exclude<ErrorKey, "registration-disabled">, string> = {
   "browser-unsupported": "This browser doesn't support passkeys. Try Safari (macOS / iOS) or Chrome (any platform).",
   "user-cancelled": "Passkey registration cancelled.",
   "verification-failed": "Passkey registration failed. Try again, or pick a different device.",
-  "registration-disabled": "This instance already has a passkey registered. Go to sign in.",
   "rate-limited": "Too many setup attempts. Wait a minute and try again.",
   "origin-mismatch": "Setup blocked: this page must run on the deployed instance, not a local copy.",
   network: "Setup failed. Check your connection and try again.",
 };
+const REGISTRATION_DISABLED_PREFIX = "This instance already has a passkey registered. ";
+const REGISTRATION_DISABLED_LINK_TEXT = "Go to sign in.";
 
 export function SetupClient(): JSX.Element {
   const router = useRouter();
@@ -67,7 +71,7 @@ export function SetupClient(): JSX.Element {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ device_label: deviceLabel }),
+        body: JSON.stringify({ deviceLabel }),
       });
 
       if (!beginRes.ok) {
@@ -149,14 +153,15 @@ export function SetupClient(): JSX.Element {
           role="alert"
           style={{ marginTop: "1.5rem", color: "#b00020", fontSize: "0.9375rem" }}
         >
-          {ERROR_COPY[errorKey]}
-          {errorKey === "registration-disabled" && (
+          {errorKey === "registration-disabled" ? (
             <>
-              {" "}
+              {REGISTRATION_DISABLED_PREFIX}
               <a href="/sign-in" style={{ color: "#b00020", textDecoration: "underline" }}>
-                Go to sign in
+                {REGISTRATION_DISABLED_LINK_TEXT}
               </a>
             </>
+          ) : (
+            ERROR_COPY[errorKey]
           )}
         </div>
       )}

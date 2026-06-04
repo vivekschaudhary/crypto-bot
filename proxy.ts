@@ -57,7 +57,18 @@ const MAX_COOKIE_BYTES = 2048;
 // First-attempt review caught that `startsWith(${p}/)` against the flat
 // PUBLIC_ROUTES list would silently classify `/api/cron/tick/anything` as
 // public — that's the MEDIUM finding the security reviewer surfaced.
-const PUBLIC_EXACT = new Set<string>(["/", "/api/cron/tick"]);
+const PUBLIC_EXACT = new Set<string>([
+  "/",
+  "/api/cron/tick",
+  // CB-1.6: /setup and /sign-in are unauthenticated UI entry points. The
+  // pages themselves run server-side session + count-of-credentials gates
+  // and redirect appropriately (e.g., already-authenticated visitors are
+  // bounced to /dashboard from inside the page). Adding them here prevents
+  // the proxy from looping unauth visitors through the very pages they
+  // need to reach in order to authenticate.
+  "/setup",
+  "/sign-in",
+]);
 
 const PUBLIC_PREFIXES: readonly string[] = [
   // Ceremony entry points — explicit sub-paths (begin/finish) live below.

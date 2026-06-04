@@ -76,6 +76,8 @@ describe("proxy.ts — public-route passthrough (no DB call)", () => {
     "/api/auth/authenticate/begin",
     "/api/auth/authenticate/finish",
     "/api/auth/recovery/redeem", // future, but the prefix is reserved
+    "/setup", // CB-1.6 exact — auth UI entry point, page does its own session+count gate
+    "/sign-in", // CB-1.6 exact — auth UI entry point, page does its own session+count gate
   ];
 
   for (const pathname of publicPaths) {
@@ -92,6 +94,18 @@ describe("proxy.ts — PUBLIC_ROUTES tightened matching (security review MEDIUM)
     const res = await proxy(makeRequest({ pathname: "/api/cron/tick/admin" }));
     // Should hit the API-401 path (no cookie)
     expect(res.status).toBe(401);
+    expect(verifySessionMock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT classify /setup/anything as public (exact match required for /setup — CB-1.6 regression)", async () => {
+    const res = await proxy(makeRequest({ pathname: "/setup/anything" }));
+    expect(res.status).toBe(302); // dashboard-class non-API → redirect
+    expect(verifySessionMock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT classify /sign-in/sub as public (exact match required for /sign-in — CB-1.6 regression)", async () => {
+    const res = await proxy(makeRequest({ pathname: "/sign-in/sub" }));
+    expect(res.status).toBe(302);
     expect(verifySessionMock).not.toHaveBeenCalled();
   });
 
