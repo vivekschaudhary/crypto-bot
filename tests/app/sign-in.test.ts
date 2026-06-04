@@ -32,6 +32,13 @@ vi.mock("@/lib/db/client", () => ({
   db: () => hoisted.sqlMock,
 }));
 
+// env() is invoked by the page only on the rejected-?next= dev-warn path;
+// we stub NODE_ENV to "test" so the warn is silenced under vitest.
+vi.mock("@/lib/env", () => ({
+  env: () => ({ NODE_ENV: "test" }),
+  origin: () => "https://crypt-bot.kindtree.us",
+}));
+
 // Mock the client component so we can inspect what safeNext value it receives.
 vi.mock("@/app/sign-in/sign-in-client", () => ({
   SignInClient: (props: { safeNext: string | null }) => {

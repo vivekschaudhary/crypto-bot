@@ -17,6 +17,7 @@ import { redirect } from "next/navigation";
 import type { JSX } from "react";
 
 import { db } from "@/lib/db/client";
+import { env } from "@/lib/env";
 import { verifySession } from "@/lib/auth/sessions";
 import { safeNextOrNull } from "@/lib/auth/safe-next";
 
@@ -68,8 +69,14 @@ export default async function SignInPage({
   // honest signal to the client that no safe redirect target was provided.
   // Per copy.md § Cross-surface strings: no rejection error is rendered to
   // the user — the legitimate operator never crafts a malicious value, and
-  // any rejection-visible UI would only inform an adversary.
+  // any rejection-visible UI would only inform an adversary. The dev-only
+  // console.warn IS in copy.md's Engineer note so debugging is possible.
   const safeNext = safeNextOrNull(params.next);
+  if (params.next !== undefined && safeNext === null) {
+    if (env().NODE_ENV !== "production") {
+      console.warn(`[sign-in] dropped unsafe ?next=${JSON.stringify(params.next)}`);
+    }
+  }
 
   // 1. Active-session gate
   const cookieStore = await cookies();

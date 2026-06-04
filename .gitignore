@@ -18,11 +18,6 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
-# Playwright local-run artifacts. Regenerated on every `pnpm e2e`.
-# Codex flagged the accidental check-in on CB-1.5; recurred on CB-1.6
-# PR #17 round-1. Permanent ignore closes the loop.
-test-results/
-
 # Environment files — never commit secrets. .env.example is the contract.
 .env
 .env.local
