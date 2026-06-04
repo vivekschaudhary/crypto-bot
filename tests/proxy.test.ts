@@ -102,19 +102,21 @@ describe("proxy.ts — PUBLIC_ROUTES tightened matching (security review MEDIUM)
 });
 
 describe("proxy.ts — protected dashboard-class routes", () => {
-  it("redirects to /?next=<encoded> with no cookie (302)", async () => {
+  it("redirects to /sign-in?next=<encoded> with no cookie (302) — CB-1.6 AC 5", async () => {
     const res = await proxy(makeRequest({ pathname: "/dashboard" }));
     expect(res.status).toBe(302);
     const location = res.headers.get("location") ?? "";
-    expect(location).toContain(`${ORIGIN}/`);
+    expect(location).toContain(`${ORIGIN}/sign-in`);
     expect(location).toContain("next=%2Fdashboard");
     expect(verifySessionMock).not.toHaveBeenCalled();
   });
 
-  it("redirects to /?next=<encoded> with invalid/tampered cookie (302)", async () => {
+  it("redirects to /sign-in?next=<encoded> with invalid/tampered cookie (302) — CB-1.6 AC 5", async () => {
     verifySessionMock.mockResolvedValueOnce(null);
     const res = await proxy(makeRequest({ pathname: "/dashboard", sessionCookie: "tampered" }));
     expect(res.status).toBe(302);
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain(`${ORIGIN}/sign-in`);
     expect(verifySessionMock).toHaveBeenCalledTimes(1);
   });
 

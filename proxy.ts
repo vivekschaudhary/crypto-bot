@@ -112,7 +112,12 @@ function isSafeNextPath(candidate: string): boolean {
 }
 
 function buildSignInRedirect(request: NextRequest): NextResponse {
-  const target = new URL("/", request.nextUrl);
+  // CB-1.6 AC 5: redirect target is /sign-in, not /. The landing `/` is
+  // now a mode-detecting surface (per CB-1.6 design.md § Surface 1); for
+  // unauth requests targeted at gated routes we route directly to the
+  // dedicated auth ceremony entry. Consumer-side `?next=` validation in
+  // lib/auth/safe-next mirrors the emit-side check below.
+  const target = new URL("/sign-in", request.nextUrl);
   const candidate = `${request.nextUrl.pathname}${request.nextUrl.search}`;
   if (isSafeNextPath(candidate)) {
     target.searchParams.set("next", candidate);
