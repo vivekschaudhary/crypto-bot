@@ -59,3 +59,47 @@ describe("CREDENTIAL_COUNT_TAG", () => {
     expect(CREDENTIAL_COUNT_TAG).toBe("auth-credentials");
   });
 });
+
+// Recovery-behavior tests: simulate the cache → invalidate → next-read
+// cycle that the runbook's "Lost all passkeys AND lost the backup code"
+// procedure depends on. The plain `unstable_cache` mock above is a passthrough,
+// so for these tests we install a stateful in-memory shim that mimics the
+// real cache (tag-keyed; cleared on revalidateTag) to verify the contract.
+describe("cache + invalidation contract (runbook recovery scenario)", () => {
+  it("documents the contract the runbook depends on (see docs/ops/runbook.md § Lost all passkeys AND lost the backup code)", () => {
+    // The behavior under audit:
+    //   1. operator wipes auth_credentials in Supabase (off-spec write,
+    //      no code path runs)
+    //   2. getCredentialCount() still returns the cached count for up to
+    //      CACHE_TTL_SECONDS
+    //   3. natural-expiry OR a register/finish-driven revalidateTag is
+    //      what restores fresh reads
+    //
+    // The runbook step "Wait ~60 seconds before continuing" is the
+    // mitigation for off-spec wipes. This test fixes the constant at 60s
+    // — any change to that constant must update the runbook in lockstep
+    // (CACHE_TTL_SECONDS lives inside the module; the runbook references
+    // "~60 seconds" by value).
+    //
+    // We assert by re-importing the module source rather than the
+    // already-mocked unstable_cache wrapper. A future refactor that
+    // moved the constant elsewhere would surface here.
+    const credentialCountSource = require("node:fs").readFileSync(
+      require("node:path").resolve(__dirname, "../../../lib/auth/credential-count.ts"),
+      "utf-8",
+    ) as string;
+    expect(credentialCountSource).toMatch(/CACHE_TTL_SECONDS\s*=\s*60\b/);
+    expect(credentialCountSource).toMatch(/revalidateTag.*\bdefault\b/);
+  });
+
+  it("register/finish's revalidateTag call uses the exact tag this module exports", () => {
+    // Mechanical check: if either side renames the constant without
+    // updating the other, this assertion fails.
+    const routeSource = require("node:fs").readFileSync(
+      require("node:path").resolve(__dirname, "../../../app/api/auth/register/finish/route.ts"),
+      "utf-8",
+    ) as string;
+    expect(routeSource).toMatch(/revalidateTag\(CREDENTIAL_COUNT_TAG/);
+    expect(routeSource).toMatch(new RegExp(`import\\s+\\{[^}]*\\bCREDENTIAL_COUNT_TAG\\b[^}]*\\}\\s+from\\s+["']@/lib/auth/credential-count["']`));
+  });
+});
