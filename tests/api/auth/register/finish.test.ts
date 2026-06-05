@@ -8,6 +8,15 @@ vi.mock("@/lib/env", () => ({
   origin: () => ORIGIN,
 }));
 
+// Stub next/cache so the route handler can call revalidateTag under
+// vitest where there's no incremental cache context. unstable_cache also
+// needs stubbing because the route transitively imports
+// @/lib/auth/credential-count which wraps a fn with it at module load.
+vi.mock("next/cache", () => ({
+  unstable_cache: <T extends (...args: unknown[]) => unknown>(fn: T): T => fn,
+  revalidateTag: vi.fn(),
+}));
+
 // Mock SimpleWebAuthn verify — the route exercises wrapper plumbing; lib's
 // cryptographic verification is its own test surface (see CB-1.1.1 AC 3).
 // Factory is hoisted to module top, so the mock fn must be declared inline.

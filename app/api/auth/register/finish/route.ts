@@ -19,11 +19,13 @@
 // Cookie attributes are constructed at this layer per architecture.md's
 // session strategy: HttpOnly + Secure + SameSite=Strict + Path=/.
 
+import { revalidateTag } from "next/cache";
 import { ulid } from "ulidx";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { env } from "@/lib/env";
 import { verifyValue } from "@/lib/auth/cookie";
+import { CREDENTIAL_COUNT_TAG } from "@/lib/auth/credential-count";
 import { createSession } from "@/lib/auth/sessions";
 import { verifyRegistrationResponse } from "@/lib/auth/webauthn";
 import type { RegistrationResponseJSON } from "@/lib/auth/webauthn";
@@ -203,6 +205,18 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const { sessionId, signedCookie } = sessionResult;
+
+  // Bust the cached `count(*) FROM auth_credentials` read used by the
+  // pre-auth Server Components at `/`, `/setup`, and `/sign-in`. Per the
+  // 2026-06-04 security audit M1 closure: this is the only on-spec write
+  // path that mutates the credential count.
+  //
+  // `revalidateTag` (not `updateTag`) — `updateTag` is documented as
+  // Server-Action-only; `revalidateTag` is the Route Handler API per
+  // Next.js 16. The `"default"` profile is the canonical short-TTL
+  // setting for the new cached value; the credential-count cache's own
+  // TTL is the upper bound.
+  revalidateTag(CREDENTIAL_COUNT_TAG, "default");
 
   // 7+8. Clear reg cookie, set session cookie, return
   return new Response(JSON.stringify({ userId: pendingUserId, sessionId }), {

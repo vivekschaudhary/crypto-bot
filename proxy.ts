@@ -33,6 +33,7 @@
 // first-attempt review surfaced the contradiction.)
 
 import { NextResponse, type NextRequest } from "next/server";
+import { isSafeNextPath } from "@/lib/auth/safe-next";
 import { verifySession } from "@/lib/auth/sessions";
 
 const SESSION_COOKIE_NAME = "__compass_session";
@@ -86,41 +87,11 @@ function isApiRoute(pathname: string): boolean {
   return pathname.startsWith("/api/");
 }
 
-/**
- * Safe-path check for the `?next=<path>` redirect parameter. Reject:
- *   - Non-string values (defensive)
- *   - Empty string
- *   - Anything not starting with `/`
- *   - Anything containing `//` ANYWHERE — covers protocol-relative URLs
- *     (`//evil.example/path`) AND mid-path double-slash (`/dashboard//evil`).
- *     The URL constructor normalizes backslash (`\`) to `/`, so a path like
- *     `/dashboard/\evil` arrives here as `/dashboard//evil` — same surface.
- *     Rejecting `//` everywhere covers both attack vectors with one rule.
- *   - Path-like values that contain `\` (defense-in-depth in case URL
- *     normalization differs across runtimes)
- *   - Anything containing `:` in the first path segment — catches
- *     `javascript:`, `data:`, `file:`, `mailto:`, etc.
- *
- * Caller responsibility: only set `?next` when the candidate value passes
- * this check. CB-1.6 (the consumer) is responsible for its own validation
- * when reading the value — emit-side validation is defense-in-depth, not
- * the sole protection.
- */
-function isSafeNextPath(candidate: string): boolean {
-  if (typeof candidate !== "string" || candidate.length === 0) return false;
-  if (!candidate.startsWith("/")) return false;
-  if (candidate.includes("//")) return false;
-  if (candidate.includes("\\")) return false;
-  // Reject anything with `:` in the first path segment — catches protocol-
-  // like prefixes (`javascript:`, `data:`, etc.). The first segment ends at
-  // the first `/` after position 0.
-  const firstColon = candidate.indexOf(":");
-  if (firstColon !== -1) {
-    const firstSlash = candidate.indexOf("/", 1);
-    if (firstSlash === -1 || firstColon < firstSlash) return false;
-  }
-  return true;
-}
+// `?next=<path>` allowlist is the SHARED helper at @/lib/auth/safe-next —
+// imported above. Single source of truth across emit (this file) and
+// consume (app/sign-in/page.tsx) sides. Per the 2026-06-04 codebase
+// security audit M2: previously this file carried an inline copy that had
+// silently drifted from safe-next.ts. Consolidated here.
 
 function buildSignInRedirect(request: NextRequest): NextResponse {
   // CB-1.6 AC 5: redirect target is /sign-in, not /. The landing `/` is

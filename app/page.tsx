@@ -14,7 +14,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { JSX } from "react";
 
-import { db } from "@/lib/db/client";
+import { getCredentialCount } from "@/lib/auth/credential-count";
 import { verifySession } from "@/lib/auth/sessions";
 import { isSafeNextPath } from "@/lib/auth/safe-next";
 import { LandingCTA } from "@/app/landing-cta";
@@ -74,12 +74,11 @@ export default async function HomePage({
     }
   }
 
-  // 2. Credential-count detection.
-  const sql = db();
-  const rows = await sql<Array<{ count: number | string }>>`
-    SELECT count(*)::int AS count FROM auth_credentials
-  `;
-  const credentialCount = Number(rows[0]?.count ?? 0);
+  // 2. Credential-count detection (cached via @/lib/auth/credential-count
+  // per M1 from the 2026-06-04 security audit — read is bounded {0, 1}
+  // for an n=1 operator product and only mutates on successful
+  // registration, where the route invalidates the tag).
+  const credentialCount = await getCredentialCount();
 
   // Forward a validated ?next= to /sign-in (State B only). Per design.md,
   // State A does NOT forward ?next= (registration completes by signing in

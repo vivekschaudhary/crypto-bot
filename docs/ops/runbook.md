@@ -177,8 +177,11 @@ Just authenticate with the surviving passkey on another registered device. Then 
    DELETE FROM auth_credentials WHERE user_id = (SELECT id FROM auth_users LIMIT 1);
    DELETE FROM auth_recovery_codes WHERE user_id = (SELECT id FROM auth_users LIMIT 1);
    ```
-2. Visit `/api/auth/register` — the UI treats zero-credentials state as "first-time setup" and starts the ceremony fresh.
-3. Re-register passkeys + generate a new recovery code per the initial-setup ceremony above.
+2. **Wait ~60 seconds before continuing.** The pre-auth landing surfaces (`/`, `/setup`, `/sign-in`) cache `count(auth_credentials)` for 60 seconds to prevent DoS against the `*/15` bot tick. The cache is only invalidated by a successful `register/finish` ceremony — which you cannot run yet because there's no UI path to `/setup` while the cache still reads `count = 1`. The TTL was deliberately kept short for this scenario; longer waits would magnify recovery friction. (See `lib/auth/credential-count.ts` § "Invalidation surface" for the on-spec + off-spec write paths.)
+3. Visit `/` (the landing page) — the now-uncached read will show State A (first-time setup). Click "Set up your passkey", which routes you to `/setup`. The UI treats zero-credentials state as "first-time setup" and starts the ceremony fresh.
+4. Re-register passkeys + generate a new recovery code per the initial-setup ceremony above.
+
+**No fast path other than waiting.** `unstable_cache` writes to Next.js's Data Cache, which Vercel persists across deploys and across regions. A `vercel redeploy` does NOT clear it. The Data Cache is invalidated only by (a) `revalidateTag` from a Route Handler / Server Action — but no such endpoint exists at this scope, and the on-spec `revalidateTag` call in `register/finish` can't fire because the operator can't reach `/setup` while the cache shows `count ≥ 1`; (b) natural TTL expiry. So the 60-second wait above is the recovery bound. If you find yourself running this procedure repeatedly, consider scoping a separate `/ops` PR that adds a `CRON_SECRET`-gated cache-clear endpoint (e.g., `POST /api/admin/credential-cache-clear` calling `revalidateTag(CREDENTIAL_COUNT_TAG, "default")`).
 
 **Note:** the bot itself keeps running on whatever `LIVE_MODE` it was in when access was lost — Coinbase API keys live in Vercel env, not behind app auth. If you need to pause the bot during lockout, either (a) flip `LIVE_MODE=false` in Vercel env, (b) delete the Coinbase API key from Coinbase, or (c) delete the Vercel cron via dashboard.
 

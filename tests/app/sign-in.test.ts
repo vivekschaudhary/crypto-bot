@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const hoisted = vi.hoisted(() => ({
   cookiesGetMock: vi.fn(),
   verifySessionMock: vi.fn(),
-  sqlMock: vi.fn(),
+  getCredentialCountMock: vi.fn(),
   signInClientPropsSpy: vi.fn(),
   state: { credCount: 1 },
 }));
@@ -28,8 +28,9 @@ vi.mock("@/lib/auth/sessions", () => ({
   verifySession: hoisted.verifySessionMock,
 }));
 
-vi.mock("@/lib/db/client", () => ({
-  db: () => hoisted.sqlMock,
+vi.mock("@/lib/auth/credential-count", () => ({
+  getCredentialCount: hoisted.getCredentialCountMock,
+  CREDENTIAL_COUNT_TAG: "auth-credentials",
 }));
 
 // env() is invoked by the page only on the rejected-?next= dev-warn path;
@@ -47,16 +48,17 @@ vi.mock("@/app/sign-in/sign-in-client", () => ({
   },
 }));
 
-hoisted.sqlMock.mockImplementation(async () => [{ count: hoisted.state.credCount }]);
+hoisted.getCredentialCountMock.mockImplementation(async () => hoisted.state.credCount);
 
-const { cookiesGetMock, verifySessionMock, sqlMock, signInClientPropsSpy, state } = hoisted;
+const { cookiesGetMock, verifySessionMock, getCredentialCountMock, signInClientPropsSpy, state } = hoisted;
 
 import SignInPage from "@/app/sign-in/page";
 
 beforeEach(() => {
   cookiesGetMock.mockReset();
   verifySessionMock.mockReset();
-  sqlMock.mockClear();
+  getCredentialCountMock.mockClear();
+  hoisted.getCredentialCountMock.mockImplementation(async () => hoisted.state.credCount);
   signInClientPropsSpy.mockClear();
   state.credCount = 1; // default: returning-operator scenario
 });

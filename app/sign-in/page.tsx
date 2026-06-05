@@ -16,7 +16,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { JSX } from "react";
 
-import { db } from "@/lib/db/client";
+import { getCredentialCount } from "@/lib/auth/credential-count";
 import { env } from "@/lib/env";
 import { verifySession } from "@/lib/auth/sessions";
 import { safeNextOrNull } from "@/lib/auth/safe-next";
@@ -88,12 +88,10 @@ export default async function SignInPage({
     }
   }
 
-  // 2. First-time-only gate (no creds = nothing to sign in to)
-  const sql = db();
-  const rows = await sql<Array<{ count: number | string }>>`
-    SELECT count(*)::int AS count FROM auth_credentials
-  `;
-  const credentialCount = Number(rows[0]?.count ?? 0);
+  // 2. First-time-only gate (no creds = nothing to sign in to).
+  // Cached via @/lib/auth/credential-count per M1 from the 2026-06-04
+  // security audit — DoS-resistant on a pre-auth public surface.
+  const credentialCount = await getCredentialCount();
   if (credentialCount === 0) {
     redirect("/setup");
   }
