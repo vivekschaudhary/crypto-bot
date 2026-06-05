@@ -48,7 +48,7 @@ describe("isSafeNextPath", () => {
   describe("rejects values not starting with /", () => {
     it.each([
       ["dashboard"],
-      ["//dashboard"], // protocol-relative
+      ["//dashboard"], // protocol-relative (also covered by mid-path `//` rule below)
       ["https://evil.example"],
       ["http://evil.example"],
       ["evil.example/path"],
@@ -56,6 +56,24 @@ describe("isSafeNextPath", () => {
       ["../dashboard"],
       ["?next=hijack"],
       ["#fragment"],
+    ])("rejects %j", (candidate) => {
+      expect(isSafeNextPath(candidate)).toBe(false);
+    });
+  });
+
+  describe("rejects `//` ANYWHERE in the path (M2 audit closure — covers URL-constructor `/\\` normalization)", () => {
+    // proxy.ts emits with the same rule. The URL constructor normalizes
+    // backslash to forward-slash, so `/dashboard/\evil` arrives here as
+    // `/dashboard//evil`. Rejecting `//` everywhere covers both attack
+    // vectors with one rule.
+    it.each([
+      ["//dashboard"],
+      ["//evil.example/path"],
+      ["/dashboard//evil"], // mid-path
+      ["/dashboard/sub//deeper"],
+      ["/a//b"],
+      ["/path//"], // trailing
+      ["//"], // bare double-slash
     ])("rejects %j", (candidate) => {
       expect(isSafeNextPath(candidate)).toBe(false);
     });

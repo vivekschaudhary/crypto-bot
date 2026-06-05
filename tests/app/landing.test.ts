@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const hoisted = vi.hoisted(() => ({
   cookiesGetMock: vi.fn(),
   verifySessionMock: vi.fn(),
-  sqlMock: vi.fn(),
+  getCredentialCountMock: vi.fn(),
   state: { credCount: 0 },
 }));
 
@@ -34,21 +34,23 @@ vi.mock("@/lib/auth/sessions", () => ({
   verifySession: hoisted.verifySessionMock,
 }));
 
-vi.mock("@/lib/db/client", () => ({
-  db: () => hoisted.sqlMock,
+vi.mock("@/lib/auth/credential-count", () => ({
+  getCredentialCount: hoisted.getCredentialCountMock,
+  CREDENTIAL_COUNT_TAG: "auth-credentials",
 }));
 
-// Bind state.credCount to the sqlMock return so tests can mutate it.
-hoisted.sqlMock.mockImplementation(async () => [{ count: hoisted.state.credCount }]);
+// Bind state.credCount to the credential-count mock return so tests can mutate it.
+hoisted.getCredentialCountMock.mockImplementation(async () => hoisted.state.credCount);
 
-const { cookiesGetMock, verifySessionMock, sqlMock, state } = hoisted;
+const { cookiesGetMock, verifySessionMock, getCredentialCountMock, state } = hoisted;
 
 import HomePage from "@/app/page";
 
 beforeEach(() => {
   cookiesGetMock.mockReset();
   verifySessionMock.mockReset();
-  sqlMock.mockClear();
+  getCredentialCountMock.mockClear();
+  hoisted.getCredentialCountMock.mockImplementation(async () => hoisted.state.credCount);
   state.credCount = 0;
 });
 

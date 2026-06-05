@@ -1,39 +1,49 @@
-// Consumer-side `?next=` allowlist validator.
+// `?next=<value>` allowlist — single source of truth for both emit (proxy.ts)
+// and consume (app/sign-in/page.tsx) sides.
 //
-// Per CB-1.4 PR #10 security-review HIGH finding closure: any consumer of the
-// `?next=<encoded-original-path>` parameter that proxy.ts emits MUST re-apply
-// the same allowlist independently — defense-in-depth across the emit/consume
-// boundary. The 4 rules below are mirrored character-for-character from
-// proxy.ts's internal `isSafeNextPath` (CB-1.4 buildSignInRedirect, AC 2).
+// History:
+//   - CB-1.4 PR #10 (security-review HIGH closure): proxy.ts established the
+//     emit-side allowlist with a 4-rule check inline.
+//   - CB-1.6 (PR #17): the consumer at /sign-in needed the same rules. The
+//     story DRI #3 explicitly deferred consolidation as post-CB-1 work; in
+//     the meantime, lib/auth/safe-next.ts shipped with a SLIGHTLY-LOOSER copy
+//     (`startsWith("//")` instead of `includes("//")`). The inline comment
+//     in this file claimed the rules were "mirrored character-for-character"
+//     — that claim was false. The codebase security audit on 2026-06-04
+//     surfaced the drift.
+//   - This file's current revision (post-audit fix, M2 closure): now the
+//     single source of truth. proxy.ts imports `isSafeNextPath` from here.
+//     The stricter `includes("//")` rule is the canonical one — it covers
+//     BOTH protocol-relative leading `//` AND mid-path `//` that the URL
+//     constructor can produce when normalizing `/dashboard/\evil` →
+//     `/dashboard//evil`.
 //
-// First consumer: app/sign-in/page.tsx (CB-1.6). Future consumers that need
-// to honor a `next` redirect after authentication SHOULD import from here
-// rather than re-implement the rules. proxy.ts's internal copy is kept inline
-// for CB-1.6 scope reasons — consolidation deferred to a post-CB-1 continuous-
-// improvement story per CB-1.6 PM DRI Decision #3 (story.md).
+// Rules:
+//   1. must be a non-empty string
+//   2. must start with `/`
+//   3. must NOT contain `//` anywhere (covers protocol-relative + URL-
+//      constructor backslash-normalization)
+//   4. must NOT contain `\` (defense-in-depth in case URL normalization
+//      differs across runtimes)
+//   5. must NOT contain `:` in the first path segment (catches
+//      `javascript:`, `data:`, `file:`, `mailto:`, etc.)
 //
-// Rules (drift between this file and proxy.ts is caught by either the
-// safe-next.test.ts or proxy.test.ts assertion sets):
-//   1. must start with `/`
-//   2. must not start with `//` (protocol-relative URL — open-redirect)
-//   3. must not contain `\` (some routers normalize `\` to `/`)
-//   4. must not contain `:` in the first path segment (catches `javascript:`,
-//      `data:`, etc.)
-//
-// Behavior on rejection: caller MUST silently drop the candidate (no error UI
-// or response shown to the user) per CB-1.6 copy.md § Cross-surface strings.
+// Behavior on rejection: caller MUST silently drop the candidate (no error
+// UI or response shown to the user) per CB-1.6 copy.md § Cross-surface
+// strings.
 
 /**
- * Validate a candidate `?next=<value>` against the consumer allowlist.
- * Returns `true` if the value is safe to navigate to as a same-origin path;
- * `false` otherwise.
+ * Validate a candidate `?next=<value>` against the allowlist. Returns
+ * `true` if the value is safe to use as a same-origin path; `false`
+ * otherwise. Used by proxy.ts at emit-side and app/sign-in/page.tsx at
+ * consume-side.
  *
  * Callers SHOULD silently drop on `false` — do not render the rejection.
  */
 export function isSafeNextPath(candidate: unknown): candidate is string {
   if (typeof candidate !== "string" || candidate.length === 0) return false;
   if (!candidate.startsWith("/")) return false;
-  if (candidate.startsWith("//")) return false;
+  if (candidate.includes("//")) return false;
   if (candidate.includes("\\")) return false;
   // Reject anything with `:` in the first path segment — catches protocol-
   // like prefixes (`javascript:`, `data:`, etc.). The first segment ends at
