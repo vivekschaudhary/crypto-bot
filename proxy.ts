@@ -57,7 +57,18 @@ const MAX_COOKIE_BYTES = 2048;
 // First-attempt review caught that `startsWith(${p}/)` against the flat
 // PUBLIC_ROUTES list would silently classify `/api/cron/tick/anything` as
 // public — that's the MEDIUM finding the security reviewer surfaced.
-const PUBLIC_EXACT = new Set<string>(["/", "/api/cron/tick"]);
+const PUBLIC_EXACT = new Set<string>([
+  "/",
+  "/api/cron/tick",
+  // CB-1.6: /setup and /sign-in are unauthenticated UI entry points. The
+  // pages themselves run server-side session + count-of-credentials gates
+  // and redirect appropriately (e.g., already-authenticated visitors are
+  // bounced to /dashboard from inside the page). Adding them here prevents
+  // the proxy from looping unauth visitors through the very pages they
+  // need to reach in order to authenticate.
+  "/setup",
+  "/sign-in",
+]);
 
 const PUBLIC_PREFIXES: readonly string[] = [
   // Ceremony entry points — explicit sub-paths (begin/finish) live below.
@@ -112,7 +123,12 @@ function isSafeNextPath(candidate: string): boolean {
 }
 
 function buildSignInRedirect(request: NextRequest): NextResponse {
-  const target = new URL("/", request.nextUrl);
+  // CB-1.6 AC 5: redirect target is /sign-in, not /. The landing `/` is
+  // now a mode-detecting surface (per CB-1.6 design.md § Surface 1); for
+  // unauth requests targeted at gated routes we route directly to the
+  // dedicated auth ceremony entry. Consumer-side `?next=` validation in
+  // lib/auth/safe-next mirrors the emit-side check below.
+  const target = new URL("/sign-in", request.nextUrl);
   const candidate = `${request.nextUrl.pathname}${request.nextUrl.search}`;
   if (isSafeNextPath(candidate)) {
     target.searchParams.set("next", candidate);

@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-06-02_
+_Last updated: 2026-06-03_
 
 ## In flight
 
 | Bet | Phase | Owner role | Awaiting | Started | ETA |
 |---|---|---|---|---|---|
-| [CB-1](bets/CB-1/brief.md) | 6 stories shipped (CB-1.1 + CB-1.1.1 + CB-1.2 + CB-1.3 + CB-1.4 + CB-1.5); CB-1.6 (first-deploy onboarding UX) is the only forecast item remaining | PM | `/create-story CB-1` for CB-1.6 (first UI surface — design + copy required) | 2026-05-31 | 2026-06-21 (per plan v5; duration_weeks 3) |
+| [CB-1](bets/CB-1/brief.md) | 6 stories shipped; [CB-1.6](bets/CB-1/stories/CB-1.6/story.md) drafted 2026-06-03 (`status: ready`) — first-deploy onboarding UX (4 surfaces: `/` mode-detecting landing, `/setup`, `/sign-in`, minimal `/dashboard` with sign-out); design + copy land alongside | PM → Engineer | HITL approval of CB-1.6 story → `/build CB-1.6` | 2026-05-31 | 2026-06-21 (per plan v5; duration_weeks 3) |
 | [CB-2](bets/CB-2/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-2` promotion | 2026-05-31 | tbd at promotion |
 | [CB-3](bets/CB-3/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-3` promotion (after CB-1 + CB-2) | 2026-05-31 | tbd at promotion |
 | [CB-4](bets/CB-4/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-4` promotion (after CB-2 + CB-3) | 2026-05-31 | tbd at promotion |
@@ -14,7 +14,9 @@ _Last updated: 2026-06-02_
 
 ## Awaiting human approval
 
-_None — CB-1.5 merged 2026-06-02; awaiting `/create-story CB-1` for CB-1.6 (first UI surface; design + copy required). Each remaining stub brief (CB-2..CB-5) requires its own HITL approval after `/create-brief <bet-id>` promotion._
+- **[CB-1.6 story](bets/CB-1/stories/CB-1.6/story.md) + [design](bets/CB-1/stories/CB-1.6/design.md) + [copy](bets/CB-1/stories/CB-1.6/copy.md)** — first-deploy onboarding UX. Drafted 2026-06-03 via `/create-story CB-1`; status: `ready`. Reviewer-of-record: operator (HITL milestone). 12 ACs covering 4 new/changed surfaces (`/`, `/setup`, `/sign-in`, `/dashboard`) + `proxy.ts` redirect-target update + scaffold cleanup (delete `app/(dashboard)/page.tsx`) + `lib/auth/safe-next.ts` consumer-side `?next=` validator + first accessibility-checked surfaces in CB-1. Approve by running `/build CB-1.6`, or push back with edits.
+
+Each remaining stub brief (CB-2..CB-5) requires its own HITL approval after `/create-brief <bet-id>` promotion.
 
 ## Recently shipped
 
@@ -52,7 +54,7 @@ _None._
 
 ## Health
 
-- **Stories shipped:** 6 (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3, CB-1.4, CB-1.5) of ~6 expected under CB-1 + 1 still forecast (CB-1.6 first-deploy onboarding UX — the only CB-1 story with actual UI surface, requires design + copy). All three passkey ceremonies + the proxy gate + the explicit-revocation write path now have end-to-end E2E coverage (4 E2E specs total: register, authenticate, proxy-gating, sign-out). CB-1 guardrail #1 ("zero unauthenticated capital-touching requests") is now closed **bidirectionally** — CB-1.4 enforces the read side (proxy-layer gate); CB-1.5 ships the write side (server-side row deletion via `invalidateSession` + cookie clearing). The "DB row is the source of truth" architectural invariant has both halves implemented.
+- **Stories shipped:** 6 (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3, CB-1.4, CB-1.5) of ~6 expected under CB-1. **7 story.md files exist** as of 2026-06-03 — CB-1.6 drafted (first UI-surface story in the bet; design + copy land alongside; status: `ready`, awaiting HITL approval → `/build`). All three passkey ceremonies + the proxy gate + the explicit-revocation write path have end-to-end E2E coverage (4 E2E specs); CB-1.6 AC 8 will add a fifth E2E that mechanically asserts the brief's `time-to-first-authenticated-dashboard < 5 min` guardrail end-to-end for the first time. CB-1 guardrail #1 ("zero unauthenticated capital-touching requests") is now closed **bidirectionally** — CB-1.4 enforces the read side; CB-1.5 ships the write side. CB-1.6 closes the auth UX loop by shipping the operator-facing surfaces that those gates protect.
 - **Status.md internal-consistency drift hit again on PR #15.** Same class as PR #11's v4-era Health hold-out (the standing convention from PR #6 that every artifact-state change must sweep status.md across all sections). Twice in two consecutive ship cycles is a pattern — Codex caught it both times. **Forward action:** when shipping a story, the status.md sweep should be a load-bearing checklist item, not a per-Edit afterthought. Worth surfacing in the next `/retro` as a candidate for a status.md-update playbook or a /create-story workflow Postcondition.
 - **Process learning captured:** review-before-merge discipline now codified at the PR-template layer (DO NOT MERGE banner). One slip → one named follow-up → one harden, traceable end-to-end via DRI logs.
 - **`/plan` v5 refreshed 2026-06-01** — **first MVP-target slip.** CB-1.4's story.md creation fires the "Stories created" trigger and the watch-threshold from v3/v4 hits. Per the [adaptive-decomposition resolution rule](foundation/plan.md#decisions), `duration_weeks = max(5 × 3 days, 2 wk) = max(2.143 wk, 2 wk) = 2.143 wk → rounds up to 3 wk`. CB-1 `estimated_end` 06-14 → 06-21; CB-1 becomes binding-dep for CB-3 (critical-path shift); downstream cascade pushes CB-3/4/5 each +7 days; **MVP target 2026-08-09 → 2026-08-16**. **Forward-watch:** at story count 7+, math stays at 3 wk firmly; at 9+, bumps to 4 wk (MVP would slip again to 2026-08-23). Standing convention from PR #6: every `/plan` refresh sweeps internal consistency across all sections (Currently-in-flight, ## Done, Blocked binding-dep, Full schedule, MVP-target paragraph, Calendar, Refinement log, Risks watch). PR #11 ran this sweep + Codex caught the one v4-era hold-out here at status.md:56 (now closed).
