@@ -79,12 +79,20 @@ export function SetupClient(): JSX.Element {
         setPhase("error");
         return;
       }
-      const options = (await beginRes.json()) as Parameters<typeof startRegistration>[0];
+      const beginBody = (await beginRes.json()) as {
+        options?: Parameters<typeof startRegistration>[0]["optionsJSON"];
+      };
+      const options = beginBody.options;
+      if (!options) {
+        setErrorKey("network");
+        setPhase("error");
+        return;
+      }
 
       // 2. Browser WebAuthn ceremony
       let attestation;
       try {
-        attestation = await startRegistration(options);
+        attestation = await startRegistration({ optionsJSON: options });
       } catch (err) {
         setErrorKey(classifyWebAuthnError(err));
         setPhase("error");

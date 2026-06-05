@@ -69,11 +69,19 @@ export function SignInClient({ safeNext }: { safeNext: string | null }): JSX.Ele
         setPhase("error");
         return;
       }
-      const options = (await beginRes.json()) as Parameters<typeof startAuthentication>[0];
+      const beginBody = (await beginRes.json()) as {
+        options?: Parameters<typeof startAuthentication>[0]["optionsJSON"];
+      };
+      const options = beginBody.options;
+      if (!options) {
+        setErrorKey("network");
+        setPhase("error");
+        return;
+      }
 
       let assertion;
       try {
-        assertion = await startAuthentication(options);
+        assertion = await startAuthentication({ optionsJSON: options });
       } catch (err) {
         setErrorKey(classifyWebAuthnError(err));
         setPhase("error");
