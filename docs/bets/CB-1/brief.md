@@ -231,16 +231,16 @@ _Populated automatically by `/measure CB-1` cron once the bet ships._
 - [2026-05-31] [PM] **Challenge-storage approach not pinned** — defer to story-level DRI
   - **Severity (required, mandatory):** P3
   - **Owner (required, mandatory):** Engineer (at story time)
-  - **Status:** open
+  - **Status:** closed 2026-06-01 via CB-1.2
   - **Area (required, tag):** implementation
-  - **Resolution (filled when closed):** [to be filled by the first `/create-story CB-1` that covers the registration ceremony — the chosen approach + rationale gets logged in that story's DRI]
+  - **Resolution:** **Signed cookie** (option a from the original three). CB-1.2's Engineer DRI Decision selected the cookie-bound `__compass_reg_session` for the registration ceremony challenge (carrying `{ challenge, pendingUserId, deviceLabel }` as a signed-cookie payload via `lib/auth/cookie.signValue` over `SESSION_SIGNING_SECRET`, 60s TTL). CB-1.3 followed the same pattern via the canonical `lib/auth/challenges.mintChallenge` / `consumeChallenge` helpers for the authentication ceremony — purpose-discriminated payload (`p: 'challenge', k: 'registration' | 'authentication'`) so cross-purpose replay is rejected at the consumer. Stateless; auto-expires; no DB row to sweep. Reversible at the LOC level if KV is ever needed.
 
 - [2026-05-31] [PM] **First-deploy onboarding UX undefined** — story-level UX design
   - **Severity (required, mandatory):** P3
   - **Owner (required, mandatory):** Designer/Engineer (at story time)
-  - **Status:** open
+  - **Status:** closed 2026-06-05 via CB-1.6
   - **Area (required, tag):** ux
-  - **Resolution (filled when closed):** [to be filled during the relevant `/create-story CB-1` for the onboarding flow story]
+  - **Resolution:** **Split route structure** chosen via elicitation-with-options at story creation (`/` mode-detecting landing + `/setup` first-deploy ceremony + `/sign-in` recurring auth + minimal `/dashboard` with sign-out). The mode-detecting landing reads `count(auth_credentials)` + session at request time and renders State A (zero creds → "Set up your passkey" CTA → `/setup`), State B (creds + unauth → "Sign in" CTA → `/sign-in`), or `redirect('/dashboard')` if authed. PM DRI Decisions on cascading questions: device label auto-derived from `navigator.userAgent` (no form field); `?next=` consumer revalidation per CB-1.4 emit-side contract; sign-out button on `/dashboard` top-right chrome. Full design + verbatim copy artifacts at `docs/bets/CB-1/stories/CB-1.6/{design,copy}.md`. Time-to-first-authenticated-dashboard `< 5min` guardrail mechanically asserted via Playwright (CB-1.6 AC 8).
 
 ---
 

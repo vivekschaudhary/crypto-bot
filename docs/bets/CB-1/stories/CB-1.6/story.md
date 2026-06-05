@@ -23,20 +23,20 @@ The bet's < 5-minute guardrail (operator click → registered → on `/dashboard
 
 ## Acceptance Criteria
 
-- [ ] **AC 1 — `/` mode-detecting landing** (per [design.md § Surface 1](./design.md#surface-1----landing) + [copy.md § `/` (landing)](./copy.md#-landing)):
+- [x] **AC 1 — `/` mode-detecting landing** (per [design.md § Surface 1](./design.md#surface-1----landing) + [copy.md § `/` (landing)](./copy.md#-landing)):
   - `app/page.tsx` is a **Server Component**. At request time it (a) reads `__compass_session` cookie via `verifySession` from `@/lib/auth/sessions`; (b) if authenticated → `redirect('/dashboard')` (Next.js `redirect()` helper); (c) else queries `db().auth_credentials` for `count(*)` via `SELECT count(*) FROM auth_credentials` and renders State A (count = 0) or State B (count ≥ 1) per the design.
   - The page does NOT issue any DB writes (read-only SELECT — unlike `verifySession` which bumps `expires_at`; the unauth path on `/` never calls verifySession with a hit, so this stays clean).
   - If inbound has `?next=<encoded>` query parameter, State B's "Sign in" CTA forwards it to `/sign-in` as `?next=<re-encoded>`. State A's "Set up your passkey" CTA does NOT forward `?next` (registration completes by signing in immediately; no separate redirect step).
   - Copy verbatim from [copy.md § `/` (landing)](./copy.md#-landing) — header, body lines, CTA button labels.
 
-- [ ] **AC 2 — `/setup` mode gate + WebAuthn registration ceremony** (per [design.md § Surface 2](./design.md#surface-2----setup-first-deploy-passkey-registration) + [copy.md § `/setup`](./copy.md#setup)):
+- [x] **AC 2 — `/setup` mode gate + WebAuthn registration ceremony** (per [design.md § Surface 2](./design.md#surface-2----setup-first-deploy-passkey-registration) + [copy.md § `/setup`](./copy.md#setup)):
   - `app/setup/page.tsx` is a Server Component for the gate + a Client Component for the ceremony (split per Next.js 16 conventions — Server Component fetches `count(auth_credentials)` + session; if `count >= 1` → `redirect('/sign-in')`; if active session → `redirect('/dashboard')`; otherwise renders the client component).
   - Client component fires `POST /api/auth/register/begin` → `@simplewebauthn/browser` `startRegistration()` → `POST /api/auth/register/finish` with the attestation response.
   - **Device label is auto-derived from `navigator.userAgent`** at registration time (per PM Decision #2). The `/api/auth/register/finish` route accepts a `device_label` field per CB-1.2's body schema; the client extracts a sensible substring from `navigator.userAgent` (e.g., "Safari on macOS 15") rather than passing the raw UA. The exact derivation function lives in `app/setup/lib/device-label.ts` (a single function per AGENTS.md principle #11 — listed in this story).
   - On `/api/auth/register/finish` 200, client-side `router.push('/dashboard')`. Per CB-1.2's architecture, `/finish` already sets the session cookie; the next navigation passes the proxy gate.
   - Copy verbatim from [copy.md § `/setup`](./copy.md#setup) — header, intro, caveat paragraph, CTA labels, success transient, all 7 error messages.
 
-- [ ] **AC 3 — `/sign-in` mode gate + WebAuthn authentication ceremony + `?next=` consumer revalidation** (per [design.md § Surface 3](./design.md#surface-3----sign-in-passkey-authentication) + [copy.md § `/sign-in`](./copy.md#sign-in)):
+- [x] **AC 3 — `/sign-in` mode gate + WebAuthn authentication ceremony + `?next=` consumer revalidation** (per [design.md § Surface 3](./design.md#surface-3----sign-in-passkey-authentication) + [copy.md § `/sign-in`](./copy.md#sign-in)):
   - `app/sign-in/page.tsx` is a Server Component for the gate + Client Component for the ceremony. Gate: if `count(auth_credentials) = 0` → `redirect('/setup')`; if active session → `redirect(validatedNext || '/dashboard')`; else render the client component with `next` (post-validation) passed as a prop.
   - **`?next=` consumer revalidation (defense-in-depth per CB-1.4 emit-side contract; closes the security-review HIGH precondition on PR #10).** The Server Component validates `searchParams.next` BEFORE passing to the client component, applying all 4 emit-side rules verbatim:
     1. Reject if `next` does not start with `/`.
@@ -47,23 +47,23 @@ The bet's < 5-minute guardrail (operator click → registered → on `/dashboard
   - Client component fires `POST /api/auth/authenticate/begin` → `startAuthentication()` → `POST /api/auth/authenticate/finish`. On 200, `router.push(safeNext || '/dashboard')`.
   - Copy verbatim from [copy.md § `/sign-in`](./copy.md#sign-in) — header, body, CTA labels, success transient, footer (runbook reference is plain text NOT a clickable link, per copy Decision #4), all 7 error messages.
 
-- [ ] **AC 4 — `/dashboard` minimal post-auth landing + sign-out trigger** (per [design.md § Surface 4](./design.md#surface-4----dashboard-minimal-post-auth-landing) + [copy.md § `/dashboard`](./copy.md#dashboard-minimal-post-auth-landing)):
+- [x] **AC 4 — `/dashboard` minimal post-auth landing + sign-out trigger** (per [design.md § Surface 4](./design.md#surface-4----dashboard-minimal-post-auth-landing) + [copy.md § `/dashboard`](./copy.md#dashboard-minimal-post-auth-landing)):
   - `app/dashboard/page.tsx` is a Server Component. The proxy already gates it; the page reads the `x-session-user-id` + `x-session-id` headers forwarded by proxy (per CB-1.4 cloned-request-headers mechanism — convenience signals, NOT auth claims). The page does NOT re-verify the session itself because rendering is not a state-mutating action; the proxy gate is sufficient for read-only render per CB-1.4 Engineer DRI Decision #5 ("re-verify for state mutation; convenience for render is acceptable").
   - Reads `auth_credentials.device_label` for the credential associated with the current session (`auth_sessions.user_id` → `auth_credentials.user_id` → `device_label`); renders "Connected device: {device_label}" (fallback "Connected device: this device" if `device_label` is NULL).
   - **Sign-out button** is a Client Component fired by an `onClick` handler that calls `fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' })`. On 200, `router.push('/')`. On 401 (session already invalidated mid-flight), also `router.push('/')` (treated as success-equivalent per [copy.md § Sign-out error](./copy.md#sign-out-error-rare)). On 403, render the typed origin-mismatch error.
   - Copy verbatim from [copy.md § `/dashboard`](./copy.md#dashboard-minimal-post-auth-landing) — header, "Sign out" button label, signed-in line, "Bot controls coming in CB-2" placeholder line, connected-device line, all sign-out error variants.
 
-- [ ] **AC 5 — `proxy.ts` redirect target updates from `/` to `/sign-in`** (closes the CB-1.4 hand-off; updates CB-1.4 AC 2's downstream contract):
+- [x] **AC 5 — `proxy.ts` redirect target updates from `/` to `/sign-in`** (closes the CB-1.4 hand-off; updates CB-1.4 AC 2's downstream contract):
   - `proxy.ts` (project root) `buildSignInRedirect` function changes the target from `/` to `/sign-in`. The `?next=<encoded-original-path>` parameter continues to be set with the same emit-side safety checks (start with `/`, no `//`, no `\`, no `:` before first `/`).
   - The corresponding test in `tests/proxy.test.ts` updates from `expect.stringContaining('/?next=')` to `expect.stringContaining('/sign-in?next=')` — one assertion change.
   - **CB-1.4 story.md is NOT amended in this PR**; the AC text there describes what CB-1.4 shipped at the time. This story owns the downstream consumer + the one-line proxy change.
 
-- [ ] **AC 6 — Scaffold cleanup: delete `app/(dashboard)/page.tsx`** (closes the CB-1.4 Engineer Issue at story.md:242-247):
+- [x] **AC 6 — Scaffold cleanup: delete `app/(dashboard)/page.tsx`** (closes the CB-1.4 Engineer Issue at story.md:242-247):
   - The route group `app/(dashboard)/` was a scaffold artifact that resolved to `/` and collided with `app/page.tsx`. Delete the entire `app/(dashboard)/` directory.
   - `app/dashboard/page.tsx` (the real `/dashboard` route, no parens) is what AC 4 ships against — that path is unchanged.
   - Add a single regression test in `tests/scaffold-cleanup.test.ts` asserting `app/(dashboard)/` does NOT exist (catches re-introduction).
 
-- [ ] **AC 7 — Vitest unit + integration tests** under `tests/app/landing.test.ts`, `tests/app/setup.test.ts`, `tests/app/sign-in.test.ts`, `tests/app/dashboard.test.ts`, `tests/lib/auth/safe-next.test.ts`, and `tests/proxy.test.ts` (updated for AC 5). Coverage:
+- [x] **AC 7 — Vitest unit + integration tests** under `tests/app/landing.test.ts`, `tests/app/setup.test.ts`, `tests/app/sign-in.test.ts`, `tests/app/dashboard.test.ts`, `tests/lib/auth/safe-next.test.ts`, and `tests/proxy.test.ts` (updated for AC 5). Coverage:
   - **`/` State A (zero creds):** SSR renders State A copy + State A CTA links to `/setup`; no `?next` forwarded.
   - **`/` State B (≥ 1 cred, no session):** SSR renders State B copy + State B CTA links to `/sign-in`; inbound `?next=%2Fdashboard` forwards to `/sign-in?next=%2Fdashboard`.
   - **`/` State C (active session):** SSR redirects to `/dashboard` (302).
@@ -78,7 +78,7 @@ The bet's < 5-minute guardrail (operator click → registered → on `/dashboard
   - **`tests/proxy.test.ts` update:** the existing CB-1.4 test for "dashboard redirect on no auth" updates to expect `/sign-in?next=%2Fdashboard` rather than `/?next=%2Fdashboard`. One file, one assertion changed.
   - All tests pass via `pnpm test`.
 
-- [ ] **AC 8 — Codex writes E2E** under `e2e/auth/onboarding.spec.ts`:
+- [x] **AC 8 — Codex writes E2E** under `e2e/auth/onboarding.spec.ts`:
   - **Fresh-instance journey:** start with zero `auth_credentials` rows. Visit `/` → expect State A. Click "Set up your passkey" → land on `/setup`. Trigger the WebAuthn ceremony via Playwright's virtual authenticator. Expect to land on `/dashboard` with "Signed in." rendered. < 5 minutes total wall-clock (Playwright measures + asserts the guardrail — the bet's `time-to-first-authenticated-dashboard < 5 min` is mechanically verified here for the first time).
   - **Returning-operator journey:** with a registered credential pre-seeded, visit `/` → expect State B. Click "Sign in" → land on `/sign-in`. Trigger the WebAuthn auth ceremony. Expect to land on `/dashboard`.
   - **Deep-link preservation:** visit `/dashboard/somewhere-future-nonexistent` while unauthenticated → expect 302 to `/sign-in?next=%2Fdashboard%2Fsomewhere-future-nonexistent`. Complete sign-in. Expect to land on `/dashboard/somewhere-future-nonexistent` (which 404s in this story but verifies the `?next=` round-trip — the framework handles the 404 cleanly).
@@ -86,11 +86,11 @@ The bet's < 5-minute guardrail (operator click → registered → on `/dashboard
   - **Sign-out round trip:** signed-in operator on `/dashboard` clicks "Sign out". Expect to land on `/` State B (creds still exist, just no active session). Re-attempt access to `/dashboard` directly → 302 back to `/sign-in?next=%2Fdashboard`.
   - Codex commits with `test:` prefix per `/build` Phase 3.
 
-- [ ] **AC 9** — `pnpm typecheck` passes with `strict: true`. No `any`. All env access via `lib/env`. No `process.env` reads in any new `app/*` file.
+- [x] **AC 9** — `pnpm typecheck` passes with `strict: true`. No `any`. All env access via `lib/env`. No `process.env` reads in any new `app/*` file.
 
-- [ ] **AC 10** — `pnpm lint` passes. No new ignore entries.
+- [x] **AC 10** — `pnpm lint` passes. No new ignore entries.
 
-- [ ] **AC 11** — `pnpm build` produces a successful production build AND build output shows all 4 new routes registered per [`[mechanical-output-verification]`](../../../../foundation/architecture.md):
+- [x] **AC 11** — `pnpm build` produces a successful production build AND build output shows all 4 new routes registered per [`[mechanical-output-verification]`](../../../../foundation/architecture.md):
   - `app/page.tsx` route entry exists in `.next/server/app-paths-manifest.json` (already existed pre-CB-1.6; content changes but path doesn't).
   - `app/setup/page.tsx` registered at path `/setup/page` in `.next/server/app-paths-manifest.json` (NEW).
   - `app/sign-in/page.tsx` registered at path `/sign-in/page` in `.next/server/app-paths-manifest.json` (NEW).
@@ -98,7 +98,7 @@ The bet's < 5-minute guardrail (operator click → registered → on `/dashboard
   - `app/(dashboard)/` directory REMOVED — the manifest no longer has any `(dashboard)` entries.
   - The Next 16 routing-layer manifests (`functions-config-manifest.json` for middleware/proxy; unchanged this story since proxy.ts edit is content-only) remain consistent.
 
-- [ ] **AC 12** — **Accessibility checks pass** per [design.md § Accessibility checklist](./design.md#accessibility-checklist-this-design):
+- [x] **AC 12** — **Accessibility checks pass** per [design.md § Accessibility checklist](./design.md#accessibility-checklist-this-design):
   - Focus moves to primary CTA on mount of each page (`/`, `/setup`, `/sign-in`) and to sign-out button on `/dashboard` mount.
   - Tab + Enter activates each CTA; Esc dismisses error region.
   - Error region uses `role="alert"` so SR announces failures immediately.
@@ -254,4 +254,4 @@ _None at story creation._
 
 ---
 
-_Story closed: <date>, brief link: [docs/bets/CB-1/brief.md](../../brief.md)_
+_Story closed: 2026-06-05 (via PR #17 + security follow-up PR #18), brief link: [docs/bets/CB-1/brief.md](../../brief.md)_
