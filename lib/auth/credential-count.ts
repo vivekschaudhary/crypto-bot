@@ -20,12 +20,28 @@
 // the cache value can only go wrong in one direction (cached "0" while
 // DB has "1") and only briefly during the setup window.
 //
-// The single invalidation hook lives in
-// `app/api/auth/register/finish/route.ts`, which calls
-// `updateTag(CREDENTIAL_COUNT_TAG)` after a successful registration.
-// That's the only on-spec write path that mutates the count; any other
-// (manual DB intervention via the runbook) requires a deploy or a
-// process restart anyway.
+// **Invalidation surface — load-bearing.**
+//
+// The on-spec write path: `app/api/auth/register/finish/route.ts` calls
+// `revalidateTag(CREDENTIAL_COUNT_TAG, "default")` after a successful
+// registration. That covers the normal `0 → 1` transition.
+//
+// The OFF-spec write path: the runbook's absolute-last-resort recovery
+// procedure (docs/ops/runbook.md § "Lost all passkeys AND lost the
+// backup code") wipes `auth_credentials` directly in Supabase, OUTSIDE
+// any Next.js code path. Nothing in the deployed code can call
+// `revalidateTag` in response to that wipe. If the TTL were long, the
+// operator's next visit to `/` would still see cached `count >= 1`,
+// route them to `/sign-in`, find no credentials, redirect to `/setup`,
+// find a cached "already set up" gate, redirect to `/sign-in` — soft
+// lockout until TTL elapses.
+//
+// Mitigation: short TTL (60 seconds). That defeats the DoS attack on
+// the postgres.js pool just as effectively as a longer TTL at the
+// realistic public-page request rate, and bounds the runbook-recovery
+// stuck window to ~1 minute. Per the audit context, the count is
+// bounded `{0, 1}` at n=1, so the per-minute DB read is structurally
+// trivial.
 
 import { unstable_cache } from "next/cache";
 
@@ -33,10 +49,11 @@ import { db } from "@/lib/db/client";
 
 export const CREDENTIAL_COUNT_TAG = "auth-credentials";
 
-// Long TTL (1 hour) — the cache is invalidated explicitly on registration.
-// The TTL is the upper bound on cache staleness in the unlikely event the
-// invalidate-tag call fails (e.g., a deploy-vs-fluid-compute race).
-const CACHE_TTL_SECONDS = 60 * 60;
+// 60-second TTL — see Invalidation surface above. Short enough that
+// runbook-driven manual DB recovery clears in ~1 min; long enough that
+// the public unauth surface doesn't issue DB reads under sustained
+// traffic.
+const CACHE_TTL_SECONDS = 60;
 
 async function fetchCredentialCount(): Promise<number> {
   const sql = db();
