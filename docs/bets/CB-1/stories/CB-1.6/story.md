@@ -2,9 +2,10 @@
 id: CB-1.6
 bet: CB-1
 type: story
-status: ready
+status: shipped
 priority: P0
 created: 2026-06-03
+shipped: 2026-06-05
 author: PM
 design_link: docs/bets/CB-1/stories/CB-1.6/design.md
 copy_link: docs/bets/CB-1/stories/CB-1.6/copy.md
@@ -161,7 +162,9 @@ This is the first story where the brief's "time-to-first-authenticated-dashboard
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #17](https://github.com/vivekschaudhary/crypto-bot/pull/17) — **merged 2026-06-04** (squash merge commit `9d26b8c`) — feat(CB-1.6): first-deploy onboarding UX (4 surfaces + scaffold cleanup). **4-commit review cycle across 3 rounds** + AC 8 E2E commit by Codex. Round 1 surfaced 3 BLOCKERs (proxy.ts gating `/setup` + `/sign-in` → infinite loop, `device_label` vs `deviceLabel` key drift dropping the UA-derived label, AC 8 E2E missing) + 3 ISSUEs (focus management on `/`, direct `process.env` read in sign-in, duplicated "Go to sign in" copy in setup race error). Round 2 surfaced 1 BLOCKER (`.gitignore` `test-results/` scope drift vs AC 10 strict reading) + 1 ISSUE (dev-only diagnostic hook removed). Round 3 clean. **Codex's AC 8 E2E (`962e262`) surfaced 2 real production bugs** in `app/setup/setup-client.tsx` + `app/sign-in/sign-in-client.tsx` that my unit tests masked: `@simplewebauthn/browser@11` API drift (`startRegistration({ optionsJSON })` not `startRegistration(options)`) + begin endpoint response shape (`{ options }` not options-at-top-level). Static mocks couldn't see the runtime contract; real Playwright + virtual authenticator did. Clean replication of the `[mechanical-output-verification]` pattern (canon.md v0.3.6 + the Next 16 anchor we patched on PR #12) — one layer earlier than prior cycles. The fix shipped in the same E2E commit. Final state: 246 Vitest tests + 5 Playwright E2E (sign-out, register, authenticate, proxy-gating, onboarding) all green. **Engineer DRI Decisions:** React 19 explicit `JSX` import; `vi.hoisted()` pattern for Server Component tests (first story with this surface); JSX-tree walk over spy assertion for SignInClient.safeNext; `safe-next.ts` consumer extracted but proxy emit-side stayed inline (consolidation deferred per PM DRI #3 — then closed earlier than planned via PR #18 below).
+
+- [PR #18](https://github.com/vivekschaudhary/crypto-bot/pull/18) — **merged 2026-06-05** (squash merge commit `4e6c7ea`) — fix: close M1 (DB DoS) + M2 (safe-next drift) from 2026-06-04 codebase security audit. **4-round review cycle.** Closes the two MEDIUM findings from the [operator-requested fresh-Agent codebase audit](../../../../retros/2026-06-04-codebase-security-audit.md). **M1:** new [`lib/auth/credential-count.ts`](../../../../../lib/auth/credential-count.ts) wraps the `count(*) FROM auth_credentials` query with Next.js `unstable_cache` + 60s TTL + tag-based invalidation; `register/finish` calls `revalidateTag(CREDENTIAL_COUNT_TAG, "default")` after successful registration. Defends the `*/15` bot tick against postgres.js-pool exhaustion via burst-flood on the 3 pre-auth pages. **M2:** [`lib/auth/safe-next.ts`](../../../../../lib/auth/safe-next.ts) is now single source of truth for the `?next=` allowlist (stricter `includes("//")` rule); [proxy.ts](../../../../../proxy.ts) imports from there; inline copy deleted. **Closes PM DRI Decision #3 deferral** ("consolidation can land as continuous-improvement post-CB-1") — earlier than scheduled because the audit elevated the drift from "tech debt" to "false documented invariant." Codex review rounds: R1 surfaced 2 BLOCKERs (`updateTag` is Server-Action-only per Next 16 docs → swap to `revalidateTag(tag, profile)`; long TTL leaves runbook recovery stuck → drop 1h→60s); R2 surfaced 1 ISSUE (60s still weakens recovery + tests mock past cache → runbook update + mechanical contract tests); R3 surfaced 1 ISSUE (false `vercel redeploy` fast-path — `unstable_cache` writes to the Data Cache which Vercel persists across deploys → honest "no fast path other than waiting" prose); R4 clean. Final: 260 Vitest tests; security review clean throughout all 4 rounds.
 
 ## Tests
 
