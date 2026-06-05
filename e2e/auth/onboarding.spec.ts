@@ -150,10 +150,7 @@ test.afterAll(async () => {
   await sql.end({ timeout: 5 });
 });
 
-test("CB-1.6 AC 8: fresh-instance journey reaches /dashboard in under 5 minutes", async ({
-  context,
-  page,
-}) => {
+test("CB-1.6 AC 8: fresh-instance journey reaches /dashboard in under 5 minutes", async ({ page }) => {
   test.setTimeout(120_000);
   const authenticator = await addVirtualAuthenticator(page);
 
