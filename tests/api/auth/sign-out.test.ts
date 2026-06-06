@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const FAKE_SECRET = "z".repeat(48);
-const ORIGIN = "https://crypt-bot.kindtree.us";
+const ORIGIN = "https://crypto-bot.kindtree.us";
 
 vi.mock("@/lib/env", () => ({
   env: () => ({ SESSION_SIGNING_SECRET: FAKE_SECRET }),

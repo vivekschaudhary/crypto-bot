@@ -37,7 +37,7 @@ vi.mock("@/lib/auth/credential-count", () => ({
 // we stub NODE_ENV to "test" so the warn is silenced under vitest.
 vi.mock("@/lib/env", () => ({
   env: () => ({ NODE_ENV: "test" }),
-  origin: () => "https://crypt-bot.kindtree.us",
+  origin: () => "https://crypto-bot.kindtree.us",
 }));
 
 // Mock the client component so we can inspect what safeNext value it receives.

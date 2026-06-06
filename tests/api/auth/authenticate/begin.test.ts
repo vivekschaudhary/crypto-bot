@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const FAKE_SECRET = "z".repeat(48);
-const ORIGIN = "https://crypt-bot.kindtree.us";
+const ORIGIN = "https://crypto-bot.kindtree.us";
 
 vi.mock("@/lib/env", () => ({
   env: () => ({ SESSION_SIGNING_SECRET: FAKE_SECRET }),
@@ -66,7 +66,7 @@ describe("POST /api/auth/authenticate/begin", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.options).toBeDefined();
-    expect(body.options.rpId).toBe("crypt-bot.kindtree.us");
+    expect(body.options.rpId).toBe("crypto-bot.kindtree.us");
     expect(body.options.challenge).toBeDefined();
     expect(body.options.allowCredentials).toBeDefined();
     expect(body.options.allowCredentials.length).toBe(1);

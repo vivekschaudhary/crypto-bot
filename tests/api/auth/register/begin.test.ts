@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const FAKE_SECRET = "z".repeat(48);
-const ORIGIN = "https://crypt-bot.kindtree.us";
+const ORIGIN = "https://crypto-bot.kindtree.us";
 
 vi.mock("@/lib/env", () => ({
   env: () => ({ SESSION_SIGNING_SECRET: FAKE_SECRET }),
@@ -61,7 +61,7 @@ describe("POST /api/auth/register/begin", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.options).toBeDefined();
-    expect(body.options.rp.id).toBe("crypt-bot.kindtree.us");
+    expect(body.options.rp.id).toBe("crypto-bot.kindtree.us");
     expect(body.options.challenge).toBeDefined();
     expect(body.pendingUserId).toBeUndefined(); // pendingUserId is NOT in response body
 

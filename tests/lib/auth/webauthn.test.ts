@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/env", () => ({
   env: () => ({ SESSION_SIGNING_SECRET: "z".repeat(48) }),
-  origin: () => "https://crypt-bot.kindtree.us",
+  origin: () => "https://crypto-bot.kindtree.us",
 }));
 
 import {
@@ -18,7 +18,7 @@ describe("lib/auth/webauthn", () => {
       userId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
       userName: "operator",
     });
-    expect(opts.rp.id).toBe("crypt-bot.kindtree.us");
+    expect(opts.rp.id).toBe("crypto-bot.kindtree.us");
     expect(opts.rp.name).toBe("Crypto DCA Bot");
     expect(opts.user.name).toBe("operator");
     expect(opts.challenge).toBeDefined();
@@ -36,7 +36,7 @@ describe("lib/auth/webauthn", () => {
 
   it("generateAuthenticationOptions returns options scoped to our RP ID", async () => {
     const opts = await generateAuthenticationOptions();
-    expect(opts.rpId).toBe("crypt-bot.kindtree.us");
+    expect(opts.rpId).toBe("crypto-bot.kindtree.us");
     expect(opts.challenge).toBeDefined();
   });
 

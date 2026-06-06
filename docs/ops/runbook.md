@@ -176,6 +176,17 @@ Just authenticate with the surviving passkey on another registered device. Then 
    DELETE FROM auth_sessions WHERE user_id = (SELECT id FROM auth_users LIMIT 1);
    DELETE FROM auth_credentials WHERE user_id = (SELECT id FROM auth_users LIMIT 1);
    DELETE FROM auth_recovery_codes WHERE user_id = (SELECT id FROM auth_users LIMIT 1);
+   DELETE FROM auth_users;
+   -- Verify all four tables are empty before proceeding:
+   SELECT 'users' AS t, count(*) FROM auth_users
+   UNION ALL SELECT 'creds', count(*) FROM auth_credentials
+   UNION ALL SELECT 'sessions', count(*) FROM auth_sessions
+   UNION ALL SELECT 'recovery', count(*) FROM auth_recovery_codes;
+   -- All four counts MUST be 0. Without DELETE FROM auth_users, the next
+   -- /setup attempt fires the first-time-only gate (count(auth_users) > 0)
+   -- and returns 409 registration-disabled — operator cannot recover.
+   -- Surfaced by the 2026-06-05 canary verification debug; full retro at
+   -- docs/retros/2026-06-05-canary-verification-debug-retro.md.
    ```
 2. **Wait ~60 seconds before continuing.** The pre-auth landing surfaces (`/`, `/setup`, `/sign-in`) cache `count(auth_credentials)` for 60 seconds to prevent DoS against the `*/15` bot tick. The cache is only invalidated by a successful `register/finish` ceremony — which you cannot run yet because there's no UI path to `/setup` while the cache still reads `count = 1`. The TTL was deliberately kept short for this scenario; longer waits would magnify recovery friction. (See `lib/auth/credential-count.ts` § "Invalidation surface" for the on-spec + off-spec write paths.)
 3. Visit `/` (the landing page) — the now-uncached read will show State A (first-time setup). Click "Set up your passkey", which routes you to `/setup`. The UI treats zero-credentials state as "first-time setup" and starts the ceremony fresh.
