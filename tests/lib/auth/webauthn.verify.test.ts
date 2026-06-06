@@ -18,7 +18,7 @@ import {
 // production hostname for assertion stability.
 vi.mock("@/lib/env", () => ({
   env: () => ({ SESSION_SIGNING_SECRET: "z".repeat(48) }),
-  origin: () => "https://crypt-bot.kindtree.us",
+  origin: () => "https://crypto-bot.kindtree.us",
 }));
 
 // Mock the SimpleWebAuthn lib in full. Factory is hoisted above this file's
@@ -57,8 +57,8 @@ describe("lib/auth/webauthn — verify wrappers (happy path)", () => {
     expect(result).toBe(successResult);
     expect(libMock).toHaveBeenCalledTimes(1);
     const callArg = libMock.mock.calls[0]![0];
-    expect(callArg.expectedOrigin).toBe("https://crypt-bot.kindtree.us");
-    expect(callArg.expectedRPID).toBe("crypt-bot.kindtree.us");
+    expect(callArg.expectedOrigin).toBe("https://crypto-bot.kindtree.us");
+    expect(callArg.expectedRPID).toBe("crypto-bot.kindtree.us");
     expect(callArg.expectedChallenge).toBe("test-challenge-base64url");
   });
 
@@ -72,8 +72,8 @@ describe("lib/auth/webauthn — verify wrappers (happy path)", () => {
         userVerified: true,
         credentialDeviceType: "singleDevice",
         credentialBackedUp: false,
-        origin: "https://crypt-bot.kindtree.us",
-        rpID: "crypt-bot.kindtree.us",
+        origin: "https://crypto-bot.kindtree.us",
+        rpID: "crypto-bot.kindtree.us",
       },
     };
     const libMock = vi.mocked(libVerifyAuthenticationResponse);
@@ -88,8 +88,8 @@ describe("lib/auth/webauthn — verify wrappers (happy path)", () => {
     expect(result).toBe(successResult);
     expect(libMock).toHaveBeenCalledTimes(1);
     const callArg = libMock.mock.calls[0]![0];
-    expect(callArg.expectedOrigin).toBe("https://crypt-bot.kindtree.us");
-    expect(callArg.expectedRPID).toBe("crypt-bot.kindtree.us");
+    expect(callArg.expectedOrigin).toBe("https://crypto-bot.kindtree.us");
+    expect(callArg.expectedRPID).toBe("crypto-bot.kindtree.us");
     expect(callArg.expectedChallenge).toBe("auth-challenge-base64url");
     expect(callArg.credential).toBe(stubCredential);
   });

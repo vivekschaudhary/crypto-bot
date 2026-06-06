@@ -31,7 +31,7 @@ _None — CB-1 fully shipped 2026-06-05. Each remaining stub brief (CB-2..CB-5) 
 - **2026-05-31** — [CB-1 brief](bets/CB-1/brief.md) promoted from stub → approved. Passkey authentication; primary metric: sign-in success rate ≥ 99%; 4 guardrails including zero unauthenticated capital-touching requests; `architecture_required: false` (foundation arch covers it).
 - **2026-05-31** — [Project Plan](foundation/plan.md) seeded (v1, `status: living`). MVP target: 2026-08-09 (10 weeks); 4-bet critical path; Day-1 parallel pair (CB-1 + CB-2). `docs/dashboard.html` auto-refreshed (218 KB, 12 artifacts).
 - **2026-05-31** — [MVP Bet Portfolio](foundation/portfolio.md) approved (`status: approved`). 5 MVP bet stubs created (CB-1..CB-5); Manual trading UI deferred to post-MVP per operator follow-up.
-- **2026-05-29** — [Foundational architecture bet](foundation/architecture.md) approved (`status: approved`). Stack: Vercel Pro + Next.js 16 + Supabase Postgres (DB only) + Vercel Cron + SimpleWebAuthn passkey + Sentry free. Scaffold landed; canary green at <https://crypt-bot.kindtree.us>.
+- **2026-05-29** — [Foundational architecture bet](foundation/architecture.md) approved (`status: approved`). Stack: Vercel Pro + Next.js 16 + Supabase Postgres (DB only) + Vercel Cron + SimpleWebAuthn passkey + Sentry free. Scaffold landed; canary green at <https://crypto-bot.kindtree.us>.
 - **2026-05-29** — [Foundational product bet](foundation/product.md) approved (`status: approved`). Signal-driven DCA bot for retail Coinbase traders; dry-run-first; single-operator scope; passkey-only auth posture (operator-owned credentials, no third-party IdP).
 
 ## Blockers

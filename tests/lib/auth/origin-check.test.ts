@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/env", () => ({
   env: () => ({ SESSION_SIGNING_SECRET: "z".repeat(48) }),
-  origin: () => "https://crypt-bot.kindtree.us",
+  origin: () => "https://crypto-bot.kindtree.us",
 }));
 
 import { OriginMismatchError, verifyOriginOrThrow } from "@/lib/auth/origin-check";
 
 function makeRequest(headers: Record<string, string>): Request {
-  return new Request("https://crypt-bot.kindtree.us/api/auth/register/begin", {
+  return new Request("https://crypto-bot.kindtree.us/api/auth/register/begin", {
     method: "POST",
     headers,
     body: JSON.stringify({}),
@@ -17,12 +17,12 @@ function makeRequest(headers: Record<string, string>): Request {
 
 describe("lib/auth/origin-check", () => {
   it("accepts a matching Origin header", () => {
-    expect(() => verifyOriginOrThrow(makeRequest({ origin: "https://crypt-bot.kindtree.us" }))).not.toThrow();
+    expect(() => verifyOriginOrThrow(makeRequest({ origin: "https://crypto-bot.kindtree.us" }))).not.toThrow();
   });
 
   it("accepts a Referer that matches the expected origin host", () => {
     expect(() =>
-      verifyOriginOrThrow(makeRequest({ referer: "https://crypt-bot.kindtree.us/setup" })),
+      verifyOriginOrThrow(makeRequest({ referer: "https://crypto-bot.kindtree.us/setup" })),
     ).not.toThrow();
   });
 

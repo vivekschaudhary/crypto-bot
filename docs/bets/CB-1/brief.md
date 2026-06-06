@@ -50,7 +50,7 @@ estimate:
 
 ## Problem
 
-The crypto-app foundation has been scaffolded and is deployed at <https://crypt-bot.kindtree.us> — a publicly addressable URL with a stub `proxy.ts` that lets all traffic through. The architecture's Foundational Identity & Access Posture section names the auth posture but no working auth flow exists yet. **As long as no real auth gate is in place, every downstream bet (CB-2, CB-3, CB-4, CB-5) exposes its sensitive surfaces — Coinbase API proxy, bot control endpoints, dashboard views — to the open internet.** This is the load-bearing precondition for being able to safely ship any other bet.
+The crypto-app foundation has been scaffolded and is deployed at <https://crypto-bot.kindtree.us> — a publicly addressable URL with a stub `proxy.ts` that lets all traffic through. The architecture's Foundational Identity & Access Posture section names the auth posture but no working auth flow exists yet. **As long as no real auth gate is in place, every downstream bet (CB-2, CB-3, CB-4, CB-5) exposes its sensitive surfaces — Coinbase API proxy, bot control endpoints, dashboard views — to the open internet.** This is the load-bearing precondition for being able to safely ship any other bet.
 
 The operator's specific pain: they want to deploy iterative work without exposing their real Coinbase Trade-scoped credentials and bot-control endpoints to whoever stumbles onto the public URL.
 

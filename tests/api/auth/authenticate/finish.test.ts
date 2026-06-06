@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { signValue } from "@/lib/auth/cookie";
 
 const FAKE_SECRET = "z".repeat(48);
-const ORIGIN = "https://crypt-bot.kindtree.us";
+const ORIGIN = "https://crypto-bot.kindtree.us";
 
 vi.mock("@/lib/env", () => ({
   env: () => ({ SESSION_SIGNING_SECRET: FAKE_SECRET }),
@@ -136,7 +136,7 @@ function goodVerifyResult(opts: { newCounter: number }): unknown {
       credentialDeviceType: "singleDevice",
       credentialBackedUp: false,
       origin: ORIGIN,
-      rpID: "crypt-bot.kindtree.us",
+      rpID: "crypto-bot.kindtree.us",
     },
   };
 }
