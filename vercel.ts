@@ -11,7 +11,16 @@ import { type VercelConfig } from "@vercel/config/v1";
 
 export const config: VercelConfig = {
   framework: "nextjs",
-  buildCommand: "next build",
+  // Auto-apply DB migrations before building. `pnpm db:migrate` is idempotent:
+  // the `_migrations` tracking table records applied filenames, so re-runs
+  // skip already-applied migrations. Failed migrations abort the build,
+  // preventing app deploys against a stale schema.
+  //
+  // Rollback: if a bad migration ships, revert this `buildCommand` line to
+  // `"next build"` and redeploy. The failed migration may need a corrective
+  // follow-up migration; revert + fix-forward is the documented pattern (no
+  // down migrations at this scale).
+  buildCommand: "pnpm db:migrate && next build",
   crons: [
     {
       // Bot tick — every 15 minutes. Pro plan required for sub-daily crons.
