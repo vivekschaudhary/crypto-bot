@@ -74,10 +74,10 @@ describe("POST /api/auth/register/begin", () => {
     expect(setCookie).toContain("Max-Age=60");
   });
 
-  it("returns 403 registration-disabled when a user already exists", async () => {
+  it("returns 409 registration-disabled when a user already exists", async () => {
     userCount = 1;
     const res = await POST(makeRequest());
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toBe("registration-disabled");
   });

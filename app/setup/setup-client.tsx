@@ -17,7 +17,7 @@ import { deriveDeviceLabel } from "@/app/setup/lib/device-label";
 
 type Phase = "idle" | "in-flight" | "success" | "error";
 
-type ErrorKey =
+export type ErrorKey =
   | "browser-unsupported"
   | "user-cancelled"
   | "verification-failed"
@@ -75,7 +75,7 @@ export function SetupClient(): JSX.Element {
       });
 
       if (!beginRes.ok) {
-        setErrorKey(errorKeyForResponse(beginRes.status));
+        setErrorKey(await classifyErrorResponse(beginRes));
         setPhase("error");
         return;
       }
@@ -108,7 +108,7 @@ export function SetupClient(): JSX.Element {
       });
 
       if (!finishRes.ok) {
-        setErrorKey(errorKeyForResponse(finishRes.status));
+        setErrorKey(await classifyErrorResponse(finishRes));
         setPhase("error");
         return;
       }
@@ -177,7 +177,42 @@ export function SetupClient(): JSX.Element {
   );
 }
 
-function errorKeyForResponse(status: number): ErrorKey {
+// Exported for direct unit-test coverage in
+// tests/app/setup-client-error-mapping.test.ts. The classify chain
+// (fetch Response → body parse → typed-error extraction → status+typed
+// disambiguation → ErrorKey) is load-bearing per the 2026-06-05 canary
+// verification retro — regression in ANY link re-introduces the 403/origin-
+// mismatch masquerade that burned ~4 hours of debug. Tests exercise:
+//   * classifyErrorResponse with a real Response object (body parse + typed
+//     extraction + dispatch into errorKeyForResponse)
+//   * errorKeyForResponse with the (status, typedError) matrix directly
+// Per "use client" Next.js semantics, exporting pure helpers from a client
+// component file is fine — they stay bundled as JS and do not become
+// Server Actions.
+export async function classifyErrorResponse(res: Response): Promise<ErrorKey> {
+  // Read typed error from response body to disambiguate 4xx paths that
+  // share a status code. The .clone() guards against the caller having
+  // already consumed the body upstream (rare in practice, but cheap to
+  // guarantee). try/catch handles non-JSON bodies — Vercel platform
+  // 403/502 pages, network failures mid-stream, etc.
+  let typedError: string | null = null;
+  try {
+    const body = (await res.clone().json()) as { error?: unknown };
+    if (typeof body.error === "string") typedError = body.error;
+  } catch {
+    // body not JSON; fall through to status-only classification
+  }
+  return errorKeyForResponse(res.status, typedError);
+}
+
+export function errorKeyForResponse(status: number, typedError: string | null = null): ErrorKey {
+  // Body-typed error takes precedence over status — disambiguates multiple
+  // 4xx paths that may share a status code. See the 2026-06-05 canary
+  // verification retro (docs/retros/) for the live failure mode that
+  // motivated this: /register/begin USED to return 403 with body
+  // { error: "registration-disabled" }, which the status-only mapping
+  // mis-classified as "origin-mismatch" and rendered the wrong copy.
+  if (typedError === "registration-disabled") return "registration-disabled";
   if (status === 409) return "registration-disabled";
   if (status === 429) return "rate-limited";
   if (status === 403) return "origin-mismatch";
