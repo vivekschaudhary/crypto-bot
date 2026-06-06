@@ -34,10 +34,10 @@ measurement_window_days: 30
 check_in_cadence: weekly
 area_tags: [auth, security, backend, frontend]
 estimate:
-  duration_weeks: 1
+  duration_weeks: 3
   confidence: high
-  refined_by: build-actuals
-  refined_at: 2026-06-06
+  refined_by: stories
+  refined_at: 2026-06-04
   estimated_start: 2026-05-31
   estimated_end: 2026-06-21
   actual_start: 2026-05-31
