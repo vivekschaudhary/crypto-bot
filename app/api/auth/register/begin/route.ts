@@ -102,7 +102,7 @@ export async function POST(request: Request): Promise<Response> {
   const rows = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM auth_users`;
   const userCount = rows[0]?.count ?? 0;
   if (userCount > 0) {
-    return jsonResponse(403, { error: "registration-disabled" });
+    return jsonResponse(409, { error: "registration-disabled" });
   }
 
   // 5. Mint identifiers

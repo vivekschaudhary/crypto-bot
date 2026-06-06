@@ -145,7 +145,7 @@ Tags:
 
 ## Fixes (post-merge)
 
-_If post-merge bugs are found, story is re-opened and fixes live under `docs/bets/CB-1/stories/CB-1.2/fixes/`._
+- **2026-06-06 — `403 → 409` status code correction on `register/begin` first-time-only gate.** Surfaced by the 2026-06-05 canary verification debug ([retro](../../../../retros/2026-06-05-canary-verification-debug-retro.md)). AC 1 text above (`Returns 403 { error: 'registration-disabled' }`) is now superseded: the route returns **409 Conflict** to match `register/finish`'s already-correct shape (both should signal a state conflict, not a forbidden request). The client-side error mapping in `app/setup/setup-client.tsx` was also refactored to read the response body's `error` field and disambiguate typed errors that share a status code (per the masquerade memo at [`docs/retros/2026-06-05-canary-verification-debug-retro.md`](../../../../retros/2026-06-05-canary-verification-debug-retro.md)). Original AC 1 text preserved for audit per Compass append-only convention.
 
 ## DRI Log
 

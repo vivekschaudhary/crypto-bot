@@ -75,7 +75,18 @@ export function SetupClient(): JSX.Element {
       });
 
       if (!beginRes.ok) {
-        setErrorKey(errorKeyForResponse(beginRes.status));
+        // Read typed error from response body to disambiguate (e.g. 409
+        // registration-disabled vs 403 origin-mismatch — status alone is
+        // not enough since both are 4xx and would map to the same key if
+        // we only looked at the number).
+        let typedError: string | null = null;
+        try {
+          const body = (await beginRes.clone().json()) as { error?: unknown };
+          if (typeof body.error === "string") typedError = body.error;
+        } catch {
+          // body not JSON; fall through to status-only classification
+        }
+        setErrorKey(errorKeyForResponse(beginRes.status, typedError));
         setPhase("error");
         return;
       }
@@ -108,7 +119,15 @@ export function SetupClient(): JSX.Element {
       });
 
       if (!finishRes.ok) {
-        setErrorKey(errorKeyForResponse(finishRes.status));
+        // Same body-read disambiguation as the begin path above.
+        let typedError: string | null = null;
+        try {
+          const body = (await finishRes.clone().json()) as { error?: unknown };
+          if (typeof body.error === "string") typedError = body.error;
+        } catch {
+          // body not JSON; fall through to status-only classification
+        }
+        setErrorKey(errorKeyForResponse(finishRes.status, typedError));
         setPhase("error");
         return;
       }
@@ -177,7 +196,14 @@ export function SetupClient(): JSX.Element {
   );
 }
 
-function errorKeyForResponse(status: number): ErrorKey {
+function errorKeyForResponse(status: number, typedError: string | null = null): ErrorKey {
+  // Body-typed error takes precedence over status — disambiguates multiple
+  // 4xx paths that may share a status code. See the 2026-06-05 canary
+  // verification retro (docs/retros/) for the live failure mode that
+  // motivated this: /register/begin USED to return 403 with body
+  // { error: "registration-disabled" }, which the status-only mapping
+  // mis-classified as "origin-mismatch" and rendered the wrong copy.
+  if (typedError === "registration-disabled") return "registration-disabled";
   if (status === 409) return "registration-disabled";
   if (status === 429) return "rate-limited";
   if (status === 403) return "origin-mismatch";
