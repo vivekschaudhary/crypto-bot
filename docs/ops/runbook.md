@@ -21,7 +21,17 @@ pnpm typecheck
 pnpm test
 ```
 
-### 2. Create Supabase project (DB only — Auth/RLS NOT used)
+### 2. Create Supabase project (DB only — Supabase Auth not used; RLS enabled defense-in-depth on auth_* tables)
+
+Note: this app does NOT use Supabase Auth (passkey auth is owned by our own
+`auth_*` tables + `lib/auth/*` code). RLS IS enabled on those tables via
+migration `0003-auth-tables-rls.sql` for defense-in-depth — the pooler role
+this app connects through has `BYPASSRLS` so server reads/writes are
+unaffected. The deny-all policies harden the tables against PostgREST
+exposure (which Supabase enables by default) and any future non-superuser
+DB role. See migration 0003's header comment for the full rationale.
+
+
 
 1. Sign in to <https://supabase.com> (existing account)
 2. **New project** → name it `crypto-app`; pick a region close to you; set a strong DB password
@@ -99,7 +109,22 @@ Locally (one-time after env is set in `.env.local`):
 pnpm db:migrate
 ```
 
-Or via Supabase SQL Editor → paste `db/migrations/0001-init.sql` → Run.
+Or via Supabase SQL Editor → paste each file in `db/migrations/` **in lexical
+order** (`0001-init.sql`, then `0002-auth-users-singleton.sql`, then
+`0003-auth-tables-rls.sql`, etc.) → Run each one in sequence. The migrations
+are designed to be idempotent (`CREATE TABLE IF NOT EXISTS`, `DROP POLICY IF
+EXISTS` etc.) so re-running a previously-applied file is a no-op.
+
+Verify all migrations applied after the SQL Editor path:
+
+```sql
+-- Tables should exist:
+SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;
+-- Should include: auth_credentials, auth_recovery_codes, auth_sessions, auth_users, plus product tables
+
+-- RLS posture (migration 0003) — all four auth_* rows must show rowsecurity = true:
+SELECT tablename, rowsecurity FROM pg_tables WHERE tablename LIKE 'auth_%';
+```
 
 ### 8. Deploy + verify canary
 

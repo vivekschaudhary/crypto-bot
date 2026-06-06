@@ -138,3 +138,25 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at
 -- Closes the concurrent-insert race where two /register/finish requests with
 -- different ULIDs could both pass the count(*) gate.
 CREATE UNIQUE INDEX IF NOT EXISTS auth_users_singleton ON auth_users ((TRUE));
+
+-- ─── Row-Level Security (defense-in-depth) ────────────────────────────
+-- Per migration 0003-auth-tables-rls.sql + the 2026-06-04 security audit.
+-- The app connects via the `postgres.<project-ref>` pooler role which
+-- bypasses RLS, so server code is unaffected. Anon/authenticated roles
+-- (used by PostgREST if ever enabled) are explicitly denied.
+ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_credentials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_recovery_codes ENABLE ROW LEVEL SECURITY;
+DO $$
+DECLARE
+  tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY['auth_users','auth_credentials','auth_sessions','auth_recovery_codes']::text[]
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "deny anon" ON %I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "deny authenticated" ON %I', tbl);
+    EXECUTE format('CREATE POLICY "deny anon" ON %I TO anon USING (false) WITH CHECK (false)', tbl);
+    EXECUTE format('CREATE POLICY "deny authenticated" ON %I TO authenticated USING (false) WITH CHECK (false)', tbl);
+  END LOOP;
+END $$;
