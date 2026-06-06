@@ -17,7 +17,7 @@ import { deriveDeviceLabel } from "@/app/setup/lib/device-label";
 
 type Phase = "idle" | "in-flight" | "success" | "error";
 
-type ErrorKey =
+export type ErrorKey =
   | "browser-unsupported"
   | "user-cancelled"
   | "verification-failed"
@@ -196,7 +196,13 @@ export function SetupClient(): JSX.Element {
   );
 }
 
-function errorKeyForResponse(status: number, typedError: string | null = null): ErrorKey {
+// Exported for direct unit-test coverage in
+// tests/app/setup-client-error-mapping.test.ts. The disambiguation matrix
+// is load-bearing per the 2026-06-05 canary verification retro — regression
+// here re-introduces the 403/origin-mismatch masquerade that burned ~4 hours
+// of debug. Per "use client" Next.js semantics, exporting a pure function
+// from a client component file is fine — it does not become a Server Action.
+export function errorKeyForResponse(status: number, typedError: string | null = null): ErrorKey {
   // Body-typed error takes precedence over status — disambiguates multiple
   // 4xx paths that may share a status code. See the 2026-06-05 canary
   // verification retro (docs/retros/) for the live failure mode that
