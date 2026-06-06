@@ -1,10 +1,10 @@
 ---
 id: PROJECT-PLAN
 type: plan
-version: 5
+version: 6
 status: living
 created: 2026-05-31
-last_refreshed: 2026-06-01
+last_refreshed: 2026-06-06
 parent: FOUNDATION-PRODUCT
 ---
 
@@ -12,13 +12,14 @@ parent: FOUNDATION-PRODUCT
 
 > Living, time-bound schedule for the MVP bet wedge. Derived from per-bet artifacts; refreshed by `/plan`. Never hand-edited — re-run `/plan` to refresh.
 
-**Last refreshed:** 2026-06-01 (version 5 — refresh after CB-1.4 story.md created + CB-1.4 shipped via PR #10. First refresh where the adaptive-decomposition max-rule legitimately bumps `duration_weeks` above the brief-approval ceiling, and the first MVP-target slip.)
+**Last refreshed:** 2026-06-06 (version 6 — first post-CB-1-shipped refresh. CB-1 fired the "All bet stories merged" trigger on 2026-06-05 with `actual_end = 2026-06-05`; bet finished **16 days ahead of v5's estimated_end of 2026-06-21**. Two intermediate "Stories created" trigger fires also captured: CB-1.5 (story count 5→6) and CB-1.6 (6→7), both held `duration_weeks = 3` via the adaptive-decomposition max() rule. MVP target stays **2026-08-16** because CB-2 became the new binding-dep for CB-3 + slipped by operator-cadence — see refinement log.)
 
 ## Currently in flight
 
 | Bet | Title | Phase | Actual start | Estimated end | Owner |
 |-----|-------|-------|--------------|---------------|-------|
-| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | Stories shipping — 5 story.md files exist (CB-1.1 + CB-1.1.1 + CB-1.2 + CB-1.3 + CB-1.4, all shipped); next is CB-1.5 (sign-out) | 2026-05-31 | 2026-06-21 | PM → Engineer (`/create-story CB-1` for CB-1.5) |
+
+_No bets in flight as of 2026-06-06. CB-1 shipped 2026-06-05; CB-2 next-up (still stub, not yet promoted)._
 
 ## Next up (unblocked, not yet started)
 
@@ -26,7 +27,7 @@ Bets whose dependencies are satisfied (or have none) but the bet itself hasn't b
 
 | Bet | Title | Estimated start | Estimated duration | Confidence |
 |-----|-------|-----------------|---------------------|------------|
-| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | 2026-06-01 | 2 weeks | low |
+| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | 2026-06-06 | 2 weeks | low |
 
 ## Blocked
 
@@ -34,16 +35,15 @@ Bets waiting on dependencies, HITL approval, or external input.
 
 | Bet | Title | Blocked by | Since | Mitigation |
 |-----|-------|------------|-------|------------|
-| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | CB-1, CB-2 | 2026-05-31 | Unblocks when CB-1 completes (v5: CB-1 is binding-dep at 2026-06-21; CB-2 stub finishes earlier at 2026-06-14). Stub estimate-only until promoted. |
+| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | CB-2 (CB-1 dep cleared 2026-06-05) | 2026-05-31 | Unblocks when CB-2 completes (v6: CB-2 is now sole binding-dep at stub-end 2026-06-19, since CB-1 cleared early). Stub estimate-only until promoted via `/create-brief CB-3`. |
 | [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | CB-2, CB-3 | 2026-05-31 | Unblocks when CB-3 completes (CB-3 is the binding dep — CB-2 finishes earlier). |
-| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | CB-1, CB-4 | 2026-05-31 | Unblocks when CB-4 completes (CB-4 is the binding dep — CB-1 finishes earlier). |
+| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | CB-4 (CB-1 dep cleared 2026-06-05) | 2026-05-31 | Unblocks when CB-4 completes (CB-4 is the sole binding dep now). |
 
 ## Done
 
-_No fully-shipped MVP bets yet — CB-1 has 5 story.md files shipped (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3, CB-1.4) but the bet itself is still in flight (2 stories remain per the brief's forecast: CB-1.5 sign-out, CB-1.6 first-deploy onboarding UX)._
-
-| Bet | Title | Actual end | Duration (actual vs estimated) |
-|-----|-------|------------|-------------------------------|
+| Bet | Title | Actual start | Actual end | Duration (actual vs estimated) | Notes |
+|-----|-------|--------------|------------|--------------------------------|-------|
+| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | 2026-05-31 | 2026-06-05 | **5 calendar days actual vs 21 estimated (3 wk)** → 16 days ahead | 7 stories (CB-1.1, CB-1.1.1, CB-1.2, CB-1.3, CB-1.4, CB-1.5, CB-1.6) shipped via PRs #1, #2, #5, #6, #8, #9, #10, #13, #14, #16, #17 + post-merge security follow-up PR #18 (M1+M2 from 2026-06-04 codebase audit) + post-canary follow-ups PRs #20/#21/#22 from the 2026-06-05 canary verification retro. Per-story actual velocity ≈ 0.7 days vs the 3-days/story plan-model default — a ~4x discrepancy worth tracking but only one data point. |
 
 ## Full schedule
 
@@ -51,13 +51,13 @@ Every MVP bet with all date columns. Source of truth for downstream tools.
 
 | Bet | Title | Depends on | Est. start | Est. end | Actual start | Actual end | Duration (wk) | Confidence | Last refined by |
 |-----|-------|------------|------------|----------|--------------|------------|---------------|------------|-----------------|
-| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-21 | 2026-05-31 | — | 3 | high | stories |
-| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | 2026-06-01 | 2026-06-14 | — | — | 2 | low | stub |
-| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | [CB-1, CB-2] | 2026-06-22 | 2026-07-05 | — | — | 2 | low | stub |
+| [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-21 | 2026-05-31 | **2026-06-05** | **1** (actual) | high | **build-actuals** |
+| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | **2026-06-06** | **2026-06-19** | — | — | 2 | low | stub |
+| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | [CB-2] (CB-1 cleared) | 2026-06-22 | 2026-07-05 | — | — | 2 | low | stub |
 | [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | [CB-2, CB-3] | 2026-07-06 | 2026-07-26 | — | — | 3 | low | stub |
-| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | [CB-1, CB-4] | 2026-07-27 | 2026-08-16 | — | — | 3 | low | stub |
+| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | [CB-4] (CB-1 cleared) | 2026-07-27 | 2026-08-16 | — | — | 3 | low | stub |
 
-**MVP completion target:** 2026-08-16 (**slipped 1 week from 2026-08-09 — the first MVP-target movement**). v5 recomputed via "Stories created" trigger on CB-1.4's story.md creation: 5 × 3 days = 2.143 wk; max-rule yields max(2.143 wk, 2 wk) = 2.143 wk, which rounds up to 3 wk per the watch-threshold from v3/v4. This crossed the brief-approval ceiling for the first time, legitimately moving `duration_weeks` from 2 → 3 on CB-1. CB-1's end-date moves 06-14 → 06-21; CB-1 becomes binding-dep for CB-3 (was CB-2); cascade pushes CB-3, CB-4, CB-5 each forward 7 days. CB-1 is now firmly on the critical path. Confidence values: CB-1 `high` (unchanged), all others `low` (still stubs).
+**MVP completion target:** 2026-08-16 (**unchanged from v5**). CB-1 finished 16 days early (v5 est: 2026-06-21 → actual: 2026-06-05), but CB-2 slipped 5 days (v5 est-start 2026-06-01 → v6 est-start 2026-06-06 — operator worked CB-1 first instead of in parallel as portfolio anticipated). Critical-path binding-dep for CB-3 SWAPPED from CB-1 → CB-2 in v6, so the early-finish on CB-1 doesn't pull CB-3 forward; CB-2's stub end (06-19) lands very close to where CB-1's old estimated end was (06-21). Net cascade: zero days. The MVP target will compress if CB-2 promotes + refines below the stub's 2-week duration.
 
 ## Calendar view
 
@@ -65,16 +65,16 @@ Every MVP bet with all date columns. Source of truth for downstream tools.
 Week of:               | Wk 1    | Wk 2    | Wk 3    | Wk 4    | Wk 5    | Wk 6    | Wk 7    | Wk 8    | Wk 9    | Wk 10   | Wk 11   |
                        | 06-01   | 06-08   | 06-15   | 06-22   | 06-29   | 07-06   | 07-13   | 07-20   | 07-27   | 08-03   | 08-10   |
 -----------------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
-CB-1 (auth)            |  ██     |  ██     |  ██     |         |         |         |         |         |         |         |         |
-CB-2 (data + top-5)    |  ██     |  ██     |         |         |         |         |         |         |         |         |         |
+CB-1 (auth) ✓ shipped  |  ██     |         |         |         |         |         |         |         |         |         |         |
+CB-2 (data + top-5)    |         |  ██     |  ██     |         |         |         |         |         |         |         |         |
 CB-3 (strategy)        |         |         |         |  ██     |  ██     |         |         |         |         |         |         |
 CB-4 (bot runtime)     |         |         |         |         |         |  ██     |  ██     |  ██     |         |         |         |
 CB-5 (ledger + dash)   |         |         |         |         |         |         |         |         |  ██     |  ██     |  ██     |
 ```
 
-Note: CB-1's actual_start (2026-05-31, Sunday) is 1 day before Wk 1 — visualization rounds to Wk 1. With duration_weeks now 3 (v5 refresh), CB-1 ends 2026-06-21 = end of Wk 3. MVP fits in 11 weeks now (was 10).
+Note: CB-1's actual_start 2026-05-31 (Sunday) → actual_end 2026-06-05 (Friday) = 5 calendar days, entirely within Wk 1 of the visualization. CB-2's estimated_start 2026-06-06 (Saturday) is end-of-Wk-1; calendar rounds it to start-of-Wk-2 for visualization (operator-cadence Monday start 2026-06-08 is the practical earliest). Wk 2/3 capture CB-2's 2-week stub span. Calendar otherwise identical to v5 (downstream cascade unchanged).
 
-Critical path: **CB-1 → CB-3 → CB-4 → CB-5** (11 weeks). With v5's CB-1 end-date shift to 2026-06-21 (vs CB-2's stub 2026-06-14), CB-1 is now the binding-dep for CB-3 — firmly on the critical path. CB-2 becomes the parallel companion. This will re-shift if CB-2 promotes and refines its own estimate.
+Critical path: **CB-2 → CB-3 → CB-4 → CB-5** (now 10.5 weeks from CB-2 start to CB-5 end). v5's critical path was CB-1 → CB-3 → CB-4 → CB-5; with CB-1 done early, CB-2 became the binding entry into the chain. CB-1 is no longer on the critical path. If CB-2 promotion refines duration below 2 weeks (per the CB-1 actual-velocity signal, plausible), the MVP target compresses.
 
 ## Refinement log
 
@@ -82,77 +82,85 @@ Each time a date moves, write a line here naming the **triggering artifact** (sp
 
 | Date | Bet | Field changed | From | To | Triggered by |
 |------|-----|---------------|------|-----|--------------|
-| 2026-05-31 | CB-1 | actual_start | — | 2026-05-31 | First story PR merged: [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1) (commit 1abea1b, merged 2026-05-31 19:26 UTC). Triggers the "First build PR merged" row of the estimate model in [`compass/workflows/plan.md`](../../compass/workflows/plan.md). |
-| 2026-05-31 | CB-1 | estimated_start | 2026-06-01 | 2026-05-31 | Actuals override planned schedule — actual_start (above) preceded the planned Monday start; per the same workflow estimate model. Source: [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). |
-| 2026-05-31 | CB-1 | confidence | low | high | "First build PR merged" trigger row in [`compass/workflows/plan.md`](../../compass/workflows/plan.md) estimate model → `confidence: high`. Source: [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). |
-| 2026-05-31 | CB-1 | refined_by | stub | build-actuals | Latest applicable trigger per [`compass/workflows/plan.md`](../../compass/workflows/plan.md) estimate model is "First build PR merged" → enum value `build-actuals`. Source: [PR #1](https://github.com/vivekschaudhary/crypto-bot/pull/1). |
-| 2026-05-31 | CB-1 | estimated_end | — | 2026-06-14 | Recomputed from `actual_start + duration_weeks` per estimate model. `actual_start = 2026-05-31`; `duration_weeks` stays at brief-approval value 2. v2-era reasoning. Net date movement: 0 days. |
-| 2026-06-01 | CB-1 | story.md count | 2 | 3 | New story.md file: [`docs/bets/CB-1/stories/CB-1.2/story.md`](../bets/CB-1/stories/CB-1.2/story.md) created during `/create-story CB-1` (commit landed via [PR #5](https://github.com/vivekschaudhary/crypto-bot/pull/5)). Fires the "Stories created" row of the estimate model. Surfaced by Codex code-review of PR #6: prior v2 refresh claimed this trigger wouldn't fire mid-bet — incorrect; trigger fires per literal reading. |
-| 2026-06-01 | CB-1 | refined_by | build-actuals | stories | Latest-applicable trigger advanced from "First build PR merged" (fired once at PR #1) to "Stories created" (fires on each new story.md file; latest fire was CB-1.2's creation). Per workflow estimate model enum order. |
-| 2026-06-01 | CB-1 | duration_weeks | 2 | 2 | Recomputed via "Stories created" trigger: 3 story.md files × 3 days each = 9 days = 1.286 weeks. Per [adaptive-decomposition resolution rule](#decisions), `duration_weeks = max(stories-based, brief-approval) = max(1.3, 2) = 2`. Net date movement: 0 days. Triggering artifact: [`docs/bets/CB-1/stories/CB-1.2/story.md`](../bets/CB-1/stories/CB-1.2/story.md). |
-| 2026-06-01 | CB-1 | story.md count | 3 | 4 | New story.md file: [`docs/bets/CB-1/stories/CB-1.3/story.md`](../bets/CB-1/stories/CB-1.3/story.md) created during `/create-story CB-1` (commit landed via [PR #8](https://github.com/vivekschaudhary/crypto-bot/pull/8)). Fires the "Stories created" row of the estimate model. |
-| 2026-06-01 | CB-1 | duration_weeks | 2 | 2 | Recomputed via "Stories created" trigger: 4 story.md files × 3 days each = 12 days = 1.714 weeks. Per the adaptive-decomposition resolution rule, `duration_weeks = max(stories-based, brief-approval) = max(1.71, 2) = 2`. Net date movement: 0 days. Triggering artifact: [`docs/bets/CB-1/stories/CB-1.3/story.md`](../bets/CB-1/stories/CB-1.3/story.md). **Watch:** at 5 story.md files, max() flips: max(2.14, 2) ≈ 2.1 → would bump duration_weeks to 3. |
-| 2026-06-01 | CB-1 | story.md count | 4 | 5 | New story.md file: [`docs/bets/CB-1/stories/CB-1.4/story.md`](../bets/CB-1/stories/CB-1.4/story.md) created during `/create-story CB-1` (commit landed via [PR #10](https://github.com/vivekschaudhary/crypto-bot/pull/10)). Fires the "Stories created" row of the estimate model — the v3/v4 watch-threshold hits. |
-| 2026-06-01 | CB-1 | duration_weeks | 2 | **3** | Recomputed via "Stories created" trigger: 5 story.md files × 3 days each = 15 days = 2.143 weeks. Per adaptive-decomposition rule, `duration_weeks = max(stories-based, brief-approval) = max(2.143, 2) = 2.143 wk`, which rounds up to 3 wk per the integer-week reporting convention. **First time max() crosses the brief-approval ceiling — legitimate duration_weeks bump.** Triggering artifact: [`docs/bets/CB-1/stories/CB-1.4/story.md`](../bets/CB-1/stories/CB-1.4/story.md). |
-| 2026-06-01 | CB-1 | estimated_end | 2026-06-14 | **2026-06-21** | Recomputed from `actual_start + duration_weeks` = 2026-05-31 + 3 weeks. CB-1 now firmly on critical path (was parallel companion to CB-2). |
-| 2026-06-01 | CB-3 | estimated_start | 2026-06-15 | **2026-06-22** | CB-1 becomes binding-dep (estimated_end now 2026-06-21, vs CB-2 stub 2026-06-14). Cascade: +7 days. |
-| 2026-06-01 | CB-3 | estimated_end | 2026-06-28 | **2026-07-05** | duration_weeks unchanged at 2 (stub); start shifted +7 days, so end shifts +7 days. |
-| 2026-06-01 | CB-4 | estimated_start | 2026-06-29 | **2026-07-06** | CB-3 binding-dep shifted; CB-4 start cascades +7 days. |
-| 2026-06-01 | CB-4 | estimated_end | 2026-07-19 | **2026-07-26** | duration_weeks unchanged at 3 (stub); +7 days cascade. |
-| 2026-06-01 | CB-5 | estimated_start | 2026-07-20 | **2026-07-27** | CB-4 binding-dep shifted; +7 days cascade. (CB-1 also pushed forward but CB-4 ends later, so CB-4 is binding.) |
-| 2026-06-01 | CB-5 | estimated_end | 2026-08-09 | **2026-08-16** | duration_weeks unchanged at 3 (stub); +7 days cascade. **= new MVP target.** First MVP-target slip. |
+| 2026-06-02 | CB-1 | story.md count | 5 | 6 | New story.md file: [`docs/bets/CB-1/stories/CB-1.5/story.md`](../bets/CB-1/stories/CB-1.5/story.md) created during `/create-story CB-1` for sign-out (commit landed via [PR #14](https://github.com/vivekschaudhary/crypto-bot/pull/14)). Fires the "Stories created" row of the estimate model. |
+| 2026-06-02 | CB-1 | duration_weeks | 3 | 3 | Recomputed: 6 × 3 days = 18 days = 2.57 wk. Per adaptive-decomposition rule, `max(2.57, 2) = 2.57 → rounds to 3 wk`. Net date movement: 0 days. Below-3-but-rounds-up case (per v5's forward-watch note). |
+| 2026-06-04 | CB-1 | story.md count | 6 | 7 | New story.md file: [`docs/bets/CB-1/stories/CB-1.6/story.md`](../bets/CB-1/stories/CB-1.6/story.md) created during `/create-story CB-1` for first-deploy onboarding UX (commit landed via [PR #17](https://github.com/vivekschaudhary/crypto-bot/pull/17)). Fires the "Stories created" row of the estimate model. |
+| 2026-06-04 | CB-1 | duration_weeks | 3 | 3 | Recomputed: 7 × 3 days = 21 days = 3 wk exactly. Per adaptive-decomposition rule, `max(3, 2) = 3 wk`. Net date movement: 0 days. Reaches the firm-3-week mark per v5's forward-watch note ("at story count 7+: max(7 × 3 days, 2 wk) = 3 wk firmly"). |
+| 2026-06-05 | CB-1 | actual_end | — | **2026-06-05** | **"All bet stories merged" trigger fires.** Final CB-1 story (CB-1.6) merged 2026-06-04 via [PR #17](https://github.com/vivekschaudhary/crypto-bot/pull/17); post-merge bookkeeping PR [#19](https://github.com/vivekschaudhary/crypto-bot/pull/19) on 2026-06-05 records bet shipped. Sources: [CB-1 brief frontmatter `actual_end`](../bets/CB-1/brief.md), [memory project_cb1_shipped.md](../../memory/project_cb1_shipped.md). Per the estimate model: bet's `actual_end` written; downstream bets' `estimated_start` shifted by (actual_end − estimated_end) = (2026-06-05 − 2026-06-21) = **−16 days**. |
+| 2026-06-05 | CB-1 | duration_weeks | 3 | **1** | Actuals: 2026-05-31 to 2026-06-05 = 5 calendar days ≈ 1 wk. Brief frontmatter `estimate.duration_weeks` updated to 1, `refined_by` advanced from `stories` to `build-actuals`, `refined_at` set to 2026-06-06. Triggering artifact: [CB-1 brief.md frontmatter](../bets/CB-1/brief.md) + [PR #19](https://github.com/vivekschaudhary/crypto-bot/pull/19). |
+| 2026-06-06 | CB-2 | binding-dep status for CB-3 | not-binding | **binding** | CB-1's actual_end (2026-06-05) cleared its dep contribution to CB-3 entirely. CB-3 now depends only on CB-2 (whose stub end 2026-06-19 is the new binding constraint). CB-1 no longer on critical path. |
+| 2026-06-06 | CB-2 | estimated_start | 2026-06-01 | **2026-06-06** | Operator-cadence reality: CB-2 was portfolio-planned as Day-1 parallel companion to CB-1 (start 2026-06-01) but operator chose serial execution (CB-1 first). With CB-1 shipped 2026-06-05 and CB-2 not yet started, the honest earliest start for CB-2 is "today" = 2026-06-06. Net 5-day slip vs v5. **Pragmatic-derivation:** strict-literal would keep estimated_start at the historical date and just mark the bet as "late"; v6 instead advances estimated_start to reflect the new earliest-realistic-start. See DRI Decision below for the rule. |
+| 2026-06-06 | CB-2 | estimated_end | 2026-06-14 | **2026-06-19** | duration_weeks unchanged at 2 (still stub); start shifted +5 days, end shifts +5 days. |
+| 2026-06-06 | CB-3 | binding-dep | CB-1 (v5: est_end 2026-06-21) | **CB-2** (v6: est_end 2026-06-19) | Swap. CB-1 cleared early; CB-2 stub end (06-19) becomes the binding constraint. Critical path entry shifts from CB-1 to CB-2. |
+| 2026-06-06 | CB-3 | estimated_start | 2026-06-22 | 2026-06-22 | New binding-dep CB-2 ends 2026-06-19 (Friday); next-day-of-week-start = Monday 2026-06-22. Math holds — net date movement: **0 days**. (If strict-literal day-after were used: 2026-06-20 Saturday → not a reasonable operator-cadence start; Monday convention preserved.) |
+| 2026-06-06 | CB-3 | estimated_end | 2026-07-05 | 2026-07-05 | duration_weeks unchanged at 2 (stub); start unchanged; end unchanged. |
+| 2026-06-06 | CB-4 | estimated_start | 2026-07-06 | 2026-07-06 | Binding-dep CB-3 end unchanged → CB-4 start unchanged. |
+| 2026-06-06 | CB-4 | estimated_end | 2026-07-26 | 2026-07-26 | duration_weeks unchanged at 3 (stub); start unchanged; end unchanged. |
+| 2026-06-06 | CB-5 | binding-dep | CB-4 was binding in v5 too; CB-1 dep cleared but wasn't binding in v5 | CB-4 | (Cosmetic — CB-5's binding-dep was already CB-4 in v5. Just notes CB-1 dep is now closed.) |
+| 2026-06-06 | CB-5 | estimated_start | 2026-07-27 | 2026-07-27 | Unchanged. |
+| 2026-06-06 | CB-5 | estimated_end | 2026-08-16 | 2026-08-16 | Unchanged. **MVP target stays at 2026-08-16.** |
 
-_v1–v4 entries (2026-05-31 to 2026-06-01) preserved in git history at versions 1–4._
+_v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions 1–5._
 
 ## Risks to plan
 
-- **CB-1 duration_weeks bumped 2 → 3 this refresh (v5)** — the watch-threshold from v3/v4 hit on CB-1.4's story.md creation. Story count now 5; max(5 × 3 days, 2 wk) = 2.143 wk → rounds up to 3 wk. MVP target slipped 1 week (2026-08-09 → 2026-08-16) via the downstream cascade. **Forward-watch:** at story count 7+ (1 more story than the brief's 6-story forecast): max(7 × 3 days, 2 wk) = 3 wk firmly (no integer rounding ambiguity); MVP target would stay at 2026-08-16. At story count 9+: max(9 × 3 days, 2 wk) = max(3.86 wk, 2 wk) ≈ 4 wk → MVP target moves to 2026-08-23. Refresh `/plan` whenever the integer-rounded `duration_weeks` would change at the next `/create-story CB-1` invocation.
-- **Stub estimates remain low-confidence for CB-2/3/4/5** — all still 2/3-week stubs. Promotion via `/create-brief <bet-id>` will refine. Expect ± 1 week per bet at medium-confidence stage; cumulative ± 2-3 weeks on the 10-week MVP target until briefs land.
-- **Solo-developer cadence is the wallclock binding constraint** (unchanged from v1) — these dates assume the operator works on the project at a sustained pace. Vacation, day-job pressure, or context-switch tax pushes everything proportionally.
-- **CB-4 (bot runtime) carries the highest single-bet extension risk** (unchanged from v1) — most surface area; may bump to 4 weeks at brief promotion. Documented as the bet most likely to slip the MVP target.
-- **Coinbase CDP key provisioning is a Day-1 blocker for CB-2** (unchanged from v1) — operator must have a working CDP key in hand before CB-2 build starts.
-- **Auto-pause + reserve floor + multi-device passkey deferred to post-MVP** (unchanged from v1) — three post-MVP bets need scheduling immediately after MVP completes.
+- **Per-story velocity 3-days/story model over-estimated CB-1 by ~4x** — CB-1 actual: 7 stories × 0.7 days ≈ 5 days. Model predicted: 7 × 3 days = 21 days. The model assumes ~3 days per story; the actual single-operator velocity on this codebase is **~0.7 days per story**. **Decision held:** v6 does NOT retune the per-story constant for CB-2..CB-5 because (a) it's one data point — could be CB-1-specific (clear-cut auth scope, well-trodden patterns), (b) future bets may have different per-story complexity (CB-4 bot runtime in particular), (c) authoring the constant from a single bet's actuals violates strict-derivation. Watch through CB-2 + CB-3 actuals before considering a model adjustment. If the pattern repeats: MVP target could compress by ~2 weeks total.
+- **CB-2 stub estimate dominates the cascade entry** — CB-2 is now binding-dep for CB-3 (was CB-1 in v5). With CB-2 still at 2-week stub + `confidence: low`, the entire downstream chain inherits stub-confidence dates. **Promotion via `/create-brief CB-2` is the single highest-leverage action** for sharpening the MVP target — it advances CB-2 from `low` to `medium` confidence and refines CB-3..CB-5's binding-dep math.
+- **Operator-cadence: serial vs parallel uncertainty** — portfolio planned CB-1 + CB-2 as Day-1 parallel pair; operator actually ran them serially (CB-1 first, CB-2 starts now). If subsequent "parallel" bets in the wedge also run serially, downstream cascade could slip. **There are no remaining portfolio-planned parallel pairs** after CB-2 (CB-3, CB-4, CB-5 are all sequential), so this risk doesn't apply beyond v6 — but if the operator wants to attack CB-2 alongside the deferred passkey-auth-kit project (separate repo), serial-vs-parallel returns as a calibration question.
+- **Three forward-watch risks unchanged from v5:** stub estimates remain `low`-confidence for CB-2..CB-5 (± 1 week per bet at brief-approval refinement; cumulative ± 2-3 weeks); CB-4 (bot runtime) carries the single-bet extension risk; CDP key provisioning is a Day-1 blocker for CB-2 (operator must have a working CDP key in hand before CB-2 build starts).
+- **Post-MVP rails scheduling unchanged from v1** — auto-pause + reserve floor + multi-device passkey ceremony all deferred; need scheduling immediately after MVP completes.
+- **Migration 0003 not yet applied to production Supabase** — PR #22 merged 2026-06-06 but the migration is operator-applied (per runbook). Until applied, `auth_*` tables remain "Unrestricted" in Supabase dashboard. Defense-in-depth gap only; does not block CB-2 work. Action item tracked in operator's TODO.
 
 ## DRI Log
 
 ### Decisions
 
-- [2026-05-31] [Project Manager] **CB-1 refresh keeps `duration_weeks: 2` (brief-approval value); only `actual_start`, `confidence`, `refined_by`, and recomputed `estimated_end` move** — strict "derived, not authored" reading of `/plan`
-  - **Rationale (required):** the workflow's "Stories created" trigger says "Story count × per-story size" — the only honest input is the **count of actual `story.md` files**, not the brief's "Expected decomposition" forecast. CB-1 has 2 story.md files (CB-1.1, CB-1.1.1) — both existed at brief-approval time; the count hasn't changed since approval. Therefore the "Stories created" trigger has not produced new evidence; `duration_weeks` stays at the brief-approval value (2). Only the "First build PR merged" trigger applies this refresh (sets `actual_start` and bumps `confidence`).
-  - **Area (required, tag):** scheduling / estimation
-  - **Alternatives considered (required):** project forward from the brief's 6-story forecast (rejected — that's authoring a date, not deriving; flagged by Codex review on PR #4); count CB-1.1 + CB-1.1.1 strictly = 6 days = ~1 week (rejected — that's mechanically literal but ignores that brief-approval already set 2 weeks as the duration estimate, and 2 stories don't yet contradict 2 weeks); leave the bet at low confidence (rejected — the model explicitly upgrades to high on first PR merge).
-  - **Reversibility:** easy — next `/plan` after CB-1.2 story.md is created will fire the "Stories created" trigger with a real artifact count and may legitimately move `duration_weeks`.
+- [2026-06-06] [Project Manager] **CB-2's `estimated_start` advances to "today" (2026-06-06) rather than holding at the historical portfolio-planned 2026-06-01** — pragmatic-derivation for operator-cadence slip
+  - **Rationale (required):** the workflow's estimate model is silent on what to do when a bet's portfolio-planned start date passes without the bet starting. Two readings: (a) strict-literal keeps `estimated_start` at the historical date and marks the bet "late" (5 days past plan); (b) pragmatic advances `estimated_start` to the new earliest-realistic-start (today). v6 picks (b) because the estimate's purpose is to communicate "when will this finish" not "when did we originally plan it" — the latter is what the refinement log preserves. Strict-literal would force every downstream cascade to compute against a date that's already past, producing dates in the past relative to today, which is not useful for forward planning. The historical date stays preserved in the v5 row of the schedule (and in the refinement-log row that records the move).
+  - **Area (required, tag):** scheduling / cascade-math
+  - **Alternatives considered (required):** strict-literal (rejected — produces dates in the past, breaks cascade utility); advance estimated_start by the slip delta (e.g., to 2026-06-08 Monday rather than today Saturday) (rejected — Monday-vs-today is a calibration question that the operator should answer at the bet level, not the plan level); add a `slipped_from` field (rejected — schema bloat for a case the refinement log handles)
+  - **Reversibility:** trivial — next `/plan` after CB-2 actually starts will move estimated_start to whatever `actual_start` is.
 
-- [2026-05-31] [Project Manager] **`refined_by` is a single token from the workflow's fixed enum** (`stub | brief-approval | architecture | stories | build-actuals`)
-  - **Rationale (required):** the workflow spec defines `refined_by` as a single-value enum field. v2's first draft used `refined_by: stories + build-actuals` (concatenated) — that violates the single-token contract; flagged by Codex review on PR #4. Convention from this point: when multiple triggers apply in a single refresh, use the latest-applicable trigger per the estimate model's row order; the audit trail of prior triggers lives in the refinement log, not in the frontmatter field.
-  - **Area (required, tag):** scheduling / contract-compliance
-  - **Alternatives considered (required):** allow concatenation with `+` separator (rejected — drifts the schema downstream tools will read); add a parallel `prior_refined_by` array field (rejected — schema bloat for a use case the refinement log already covers); leave it ambiguous (rejected — flagged in review).
+- [2026-06-06] [Project Manager] **CB-1's `duration_weeks` set to 1 (actual) rather than retaining 3 (v5 stories-based estimate)** — "build-actuals" trigger row in the estimate model
+  - **Rationale (required):** the workflow estimate model's "All bet stories merged" trigger row says `confidence after: n/a (bet done)`. It doesn't say what to write for `duration_weeks` — the model assumes durations are forward-looking estimates, not retrospective actuals. v6 chooses to overwrite `duration_weeks` with the actual duration (5 calendar days ≈ 1 wk) because (a) leaving it at the estimate is dishonest now that we know what happened, (b) downstream tooling that reads frontmatter would otherwise see "estimated 3 weeks" for a bet that took 1 — actively misleading. `actual_duration_days: 5` is also preserved in the frontmatter for fine-grained accuracy.
+  - **Area (required, tag):** scheduling / frontmatter-contract
+  - **Alternatives considered (required):** keep duration_weeks at 3 + rely on `actual_end` field to communicate completion (rejected — actively misleading for tooling); add a separate `actual_duration_weeks` field (rejected — schema bloat; `actual_duration_days` already covers fine-grained); set duration_weeks to 0 to signal "completed" (rejected — unitless poison value)
   - **Reversibility:** trivial.
 
-- [2026-06-01] [Project Manager] **Adaptive-decomposition resolution rule: `duration_weeks = max(stories-based, brief-approval)`** — closes the framework gap where mid-bet story counts under-represent the bet
-  - **Rationale (required):** the `/plan` workflow's estimate model assumes upfront story decomposition (story count is monotonically informative). This project's brief explicitly uses adaptive decomposition ("decomposed one at a time via `/create-story CB-1`") — so at any mid-bet moment, the story.md count UNDER-represents the bet's true scope because not-yet-decomposed stories don't exist as files yet. Strict-derivation reading on PR #4 partially handled this by checking "did the count change?" (and finding it hadn't). But once a new story.md is created mid-bet (CB-1.2's case here), strict-derivation says: recompute = 3 × 3 days = 1.3 wk, which is SHORTER than the brief-approval estimate of 2 wk despite KNOWING 4 more stories are forecast. That's wrong. The honest fix: take `max(stories-based, brief-approval)` as the working duration. The brief-approval estimate is the PM's upfront scope ceiling; story-files-so-far is the implementation floor; their max is a conservative bound that aligns with reality without authoring future dates.
-  - **Area (required, tag):** scheduling / framework-adaptation
-  - **Alternatives considered (required):** apply strict-derivation literally and let `duration_weeks` shrink to 1.3 wk = 1 wk (rejected — knowingly under-estimates a bet with explicit remaining forecast); project forward from the brief's 6-story forecast as if those stories already existed (rejected — that's PR #4's authoring trap); freeze `duration_weeks` at the brief-approval value until the bet ships (rejected — wouldn't reflect legitimate refinement when story count exceeds the forecast); add a `manual_override` field to frontmatter (rejected — bypasses the derive discipline entirely).
-  - **Reversibility:** easy — the rule is documented here + applied at each `/plan` refresh; future cycles either keep it, refine it, or replace it with something better.
-  - **Surfaced by:** Codex code review of PR #6 (the post-CB-1.2-merge bookkeeping PR), which correctly flagged that this v3 refresh's draft prose claimed `/plan` could be skipped — but the `/plan` workflow's literal rule does fire on each new story.md, even if the resulting duration math collapses to the brief-approval value via this max() rule.
+- [2026-06-06] [Project Manager] **Per-story velocity model (3 days/story default) NOT retuned in v6 despite CB-1's ~4x discrepancy** — single-data-point doesn't justify model change
+  - **Rationale (required):** CB-1 shipped at ~0.7 days/story actual vs the model's 3 days/story default — a 4.3x velocity advantage. Tempting to retune CB-2..CB-5's stub estimates downward. But: (a) it's one data point, (b) CB-1 was authentication — well-trodden patterns, n=1 single-operator scope, no external API integration challenges — which may NOT generalize to CB-2 (Coinbase API surface complexity), CB-3 (strategy authoring UI), CB-4 (bot runtime with real-money guardrails). The model's 3 days/story is a defensive default; downward retune from one favorable bet would author dates. **Watch through CB-2 + CB-3 actuals before considering an adjustment.** If both also ship at <1 day/story, then a v7+ may retune the default to 1.5 or 2 days/story — but with at least 2-3 data points and a documented adjustment.
+  - **Area (required, tag):** scheduling / model-calibration
+  - **Alternatives considered (required):** retune to 1 day/story immediately (rejected — single data point); retune to 2 days/story as a "split the difference" compromise (rejected — same reason); add a per-bet velocity multiplier field (rejected — schema bloat without data to populate it)
+  - **Reversibility:** easy — next /plan after CB-2 + CB-3 ship can retune with two more data points.
 
 ### Risks
 
-- [2026-05-31] [Project Manager] **CB-1 estimate likely to grow once future CB-1.x stories actually land as story.md files**
-  - **Likelihood (required):** medium (brief forecasts ~6 stories; current count is 2; story-count-based recomputation may exceed 2-week duration)
-  - **Impact (required):** medium (additional 1-week slip on CB-1 likely shifts MVP target by ~1 week if it bites)
-  - **Mitigation (required):** re-run `/plan` after each new CB-1.x story.md file lands (or after each PR merge). The estimate model's "Stories created" trigger then fires with real artifact count. Refinement log captures every movement.
-  - **Area (required, tag):** scheduling / estimation
+- [2026-06-06] [Project Manager] **CB-2 stub-vs-actual delta is now the single highest-leverage uncertainty in the cascade**
+  - **Likelihood (required):** certain (CB-2 has never been promoted from stub; refinement WILL happen at promotion)
+  - **Impact (required):** medium-to-high (CB-2 is now the critical-path entry; ± 1 week here cascades through CB-3, CB-4, CB-5; cumulative MVP-target movement potential ± 1-2 weeks)
+  - **Mitigation (required):** prioritize `/create-brief CB-2` as the next workflow invocation. After promotion, `/plan` v7 will refine CB-2 from `low` → `medium` confidence and recompute cascade.
+  - **Area (required, tag):** scheduling / cascade-confidence
 
-- [2026-05-31] [Project Manager] **v1's risks remain active** — stub-estimate slippage on CB-2..CB-5, CB-4 extension risk, CDP key provisioning, post-MVP rails scheduling
-  - **Likelihood (required):** see v1 entries
-  - **Impact (required):** see v1 entries
-  - **Mitigation (required):** unchanged from v1 — re-run `/plan` after each brief approval; refinement log captures every movement.
+- [2026-06-06] [Project Manager] **CB-1 velocity model discrepancy may compound across CB-2..CB-5 OR may be CB-1-specific** — unresolvable until more data
+  - **Likelihood (required):** unknown (50/50 — could be operator-specific velocity OR bet-specific complexity)
+  - **Impact (required):** if it generalizes, MVP target compresses by ~2 weeks (from 2026-08-16 to ~2026-08-02). If CB-1-specific, no impact.
+  - **Mitigation (required):** track per-story velocity on CB-2 explicitly (note actual start/end of each story PR; compute `actual_days_per_story` in CB-2's brief Fixes/Outcomes section at bet end). After CB-2's actuals are in, v7+ can decide whether to retune the default model constant.
+  - **Area (required, tag):** scheduling / model-calibration
+
+- [2026-06-06] [Project Manager] **All v5 risks remain active** — stub-estimate slippage on CB-2..CB-5, CB-4 extension risk, CDP key provisioning Day-1 blocker, post-MVP rails scheduling
+  - **Likelihood (required):** see v5 entries
+  - **Impact (required):** see v5 entries
+  - **Mitigation (required):** unchanged from v5 — re-run `/plan` after each brief approval; refinement log captures every movement.
   - **Area (required, tag):** scheduling / estimation
 
 ### Issues
 
-_None at v2 refresh. v2's initial draft had 3 review findings (single-token contract violation, forecasted-decomposition authoring, missing artifact citations in refinement log); all closed by this update before merge — see DRI Decisions above + tightened refinement log table._
+- [2026-06-06] [Project Manager] **Migration 0003 (RLS) not yet applied to production Supabase** — operator-applied per runbook; defense-in-depth gap until then
+  - **Severity (required, mandatory):** P4 (defense-in-depth; no functional impact on MVP or any in-flight work)
+  - **Owner (required, mandatory):** operator
+  - **Status:** open
+  - **Area (required, tag):** security / infra
+  - **Resolution (filled when closed):** operator pastes `db/migrations/0003-auth-tables-rls.sql` into Supabase SQL Editor (or runs `pnpm db:migrate`) + verifies via `SELECT tablename, rowsecurity FROM pg_tables WHERE tablename LIKE 'auth_%'` (all four rows should show `rowsecurity = true`). Tracked in conversation TODO.
 
 ---
 
