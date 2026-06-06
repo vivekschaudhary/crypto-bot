@@ -22,9 +22,9 @@ tool_assignments:
   ux_writer:                claude
   architect:                claude
   enterprise_architect:     claude
-  engineer:                 claude    # writes unit/API/component tests too
+  engineer:                 codex    # writes unit/API/component tests too
   reviewer:                 codex     # writes E2E + automation framework
-  security_reviewer:        codex
+  security_reviewer:        claude
   tech_writer:              claude
   project_manager:          claude
 
