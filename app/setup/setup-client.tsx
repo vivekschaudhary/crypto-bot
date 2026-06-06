@@ -75,18 +75,7 @@ export function SetupClient(): JSX.Element {
       });
 
       if (!beginRes.ok) {
-        // Read typed error from response body to disambiguate (e.g. 409
-        // registration-disabled vs 403 origin-mismatch — status alone is
-        // not enough since both are 4xx and would map to the same key if
-        // we only looked at the number).
-        let typedError: string | null = null;
-        try {
-          const body = (await beginRes.clone().json()) as { error?: unknown };
-          if (typeof body.error === "string") typedError = body.error;
-        } catch {
-          // body not JSON; fall through to status-only classification
-        }
-        setErrorKey(errorKeyForResponse(beginRes.status, typedError));
+        setErrorKey(await classifyErrorResponse(beginRes));
         setPhase("error");
         return;
       }
@@ -119,15 +108,7 @@ export function SetupClient(): JSX.Element {
       });
 
       if (!finishRes.ok) {
-        // Same body-read disambiguation as the begin path above.
-        let typedError: string | null = null;
-        try {
-          const body = (await finishRes.clone().json()) as { error?: unknown };
-          if (typeof body.error === "string") typedError = body.error;
-        } catch {
-          // body not JSON; fall through to status-only classification
-        }
-        setErrorKey(errorKeyForResponse(finishRes.status, typedError));
+        setErrorKey(await classifyErrorResponse(finishRes));
         setPhase("error");
         return;
       }
@@ -197,11 +178,33 @@ export function SetupClient(): JSX.Element {
 }
 
 // Exported for direct unit-test coverage in
-// tests/app/setup-client-error-mapping.test.ts. The disambiguation matrix
-// is load-bearing per the 2026-06-05 canary verification retro — regression
-// here re-introduces the 403/origin-mismatch masquerade that burned ~4 hours
-// of debug. Per "use client" Next.js semantics, exporting a pure function
-// from a client component file is fine — it does not become a Server Action.
+// tests/app/setup-client-error-mapping.test.ts. The classify chain
+// (fetch Response → body parse → typed-error extraction → status+typed
+// disambiguation → ErrorKey) is load-bearing per the 2026-06-05 canary
+// verification retro — regression in ANY link re-introduces the 403/origin-
+// mismatch masquerade that burned ~4 hours of debug. Tests exercise:
+//   * classifyErrorResponse with a real Response object (body parse + typed
+//     extraction + dispatch into errorKeyForResponse)
+//   * errorKeyForResponse with the (status, typedError) matrix directly
+// Per "use client" Next.js semantics, exporting pure helpers from a client
+// component file is fine — they stay bundled as JS and do not become
+// Server Actions.
+export async function classifyErrorResponse(res: Response): Promise<ErrorKey> {
+  // Read typed error from response body to disambiguate 4xx paths that
+  // share a status code. The .clone() guards against the caller having
+  // already consumed the body upstream (rare in practice, but cheap to
+  // guarantee). try/catch handles non-JSON bodies — Vercel platform
+  // 403/502 pages, network failures mid-stream, etc.
+  let typedError: string | null = null;
+  try {
+    const body = (await res.clone().json()) as { error?: unknown };
+    if (typeof body.error === "string") typedError = body.error;
+  } catch {
+    // body not JSON; fall through to status-only classification
+  }
+  return errorKeyForResponse(res.status, typedError);
+}
+
 export function errorKeyForResponse(status: number, typedError: string | null = null): ErrorKey {
   // Body-typed error takes precedence over status — disambiguates multiple
   // 4xx paths that may share a status code. See the 2026-06-05 canary
