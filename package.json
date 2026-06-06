@@ -15,7 +15,7 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "db:migrate": "tsx lib/db/migrate.ts"
+    "db:migrate": "node --env-file-if-exists=.env.local --import tsx lib/db/migrate.ts"
   },
   "dependencies": {
     "next": "^16.0.0",
