@@ -23,7 +23,11 @@ This story also lays in the **architectural invariant** from [CB-2 PM DRI Decisi
 
 ## Acceptance Criteria
 
-- [ ] **AC 1** — Engineer DRI Decision logged at the top of this story's DRI Log selecting one of: (a) `tiagosiebler/coinbase-api`, (b) `coinbase-samples/advanced-sdk-ts`, (c) `JoshJancula/coinbase-advanced-node`. Rationale (required) compares activity signal (last 60-day commit frequency), Advanced Trade endpoint coverage (must include `getProductStats` for CB-3's top-5 computation + `placeOrder` for CB-4's writes), test-suite health, and TypeScript-types quality. Alternatives-rejected (required) names the two unpicked SDKs with a one-sentence rejection rationale each. Reversibility (required) — "easy" with concrete cost estimate (half-day swap cost; well-defined seam at `lib/coinbase/client.ts`). The chosen SDK is added to `package.json` `dependencies` (not `devDependencies`).
+- [ ] **AC 1 (amended 2026-06-06)** — Engineer DRI Decision logged at the top of this story's DRI Log selecting **no SDK — direct fetch + per-request JWT minted via `node:crypto`**. Rationale: operator's sibling app demonstrates the working pattern; alignment with [foundation/architecture.md § Decision](../../../foundation/architecture.md#decision)'s "minimize vendor surface" stance; ES256/EdDSA auto-detection from key format future-proofs Coinbase's CDP key-format migration (Ed25519 is the newer standard); zero vendor in the auth path; smaller bundle. Alternatives-rejected: (a) `tiagosiebler/coinbase-api` — adds an SDK vendor in the JWT-signing path; CDP raw-base64/EdDSA support uncertain; (b) `coinbase-samples/advanced-sdk-ts` — 8+ months stale (last release Sept 2024); no test suite; (c) `JoshJancula/coinbase-advanced-node` — CDP JWT support not explicit; (d) adding `jose` JWT library — over-delivers for simple sign(payload, key) → token; `node:crypto` handles both ES256 + Ed25519 natively. Reversibility: easy — if direct path surfaces unforeseen complexity, swap to `tiagosiebler/coinbase-api` at any later story is a half-day swap (the thin shim shape doesn't lock in). **No SDK is added to `package.json`.**
+
+  **Original AC 1 text** (pre-amendment, retained for audit per Compass append-only convention): "Engineer DRI Decision logged at the top of this story's DRI Log selecting one of: (a) `tiagosiebler/coinbase-api`, (b) `coinbase-samples/advanced-sdk-ts`, (c) `JoshJancula/coinbase-advanced-node`. Rationale (required) compares activity signal (last 60-day commit frequency), Advanced Trade endpoint coverage (must include `getProductStats` for CB-3's top-5 computation + `placeOrder` for CB-4's writes), test-suite health, and TypeScript-types quality. Alternatives-rejected (required) names the two unpicked SDKs with a one-sentence rejection rationale each. Reversibility (required) — 'easy' with concrete cost estimate (half-day swap cost; well-defined seam at `lib/coinbase/client.ts`). The chosen SDK is added to `package.json` `dependencies` (not `devDependencies`)."
+
+  **Amendment rationale:** the operator surfaced (during `/build CB-2.1` plan-mode review) that they have a working direct-fetch + per-request-JWT pattern in a sibling app against real Coinbase production. That implementation is structurally better than wrapping a third-party SDK: zero vendor in the auth path, supports both CDP key formats (PEM EC + raw base64), tiny bundle, all types owned via Zod at the boundary, battle-tested. Pivot to direct fetch. Story AC 1 satisfied by a "no SDK" Engineer DRI Decision; the original SDK alternatives are now documented as rejected.
 
 - [ ] **AC 2** — `lib/coinbase/client.ts` exports a single configured Coinbase client instance and a typed accessor:
   - `coinbase()` returns the lazily-initialized client (mirrors the `env()` lazy-cache pattern in `lib/env/index.ts:48` — `let cached: Client | undefined; if (cached) return cached; ...`)
@@ -135,9 +139,36 @@ _If post-merge bugs are found, story is re-opened and fixes live under `docs/bet
 
 ### Decisions
 
-_To be filled by Engineer at first PR commit. Required entries:_
+- [2026-06-06] [Engineer] **No SDK — direct fetch + per-request JWT via `node:crypto`** (satisfies amended AC 1; supersedes the original SDK-pick framing)
+  - **Rationale (required):** four pillars converge on direct-fetch as the right answer for this project: (1) operator has a working direct-fetch + JWT pattern in a sibling app against real Coinbase production — porting a working pattern is lower-risk than vetting a third-party SDK; (2) auto-detect ES256 (PEM EC) vs EdDSA (raw base64) from key format future-proofs against Coinbase's CDP key-format migration (Ed25519 is the newer standard, and no SDK explicitly guarantees support for both); (3) zero vendor in the auth path matches the foundation architecture's "minimize vendor surface" stance explicitly named in [architecture.md § Decision](../../../foundation/architecture.md#decision); (4) `node:crypto` already used in [`lib/auth/cookie.ts:17`](../../../../lib/auth/cookie.ts) for HMAC; dependency posture stays consistent with the codebase's "Node built-ins, no third-party crypto" rule.
+  - **Area (required, tag):** architectural / dependency / security
+  - **Alternatives considered (required):** (a) `tiagosiebler/coinbase-api` — would add an SDK vendor in the JWT-signing path; CDP raw-base64 / EdDSA support uncertain from README; ~150 LOC of wrapper code we'd own anyway. (b) `coinbase-samples/advanced-sdk-ts` — 8+ months stale (last release Sept 2024); no test suite (`"test": "Error: no test specified"`). (c) `JoshJancula/coinbase-advanced-node` — CDP JWT support not explicit in README; key-format support unclear. (d) Adding `jose` JWT library — over-delivers for `sign(payload, key) → token`; `node:crypto` handles ES256 + Ed25519 natively without the dep weight.
+  - **Reversibility:** easy — thin shim shape (`mintJWT` + `request`/`publicRequest`) means swapping in `tiagosiebler/coinbase-api` at any later story is a half-day swap. Engineer DRI Decision-supersession pattern (per Compass append-only convention) would handle the bookkeeping.
 
-1. **SDK pick** (per AC 1) — Engineer DRI Decision with rationale + alternatives + reversibility.
+- [2026-06-06] [Engineer] **`vitest.config.ts` URL → `fileURLToPath` correction** — small drive-by fix
+  - **Rationale (required):** `vitest.config.ts:14` used `new URL(".", import.meta.url).pathname`, which leaves percent-encoded characters (e.g. `%20` for spaces) in the resolved path. Breaks the `@`-alias resolution when the working directory contains a space — which the operator's local checkout does (`/Volumes/Vivek mac/...`). Symptom: 25 of 27 test files fail with `Cannot find module '@/...'` locally, even though CI (no spaces) passes. Surfaced during this story's gate runs.
+  - **Area (required, tag):** tooling / dx
+  - **Alternatives considered (required):** ship the fix in a separate `/ops` PR (rejected — without it, this story can't be locally validated, including the integration test against real Coinbase; the fix is a one-line config change that pairs naturally with the work that needed it); leave as-is and document the workaround (rejected — pre-existing latent bug PR #21 already named; resolving it under this story closes the local-test gap permanently).
+  - **Reversibility:** trivial.
+
+### Risks (Engineer round-1, then PM-pre-existing for audit)
+
+- [2026-06-06] [Engineer] **EdDSA path against Coinbase `/api/v3/brokerage/*` endpoints is unverified** — surfaced by Codex PR #26 round-1 BLOCKER
+  - **Likelihood (required):** medium. Coinbase's brokerage-specific auth/CLI docs say to create ECDSA keys for brokerage and warn that Ed25519 returns HTTP 401 from `/api/v3/brokerage/*` endpoints. The operator's sibling app reports the EdDSA path works against their Coinbase target — but that target may or may not be brokerage. We don't have data either way for the brokerage endpoints CB-2.2+ will hit.
+  - **Impact (required):** low at CB-2.1 scope (CB-2.1 ships the JWT minting + transport layer; no brokerage endpoint is actually called with EdDSA in our tests — public market endpoints don't need any JWT, and the unit tests verify JWT structure not Coinbase's acceptance). Becomes medium-impact if CB-4 / CB-5 deploy with EdDSA credentials and hit auth-required brokerage endpoints; would surface as 401s.
+  - **Mitigation (required):** `lib/coinbase/jwt.ts` JSDoc explicitly names the unresolved tension (per operator HITL Decision: option (b) — keep path + tag it). Resolution path: a CB-2.5 (trace.ts) follow-up integration test against real Coinbase brokerage with a real EdDSA credential either confirms the path works (Coinbase docs are stale) or confirms the 401 (then drop the EdDSA path entirely in a Decision-supersession entry). Story-level Risk tracked here; brief-level escalation not warranted (this is a scope-internal verification question, not a brief-level scope change).
+  - **Area (required, tag):** technical / vendor-uncertainty
+  - **Surfaced by:** Codex code review of PR #26 round-1
+
+- [2026-06-06] [Engineer] **fetch() transport failures originally escaped as raw errors, bypassing the CoinbaseClientError contract** — surfaced by Codex PR #26 round-1 BLOCKER
+  - **Likelihood (required):** medium (transport failures — DNS, TLS, timeouts, connection resets — are normal in network code)
+  - **Impact (required):** low post-fix (consumers now get one uniform error shape); was medium pre-fix (consumers would have had to handle two error types)
+  - **Mitigation (required):** `lib/coinbase/client.ts` `safeFetch` wrapper catches all fetch errors and re-throws as `CoinbaseClientError` with `code: "network"` and the original error preserved as `cause`. Two new tests cover the wrap (one per `request` / `publicRequest` path).
+  - **Area (required, tag):** technical / error-contract
+  - **Surfaced by:** Codex code review of PR #26 round-1
+  - **Status:** closed by [`safeFetch` in client.ts](../../../../lib/coinbase/client.ts) round-1 push
+
+### Risks (PM-pre-existing, retained for audit)
 
 ### Risks
 

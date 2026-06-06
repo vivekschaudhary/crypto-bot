@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -11,7 +13,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": new URL(".", import.meta.url).pathname,
+      // Use fileURLToPath to correctly decode percent-encoded characters
+      // (e.g., spaces) in the working-directory path. URL.pathname leaves
+      // `%20` in place, which breaks resolution on macOS paths containing
+      // spaces (e.g., "/Volumes/Vivek mac/apps/crypto-app").
+      "@": fileURLToPath(new URL(".", import.meta.url)),
     },
   },
 });
