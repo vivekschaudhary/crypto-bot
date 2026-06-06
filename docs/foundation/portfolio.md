@@ -82,6 +82,7 @@ _Populated as each stub gets promoted to a full brief via `/create-brief <bet-id
 | Bet ID | Promoted on | Status after promotion |
 | ------ | ----------- | ---------------------- |
 | [CB-1](../bets/CB-1/brief.md) | 2026-05-31 | approved |
+| [CB-2](../bets/CB-2/brief.md) | 2026-06-06 | approved |
 
 ## DRI Log
 
@@ -146,6 +147,7 @@ _Populated as each stub gets promoted to a full brief via `/create-brief <bet-id
   - **Impact (required):** low (resolvable during CB-2 brief promotion; doesn't gate other bets; choice is reversible)
   - **Mitigation (required):** logged in [CB-2 brief stub](../bets/CB-2/brief.md) as "Open question — resolve at promotion." Default lean: operator's personal trading volume.
   - **Area (required, tag):** product / data
+  - **Resolution (filled when closed):** 2026-06-06 — operator selected **global Coinbase 24h volume** at `/create-brief CB-2` promotion (NOT the original default lean). Recorded as PM DRI Decision #2 in [CB-2 brief](../bets/CB-2/brief.md#decisions). Also closed the related PM Issue below.
 
 - [2026-05-31] [PM] **Auto-pause on drawdown + reserve floor deferred to post-MVP creates a real-money risk window**
   - **Likelihood (required):** low (mitigated by dry-run-first guardrail — ≥ 60 dry-run sessions before `LIVE_MODE=true`)
@@ -170,9 +172,9 @@ _Populated as each stub gets promoted to a full brief via `/create-brief <bet-id
 - [2026-05-31] [PM] Top-5 crypto discovery basis (operator's personal volume vs Coinbase global volume) — defer to CB-2 brief promotion
   - **Severity (required, mandatory):** P3
   - **Owner (required, mandatory):** PM (operator-resolved)
-  - **Status:** open
+  - **Status:** closed 2026-06-06
   - **Area (required, tag):** product / data
-  - **Resolution (filled when closed):** [to be filled during `/create-brief CB-2`]
+  - **Resolution (filled when closed):** 2026-06-06 — operator chose **global Coinbase 24h volume** at `/create-brief CB-2` HITL. Resolution recorded as PM DRI Decision #2 in [CB-2 brief](../bets/CB-2/brief.md#decisions); Risk above (same topic) also closed.
 
 - [2026-05-31] [PM] Strategy authoring depth (hard-coded + env tweaks vs full UI authoring) — defer to CB-3 brief promotion
   - **Severity (required, mandatory):** P3
