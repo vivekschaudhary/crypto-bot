@@ -63,7 +63,7 @@ function makeClient(): CoinbaseClient {
   return {
     async request<T = unknown>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
       const jwt = mintJWT(method, path);
-      const res = await fetch(`${COINBASE_BASE_URL}${path}`, {
+      const res = await safeFetch(method, path, `${COINBASE_BASE_URL}${path}`, {
         method,
         headers: {
           authorization: `Bearer ${jwt}`,
@@ -75,13 +75,38 @@ function makeClient(): CoinbaseClient {
     },
 
     async publicRequest<T = unknown>(method: HttpMethod, path: string): Promise<T> {
-      const res = await fetch(`${COINBASE_BASE_URL}${path}`, {
+      const res = await safeFetch(method, path, `${COINBASE_BASE_URL}${path}`, {
         method,
         headers: { "content-type": "application/json" },
       });
       return handleResponse<T>(method, path, res);
     },
   };
+}
+
+/**
+ * Wrap `fetch()` so transport-layer failures (DNS, TLS handshake, connection
+ * reset, timeout, AbortError, etc.) surface as `CoinbaseClientError` with
+ * `code: "network"`. Without this wrap, consumers would have to handle two
+ * error shapes — `CoinbaseClientError` for non-2xx responses AND raw
+ * `TypeError` / `DOMException` for transport failures. The wrapper's job is
+ * to give consumers one uniform error contract.
+ *
+ * Per Codex PR #26 round-1 BLOCKER: the original CB-2.1 implementation
+ * only wrapped non-2xx Responses, letting transport failures escape as
+ * raw fetch errors.
+ */
+async function safeFetch(method: HttpMethod, path: string, url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new CoinbaseClientError({
+      code: "network",
+      message: `Coinbase ${method} ${path} failed at the transport layer: ${reason}`,
+      cause: err,
+    });
+  }
 }
 
 async function handleResponse<T>(method: HttpMethod, path: string, res: Response): Promise<T> {

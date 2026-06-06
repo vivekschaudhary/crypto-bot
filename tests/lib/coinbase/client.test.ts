@@ -133,6 +133,35 @@ describe("lib/coinbase/client — coinbase()", () => {
         status: 503,
       });
     });
+
+    it("wraps fetch transport failures (DNS / TLS / timeout) as CoinbaseClientError", async () => {
+      // Simulate a network-layer failure — fetch() rejects synchronously with
+      // a TypeError (the typical Node + browser shape for "DNS resolved no
+      // address" / "connection refused" / "TLS handshake failed").
+      fetchMock.mockRejectedValueOnce(new TypeError("fetch failed: ENOTFOUND api.coinbase.com"));
+      await expect(
+        coinbase().request("GET", "/api/v3/brokerage/accounts"),
+      ).rejects.toMatchObject({
+        name: "CoinbaseClientError",
+        code: "network",
+        status: undefined,
+      });
+    });
+
+    it("preserves the original transport error as `cause`", async () => {
+      const original = new TypeError("fetch failed: ETIMEDOUT");
+      fetchMock.mockRejectedValueOnce(original);
+      try {
+        await coinbase().request("GET", "/api/v3/brokerage/accounts");
+        expect.fail("expected throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(CoinbaseClientError);
+        expect((err as CoinbaseClientError).cause).toBe(original);
+        expect((err as CoinbaseClientError).message).toContain("ETIMEDOUT");
+        expect((err as CoinbaseClientError).message).toContain("GET");
+        expect((err as CoinbaseClientError).message).toContain("/api/v3/brokerage/accounts");
+      }
+    });
   });
 
   describe("publicRequest (unauthenticated)", () => {
@@ -162,6 +191,19 @@ describe("lib/coinbase/client — coinbase()", () => {
       ).rejects.toMatchObject({
         code: "not_found",
         status: 404,
+      });
+    });
+
+    it("wraps fetch transport failures as CoinbaseClientError (same shape as request())", async () => {
+      // publicRequest hits the same safeFetch wrapper; transport failures
+      // surface uniformly regardless of which method consumers use.
+      fetchMock.mockRejectedValueOnce(new TypeError("fetch failed: ECONNRESET"));
+      await expect(
+        coinbase().publicRequest("GET", "/api/v3/brokerage/market/products/BTC-USD"),
+      ).rejects.toMatchObject({
+        name: "CoinbaseClientError",
+        code: "network",
+        status: undefined,
       });
     });
   });

@@ -151,6 +151,23 @@ _If post-merge bugs are found, story is re-opened and fixes live under `docs/bet
   - **Alternatives considered (required):** ship the fix in a separate `/ops` PR (rejected — without it, this story can't be locally validated, including the integration test against real Coinbase; the fix is a one-line config change that pairs naturally with the work that needed it); leave as-is and document the workaround (rejected — pre-existing latent bug PR #21 already named; resolving it under this story closes the local-test gap permanently).
   - **Reversibility:** trivial.
 
+### Risks (Engineer round-1, then PM-pre-existing for audit)
+
+- [2026-06-06] [Engineer] **EdDSA path against Coinbase `/api/v3/brokerage/*` endpoints is unverified** — surfaced by Codex PR #26 round-1 BLOCKER
+  - **Likelihood (required):** medium. Coinbase's brokerage-specific auth/CLI docs say to create ECDSA keys for brokerage and warn that Ed25519 returns HTTP 401 from `/api/v3/brokerage/*` endpoints. The operator's sibling app reports the EdDSA path works against their Coinbase target — but that target may or may not be brokerage. We don't have data either way for the brokerage endpoints CB-2.2+ will hit.
+  - **Impact (required):** low at CB-2.1 scope (CB-2.1 ships the JWT minting + transport layer; no brokerage endpoint is actually called with EdDSA in our tests — public market endpoints don't need any JWT, and the unit tests verify JWT structure not Coinbase's acceptance). Becomes medium-impact if CB-4 / CB-5 deploy with EdDSA credentials and hit auth-required brokerage endpoints; would surface as 401s.
+  - **Mitigation (required):** `lib/coinbase/jwt.ts` JSDoc explicitly names the unresolved tension (per operator HITL Decision: option (b) — keep path + tag it). Resolution path: a CB-2.5 (trace.ts) follow-up integration test against real Coinbase brokerage with a real EdDSA credential either confirms the path works (Coinbase docs are stale) or confirms the 401 (then drop the EdDSA path entirely in a Decision-supersession entry). Story-level Risk tracked here; brief-level escalation not warranted (this is a scope-internal verification question, not a brief-level scope change).
+  - **Area (required, tag):** technical / vendor-uncertainty
+  - **Surfaced by:** Codex code review of PR #26 round-1
+
+- [2026-06-06] [Engineer] **fetch() transport failures originally escaped as raw errors, bypassing the CoinbaseClientError contract** — surfaced by Codex PR #26 round-1 BLOCKER
+  - **Likelihood (required):** medium (transport failures — DNS, TLS, timeouts, connection resets — are normal in network code)
+  - **Impact (required):** low post-fix (consumers now get one uniform error shape); was medium pre-fix (consumers would have had to handle two error types)
+  - **Mitigation (required):** `lib/coinbase/client.ts` `safeFetch` wrapper catches all fetch errors and re-throws as `CoinbaseClientError` with `code: "network"` and the original error preserved as `cause`. Two new tests cover the wrap (one per `request` / `publicRequest` path).
+  - **Area (required, tag):** technical / error-contract
+  - **Surfaced by:** Codex code review of PR #26 round-1
+  - **Status:** closed by [`safeFetch` in client.ts](../../../../lib/coinbase/client.ts) round-1 push
+
 ### Risks (PM-pre-existing, retained for audit)
 
 ### Risks

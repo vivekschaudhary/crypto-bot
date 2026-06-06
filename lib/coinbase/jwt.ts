@@ -7,10 +7,36 @@
 //   - PEM-wrapped EC private key  (`-----BEGIN ... PRIVATE KEY-----`) → ES256
 //   - Raw 64-byte base64                                              → EdDSA (Ed25519)
 //
-// This future-proofs against Coinbase's CDP key-format migration (Ed25519 is
-// the newer standard). No external JWT library; node:crypto handles both
-// signing algorithms natively — mirrors lib/auth/cookie.ts's "Node built-ins,
-// no third-party crypto" posture.
+// No external JWT library; node:crypto handles both signing algorithms
+// natively — mirrors lib/auth/cookie.ts's "Node built-ins, no third-party
+// crypto" posture.
+//
+// ──────────────────────────────────────────────────────────────────────────
+// EdDSA caveat — UNVERIFIED FOR COINBASE BROKERAGE ENDPOINTS
+// ──────────────────────────────────────────────────────────────────────────
+// Coinbase's general "Advanced Trade auth" docs say both Ed25519 (EdDSA) and
+// ECDSA (ES256) keys work for direct API calls. HOWEVER, Coinbase's
+// brokerage-specific auth/CLI documentation says to **create ECDSA keys for
+// brokerage** and warns that **Ed25519 returns HTTP 401** from
+// `/api/v3/brokerage/*` endpoints.
+//
+// The operator's sibling app reports the EdDSA path works against their
+// Coinbase target (which may or may not be brokerage). We keep the EdDSA
+// path implemented (per CB-2.1 Engineer DRI Decision — option (b)) but
+// **flag that it MAY return 401 from `/api/v3/brokerage/*` endpoints.**
+// Verify against real Coinbase brokerage with a real EdDSA credential
+// before relying on it for production traffic.
+//
+// Resolution path: when CB-2.5 (trace.ts) ships Sentry breadcrumbs +
+// rate-limit-header awareness, an EdDSA brokerage integration test against
+// real Coinbase will resolve the ambiguity. If 401 confirmed at that point,
+// drop the EdDSA path in a Decision-supersession entry; if 200 confirmed,
+// promote this caveat to a closed Risk.
+//
+// Tracked as story-level Engineer Risk in
+// docs/bets/CB-2/stories/CB-2.1/story.md DRI Log.
+// Surfaced by Codex code review of PR #26 round-1 (BLOCKER).
+// ──────────────────────────────────────────────────────────────────────────
 //
 // Per CB-2 brief PM DRI Decision #3: this file does NOT reference LIVE_MODE.
 // The wrapper is policy-free; the consumer (CB-4) owns the gate.
