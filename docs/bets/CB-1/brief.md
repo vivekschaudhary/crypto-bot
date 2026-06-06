@@ -37,7 +37,7 @@ estimate:
   duration_weeks: 3
   confidence: high
   refined_by: stories
-  refined_at: 2026-06-01
+  refined_at: 2026-06-04
   estimated_start: 2026-05-31
   estimated_end: 2026-06-21
   actual_start: 2026-05-31
