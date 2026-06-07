@@ -178,8 +178,9 @@ describe("getProductCandles — Date conversion + range validation", () => {
     expect(candles).toHaveLength(2);
   });
 
-  it("throws CoinbaseClientError({code: 'range-too-wide'}) when implied candle count exceeds 300", async () => {
-    // 24h at ONE_MINUTE = 1440 candles, well over the 300 cap.
+  it("throws CoinbaseClientError({code: 'range-too-wide'}) when implied candle count exceeds 350", async () => {
+    // 24h at ONE_MINUTE = 1440 candles, well over the 350 cap (per current
+    // Coinbase docs; cap lives in COINBASE_MAX_CANDLES_PER_REQUEST).
     const start = new Date("2026-06-06T00:00:00Z");
     const end = new Date("2026-06-07T00:00:00Z");
 

@@ -90,11 +90,13 @@ export async function getProduct(productId: string): Promise<Product> {
 /**
  * Fetch historical OHLCV candles for a product.
  *
- * Coinbase caps candles at 300 per request. If the requested range implies
- * more than that, throws `CoinbaseClientError({code: "range-too-wide"})` —
- * fail-loud beats silent truncation. CB-4's bot tick (every 15 min) reads
- * small lookback windows (~14-30 candles for RSI/MA); this guard is for
- * consumer bugs, not normal operation.
+ * Coinbase caps candles at 350 per request (per the current Get Public
+ * Product Candles docs). If the requested range implies more than that,
+ * throws `CoinbaseClientError({code: "range-too-wide"})` — fail-loud beats
+ * silent truncation. The exact cap lives in `COINBASE_MAX_CANDLES_PER_REQUEST`
+ * in `market-schemas.ts`; this comment narrates the contract at the call
+ * site. CB-4's bot tick (every 15 min) reads small lookback windows (~14-30
+ * candles for RSI/MA); this guard is for consumer bugs, not normal operation.
  */
 export async function getProductCandles(args: {
   productId: string;
