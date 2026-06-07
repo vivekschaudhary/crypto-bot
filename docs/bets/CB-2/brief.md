@@ -35,11 +35,14 @@ check_in_cadence: weekly
 area_tags: [backend, coinbase-integration, dependency-management]
 estimate:
   duration_weeks: 1
-  confidence: medium
-  refined_by: brief-approval
+  confidence: high
+  refined_by: build-actuals
   refined_at: 2026-06-06
   estimated_start: 2026-06-06
   estimated_end: 2026-06-13
+  actual_start: 2026-06-06
+  stories_shipped: 1
+  stories_remaining_forecast: 4
 ---
 
 # CB-2 — Typed `lib/coinbase/` Wrapper Around Coinbase Advanced Trade
@@ -70,7 +73,7 @@ It also sits at the **only place in the codebase that touches a real-money API**
 
 ## Hypothesis (the bet)
 
-If we ship a typed `lib/coinbase/` wrapper around Coinbase Advanced Trade REST (CDP JWT auth via `@coinbase/coinbase-sdk` or `tiagosiebler/coinbase-api` — final pick at first story per the [Architecture DRI Issue #1](../../foundation/architecture.md#issues)), exposing all read + write endpoints needed by CB-3/CB-4/CB-5 with consistent Zod-validated types + structured-log breadcrumbs + zero `LIVE_MODE` knowledge inside the wrapper, then **wrapper API success rate (2xx responses / total requests, excluding 4xx caller errors) reaches ≥ 99% over a rolling 30-day window** once the wrapper has accrued ≥ 100 real requests, measured from CB-4's first deployed bot tick.
+If we ship a typed `lib/coinbase/` wrapper around Coinbase Advanced Trade REST using **direct fetch + per-request JWT via `node:crypto` (no SDK)** — resolved 2026-06-06 via the [CB-2.1 Engineer DRI Decision](stories/CB-2.1/story.md#decisions), which closes [foundation architecture DRI Issue #1](../../foundation/architecture.md#issues) — exposing all read + write endpoints needed by CB-3/CB-4/CB-5 with consistent Zod-validated types + structured-log breadcrumbs + zero `LIVE_MODE` knowledge inside the wrapper, then **wrapper API success rate (2xx responses / total requests, excluding 4xx caller errors) reaches ≥ 99% over a rolling 30-day window** once the wrapper has accrued ≥ 100 real requests, measured from CB-4's first deployed bot tick.
 
 ## Defensibility
 
@@ -90,9 +93,9 @@ Not a moat. Coinbase has multiple actively-maintained TS SDKs ([arch-research.md
   - `lib/coinbase/types.ts` — Zod schemas at the wrapper boundary; typed errors via custom class (`CoinbaseClientError` with `code`, `message`, `cause`, `status`)
   - `lib/coinbase/trace.ts` — structured-log breadcrumb helper: emits one log line per request with `{method, endpoint, status, duration_ms}` for the success-rate metric
 - **CDP JWT auth** integration via `lib/env` (per CB-1.1 pattern — env vars validated at startup; no direct `process.env` reads)
-- **Coinbase TS SDK pick** as the first Engineer DRI Decision on the first CB-2 story (lean is tiagosiebler per [arch-research.md §1.3](../../foundation/architecture-research.md#1-prior-art); rejection of alternatives logged inline)
+- ~~**Coinbase TS SDK pick** as the first Engineer DRI Decision on the first CB-2 story (lean is tiagosiebler per [arch-research.md §1.3](../../foundation/architecture-research.md#1-prior-art); rejection of alternatives logged inline)~~ **RESOLVED 2026-06-06 via [CB-2.1 Engineer DRI Decision](stories/CB-2.1/story.md#decisions): NO SDK** — direct REST + JWT via `node:crypto`. Three SDK alternatives explicitly rejected. Closes [foundation architecture DRI Issue #1](../../foundation/architecture.md#issues).
 - **Test coverage:**
-  - Unit tests with mocked SDK responses (every wrapper function)
+  - Unit tests with mocked `fetch` responses (every wrapper function — no SDK to mock)
   - Contract tests using a snapshot of real Coinbase responses (fixture-replay; no live calls in CI)
   - One integration test against the real Coinbase API gated on a `RUN_INTEGRATION_TESTS` env var (operator-runs locally before bet ships)
 - **Rate-limit awareness:** wrapper inspects `X-RateLimit-Remaining` headers and emits warnings via Sentry breadcrumb when usage exceeds 25% of ceiling per request (defensive; well under the architecture's 10% threshold target)
@@ -112,13 +115,13 @@ Not a moat. Coinbase has multiple actively-maintained TS SDKs ([arch-research.md
 
 ## Open questions for Researcher
 
-1. **Coinbase rate-limit headers** — does CDP JWT-auth'd Advanced Trade actually surface `X-RateLimit-Remaining`, or only return 429 on exceedance? Affects whether our defensive 25%-warning is achievable or whether we wait for 429 + back off. Cite the Coinbase docs page that confirms either way. ([Coinbase Developer Platform — Rate Limits](https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/websocket/websocket-rate-limits))
-2. **SDK comparison** — `tiagosiebler/coinbase-api` vs `coinbase-samples/advanced-sdk-ts` vs `JoshJancular/coinbase-advanced-node` as of 2026-06-06: which has the most up-to-date Advanced Trade endpoint coverage including the `getProductStats` (24h-volume) endpoint CB-3 needs? Last release dates. Issue-tracker health. Engineer DRI Decision lives on the first story but Researcher fronts the data.
-3. **CDP JWT key rotation cadence** — Coinbase recommends rotating CDP keys quarterly per [runbook § Rotation procedures](../../ops/runbook.md#coinbase-api-key-quarterly). Does the SDK gracefully handle mid-request rotation (key changes between request A and request B), or do we need a process-restart shim? Affects whether key rotation requires a deploy or just an env-var update.
+1. **Coinbase rate-limit headers** — does CDP JWT-auth'd Advanced Trade actually surface `X-RateLimit-Remaining`, or only return 429 on exceedance? Affects whether our defensive 25%-warning is achievable or whether we wait for 429 + back off. Cite the Coinbase docs page that confirms either way. ([Coinbase Developer Platform — Rate Limits](https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/websocket/websocket-rate-limits)) (Deferred to CB-2.5 when `trace.ts` ships rate-limit observability.)
+2. ~~**SDK comparison**~~ — **CLOSED 2026-06-06.** Resolved via [CB-2.1 Engineer DRI Decision](stories/CB-2.1/story.md#decisions): no SDK at all. The three SDK candidates were evaluated and all three rejected (tiagosiebler — vendor in auth path + EdDSA support uncertain; coinbase-samples — 8+ months stale, no test suite; JoshJancula — CDP JWT support not explicit). Direct REST + JWT via `node:crypto` is the shipped pattern. **No remaining SDK question for Researcher.**
+3. **CDP JWT key rotation cadence** — Coinbase recommends rotating CDP keys quarterly per [runbook § Rotation procedures](../../ops/runbook.md#coinbase-api-key-quarterly). Does our direct `node:crypto` JWT-minting path gracefully handle mid-request rotation (key changes between request A and request B), or do we need a process-restart shim? Affects whether key rotation requires a deploy or just an env-var update. (Reframed from "Does the SDK gracefully handle..." now that the no-SDK pivot is committed.)
 
 ## Research findings
 
-_To be filled by Researcher. Lean from architecture-research already covers SDK ecosystem ([arch-research.md §1.3 + §3.4](../../foundation/architecture-research.md#1-prior-art)) and rate-limit ceilings ([§2.2](../../foundation/architecture-research.md#2-benchmarks)). Researcher to specifically confirm the three Open Questions above with primary-source citations._
+**Researcher item 2 (SDK comparison) is now closed by the CB-2.1 Engineer DRI Decision** (no SDK; direct REST + JWT). Items 1 (rate-limit headers) and 3 (CDP JWT key rotation behavior of our direct path) remain open; both are deferred to CB-2.5 (trace.ts + rate-limit observability) where they're directly load-bearing on the build work.
 
 ## User pain input (from Support)
 
@@ -131,23 +134,21 @@ _n=1 single-operator product — Support pain mirrors the operator's own develop
 
 _Decomposed one at a time via `/create-story CB-2`. Forecast: 3–5 stories. Not authoritative; the workflow estimate model fires the "Stories created" trigger as each story.md file lands._
 
-Expected decomposition (forecast for planning only; not committed scope):
-
-- **CB-2.1 — SDK pick + client.ts + env wiring** — Engineer DRI Decision on the SDK; `lib/coinbase/client.ts` with CDP JWT auth; `lib/env` extension for `COINBASE_API_KEY_NAME` + `COINBASE_API_PRIVATE_KEY`; "hello world" integration test against Coinbase API
-- **CB-2.2 — `market.ts` + Zod types for public endpoints** — `getProducts`, `getProductStats`, `getProductCandles`; the typed surface CB-3 (next bet) reads from
-- **CB-2.3 — `accounts.ts` for authenticated reads** — `getAccountBalances`, `getAccountTradeHistory`; the typed surface CB-5 reads from
+- **CB-2.1 — `client.ts` + `jwt.ts` + `types.ts` foundation** — **SHIPPED 2026-06-06** via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) (commit `fc88b5f`). [Engineer DRI Decision: no SDK](stories/CB-2.1/story.md#decisions) — direct REST + per-request JWT via `node:crypto` (ES256/EdDSA auto-detect). Closes [foundation architecture DRI Issue #1](../../foundation/architecture.md#issues). Ships `lib/coinbase/{client,jwt,types}.ts` + 46 unit tests + 2 gated integration tests against real Coinbase public endpoint (no CDP creds required for smoke). 2 Codex round-1 BLOCKERs closed (transport-failure `safeFetch` wrap + EdDSA brokerage caveat).
+- **CB-2.2 — `market.ts` + Zod types for public endpoints** — `getProducts`, `getProductStats`, `getProductCandles`; the typed surface CB-3 (next bet) reads from. Rides `publicRequest()` from CB-2.1; no JWT exercise. **Next slice** via `/create-story CB-2`.
+- **CB-2.3 — `accounts.ts` for authenticated reads** — `getAccountBalances`, `getAccountTradeHistory`; the typed surface CB-5 reads from. First story that exercises `request()` + JWT auth against `/api/v3/brokerage/*` endpoints. Requires CDP credentials in `.env.local` for the integration test.
 - **CB-2.4 — `orders.ts` for authenticated writes** — `placeOrder`, `cancelOrder`; no policy; the typed surface CB-4 reads from
-- **CB-2.5 — `trace.ts` + Sentry integration** — structured-log breadcrumbs; the success-rate metric instrumentation
+- **CB-2.5 — `trace.ts` + Sentry integration** — structured-log breadcrumbs; the success-rate metric instrumentation; resolves the EdDSA brokerage uncertainty surfaced in CB-2.1 (real auth'd integration test against brokerage with EdDSA credentials)
 
-Per the operator's [CB-1 actual-velocity signal](../../foundation/plan.md#risks-to-plan) (~0.7 days/story), this likely ships in 3–5 calendar days. Confidence held at `medium` until first story merges (per workflow estimate model row "First build PR merged").
+Per the operator's [CB-1 actual-velocity signal](../../foundation/plan.md#risks-to-plan) (~0.7 days/story), this likely ships in 3–5 calendar days. **Confidence advanced `medium` → `high` on 2026-06-06** per the workflow estimate model "First build PR merged" trigger (CB-2.1's ship). See [brief frontmatter](#) `estimate.refined_by: build-actuals`.
 
 ## Scan summary
 
-- **Last scanned:** n/a (no scan-report yet — first scan happens after first story shipped per `/scan` pattern)
-- **Current phase:** brief promotion (HITL approval pending)
-- **Open findings:** n/a
-- **Blocking advance:** no — HITL approval is the next gate
-- **Full report:** [`scan-report.md`](./scan-report.md) (will exist after `/build` + `/scan CB-2` fires)
+- **Last scanned:** n/a (no scan-report yet — first scan happens after first story shipped per `/scan` pattern; CB-2.1 shipped 2026-06-06 but `/scan CB-2` not yet fired)
+- **Current phase:** in-build (CB-2.1 shipped 2026-06-06 via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26); 1 of ~5 stories done; `/create-story CB-2` for CB-2.2 is next)
+- **Open findings:** n/a (no `/scan` run yet)
+- **Blocking advance:** no
+- **Full report:** [`scan-report.md`](./scan-report.md) (will exist after the first `/scan CB-2` fires)
 
 ## Check-in log
 
@@ -189,11 +190,12 @@ _Populated automatically by `/measure` cron once the wrapper has accrued ≥ 100
 
 ### Risks
 
-- [2026-06-06] [PM] **SDK pick may surface mid-implementation — picking too early makes a rewrite painful; picking too late blocks CB-3**
+- [2026-06-06] [PM] **SDK pick may surface mid-implementation — picking too early makes a rewrite painful; picking too late blocks CB-3** (**RESOLVED 2026-06-06**)
   - **Likelihood (required):** medium (three viable TS SDKs; their endpoint-coverage maps may differ in surprising ways)
   - **Impact (required):** medium (mid-story SDK swap is a half-day of work + re-running tests against a new mock surface)
   - **Mitigation (required):** Engineer DRI Decision on CB-2.1 commits to ONE SDK with rationale; if a later story uncovers an endpoint the chosen SDK doesn't support, the swap is the Decision-supersession pattern (per Compass append-only DRI convention); architecture.md Issue #1 already names this as deferred-to-first-story
   - **Area (required, tag):** scheduling / technical
+  - **Resolution (filled when closed):** 2026-06-06 — CB-2.1 [Engineer DRI Decision](stories/CB-2.1/story.md#decisions) selected **no SDK** (direct REST + JWT via `node:crypto`). Three SDK alternatives all rejected (tiagosiebler: vendor in auth path + EdDSA uncertain; coinbase-samples: stale; JoshJancula: CDP JWT unclear). Pre-mitigation rationale ("pick early, swap if needed") moot; replaced by the no-SDK direct pattern. **A new Risk took its place** (EdDSA brokerage compatibility), tracked at [CB-2.1 story DRI](stories/CB-2.1/story.md#risks-engineer-round-1-then-pm-pre-existing-for-audit); resolution deferred to CB-2.5 (trace.ts) when real-brokerage EdDSA integration test will resolve the ambiguity.
 
 - [2026-06-06] [PM] **Coinbase changes a response shape mid-flight — wrapper's Zod schemas reject the new field; consumer surfaces opaque error**
   - **Likelihood (required):** low (Coinbase Advanced Trade is a versioned, documented API; breaking changes are rare and announced)
@@ -207,10 +209,11 @@ _Populated automatically by `/measure` cron once the wrapper has accrued ≥ 100
   - **Mitigation (required):** wrapper's `trace.ts` redacts auth headers from all log lines; gitleaks + GitHub secret-scan inherited from CB-1.1's CI gates; CDP key has Trade-only scope (no Withdraw) per [product.md § Failure mode if auth is bypassed](../../foundation/product.md#failure-mode-if-auth-is-bypassed) so even worst-case compromise can't drain capital
   - **Area (required, tag):** security
 
-- [2026-06-06] [PM] **Coinbase rate-limit headers may not be exposed by the SDK** (Researcher open question)
-  - **Likelihood (required):** low-to-medium (depends on SDK choice; Coinbase's docs surface them but the SDK may abstract them away)
-  - **Impact (required):** low (we'd fall back to "react to 429s with exponential backoff" — the SDK's default behavior; no value loss, just less proactive instrumentation)
-  - **Mitigation (required):** if `X-RateLimit-Remaining` isn't exposed by the chosen SDK, the 25%-utilization guardrail downgrades to "rely on Sentry alerts on 429s"; documented as Decision supersession on first story if needed
+- [2026-06-06] [PM] **Coinbase rate-limit headers may not be returned by the Advanced Trade `/api/v3/brokerage/*` endpoints** (Researcher open question; reframed against the no-SDK direct-fetch path shipped in CB-2.1)
+  - **Likelihood (required):** low-to-medium (Coinbase's general docs surface `X-RateLimit-Remaining` semantics, but the brokerage-specific endpoints may or may not return the header per request — undocumented at the brokerage tier; the only way to confirm is to inspect real responses via the wrapper's `trace.ts` once CB-2.5 ships)
+  - **Impact (required):** low (with no SDK in the path, our `lib/coinbase/client.ts` has full access to the raw `Response` headers — there's no abstraction layer hiding them. If Coinbase doesn't include `X-RateLimit-Remaining` on brokerage responses, we fall back to "react to 429s with exponential backoff" instead of proactive 25%-utilization warnings; no value loss, just less proactive instrumentation. The 10%-of-ceiling Performance-Efficiency fitness function ([architecture.md § Fitness Functions](../../foundation/architecture.md#fitness-functions)) still holds either way — well within free-tier budget.)
+  - **Mitigation (required):** when CB-2.5 (trace.ts) ships, it logs raw response headers via Sentry breadcrumb on a sample of requests; if `X-RateLimit-Remaining` is absent from real brokerage responses, the 25%-utilization guardrail [brief frontmatter `guardrails[0]`](#) downgrades to "rely on Sentry alerts on 429s" via a Decision supersession at that story.
+  - **Reframing note (2026-06-06):** original wording framed this risk against an SDK that might "abstract the headers away." Now that CB-2.1's no-SDK direct-fetch is the shipped pattern, the SDK-abstraction concern is moot — but the underlying brokerage-API question (does Coinbase even send the header on `/api/v3/brokerage/*`?) remains. Reframed accordingly. Researcher item 1 (rate-limit headers) under [§ Open questions](#open-questions-for-researcher) tracks the primary-source confirmation.
   - **Area (required, tag):** observability / technical
 
 - [2026-06-06] [PM] **The `LIVE_MODE` gate in CB-4 (not the wrapper) means a CB-4 bug could fire a real-money order in dry-run**
@@ -224,16 +227,16 @@ _Populated automatically by `/measure` cron once the wrapper has accrued ≥ 100
 - [2026-06-06] [PM] **Final SDK pick deferred to Engineer DRI on CB-2.1** — current lean is `tiagosiebler/coinbase-api` per [arch-research.md §1.3](../../foundation/architecture-research.md#1-prior-art) activity signal
   - **Severity (required, mandatory):** P3 (deferred-by-design; closes naturally on CB-2.1 ship)
   - **Owner (required, mandatory):** Engineer at first-story time
-  - **Status:** open
+  - **Status:** **CLOSED 2026-06-06**
   - **Area (required, tag):** architectural / dependency
-  - **Resolution (filled when closed):** [to be filled during `/create-story CB-2` for CB-2.1 — Engineer compares the three options against actual endpoint surface needed for `market.ts` and `orders.ts`; picks one with rationale + rejection-of-alternatives logged per AGENTS.md append-only DRI]
+  - **Resolution (filled when closed):** 2026-06-06 — Engineer DRI Decision on CB-2.1 selected **no SDK** (direct REST + per-request JWT via `node:crypto`). All three SDK candidates explicitly rejected: `tiagosiebler/coinbase-api` (vendor in auth path + EdDSA support uncertain), `coinbase-samples/advanced-sdk-ts` (8+ months stale, no test suite), `JoshJancula/coinbase-advanced-node` (CDP JWT support not explicit). Closes [foundation architecture DRI Issue #1](../../foundation/architecture.md#issues). Full rationale + alternatives at [CB-2.1 story DRI](stories/CB-2.1/story.md#decisions). Shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26).
 
-- [2026-06-06] [PM] **Three Researcher Open Questions logged above (rate-limit headers; SDK comparison freshness; CDP JWT rotation behavior)** — Researcher fills before CB-2.1 starts
+- [2026-06-06] [PM] **Three Researcher Open Questions logged above (rate-limit headers; SDK comparison freshness; CDP JWT rotation behavior)** — Researcher fills before CB-2.1 starts (**PARTIALLY RESOLVED 2026-06-06**)
   - **Severity (required, mandatory):** P3 (informational; doesn't block brief approval)
   - **Owner (required, mandatory):** Researcher
-  - **Status:** open
+  - **Status:** Item 2 (SDK comparison) **CLOSED 2026-06-06** by CB-2.1 Engineer DRI Decision (no SDK; comparison moot). Items 1 (rate-limit headers) + 3 (CDP JWT rotation behavior of the direct path) **REMAIN OPEN** — deferred to CB-2.5 (trace.ts + rate-limit observability) where they're directly load-bearing.
   - **Area (required, tag):** research / dependency
-  - **Resolution (filled when closed):** [to be filled when Researcher appends findings to this brief or creates `docs/bets/CB-2/research.md`]
+  - **Resolution (filled when closed):** Item 2 — see CB-2.1 Engineer DRI Decision above. Items 1 + 3 — to be filled when Researcher appends findings during CB-2.5 build (or creates `docs/bets/CB-2/research.md`).
 
 ## Fixes (post-merge)
 
