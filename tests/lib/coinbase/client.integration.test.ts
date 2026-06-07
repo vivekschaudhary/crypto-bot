@@ -60,4 +60,62 @@ describe.skipIf(!RUN)("lib/coinbase/client — integration (real Coinbase)", () 
       expect(Object.keys(result).length).toBeGreaterThan(0);
     }
   }, 15_000);
+
+  // CB-2.2 — exercise the `market.ts` wrappers against the real Coinbase
+  // public market endpoints. Validates the full chain: Zod schemas accept
+  // the live response shape, pagination reaches all products, and the
+  // candle-range guard doesn't false-positive on a reasonable window.
+
+  it("getProducts() returns at least 50 products including BTC-USD", async () => {
+    const { getProducts } = await import("@/lib/coinbase/market");
+    const products = await getProducts();
+
+    // Coinbase Advanced Trade has hundreds of trading pairs as of 2026.
+    // 50 is a safe floor — well under the actual count, well above the
+    // single-page default limit (49), so a < 50 result would signal
+    // pagination is broken.
+    expect(products.length).toBeGreaterThanOrEqual(50);
+    expect(products.some((p) => p.product_id === "BTC-USD")).toBe(true);
+  }, 30_000);
+
+  it("getProduct('BTC-USD') returns a typed product with 24h volume", async () => {
+    const { getProduct } = await import("@/lib/coinbase/market");
+    const product = await getProduct("BTC-USD");
+
+    expect(product.product_id).toBe("BTC-USD");
+    // volume_24h is a required field per Coinbase's public product contract
+    // and is load-bearing for CB-3's top-5-by-24h-volume ranking. Assert
+    // unconditionally — Zod schema already requires it, but the integration
+    // test makes the contract explicit against a live response.
+    expect(product.volume_24h).toBeTruthy();
+    const parsed = Number(product.volume_24h);
+    expect(Number.isFinite(parsed)).toBe(true);
+    expect(parsed).toBeGreaterThanOrEqual(0);
+  }, 15_000);
+
+  it("getProductCandles() returns OHLCV rows for the last 24h at ONE_HOUR granularity", async () => {
+    const { getProductCandles } = await import("@/lib/coinbase/market");
+    const end = new Date();
+    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    const candles = await getProductCandles({
+      productId: "BTC-USD",
+      granularity: "ONE_HOUR",
+      start,
+      end,
+    });
+
+    // 24h ÷ 1h = 24 candles expected; allow 20 as a floor (Coinbase
+    // occasionally returns one fewer at boundary edges).
+    expect(candles.length).toBeGreaterThanOrEqual(20);
+    expect(candles.length).toBeLessThanOrEqual(25);
+    // Each row should have all OHLCV fields.
+    for (const c of candles.slice(0, 3)) {
+      expect(c.start).toBeTruthy();
+      expect(c.open).toBeTruthy();
+      expect(c.high).toBeTruthy();
+      expect(c.low).toBeTruthy();
+      expect(c.close).toBeTruthy();
+      expect(c.volume).toBeTruthy();
+    }
+  }, 15_000);
 });
