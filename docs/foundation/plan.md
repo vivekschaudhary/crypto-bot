@@ -20,8 +20,7 @@ Bets with `actual_start` populated and `actual_end` still empty.
 
 | Bet | Title | Phase | Actual start | Estimated end | Owner |
 |-----|-------|-------|--------------|---------------|-------|
-
-_None — CB-1 shipped 2026-06-05. CB-2 has a brief-approved status + a ready story but no commits yet, so it lives in "Next up" below until its first PR merges + writes `actual_start`._
+| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | 1 of ~5 stories shipped ([CB-2.1](../bets/CB-2/stories/CB-2.1/story.md) via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26)); `/create-story CB-2` for CB-2.2 (`lib/coinbase/market.ts` — public endpoints) is next | 2026-06-06 | 2026-06-13 | PM → Engineer |
 
 ## Next up (unblocked, not yet started)
 
@@ -29,7 +28,8 @@ Bets whose dependencies are satisfied (or have none) but `actual_start` is empty
 
 | Bet | Title | Estimated start | Estimated end | Estimated duration | Confidence | Promotion status |
 |-----|-------|-----------------|---------------|---------------------|------------|-------------------|
-| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | 2026-06-06 | 2026-06-13 | 1 week | medium | brief approved 2026-06-06; [CB-2.1 story](../bets/CB-2/stories/CB-2.1/story.md) `ready`; `/build CB-2.1` is the next workflow |
+
+_None — CB-2 has moved to "Currently in flight" via CB-2.1's PR #26 merge (writes `actual_start = 2026-06-06`; "First build PR merged" trigger fires per the workflow estimate model). CB-3..CB-5 remain in "Blocked"._
 
 ## Blocked
 
@@ -54,7 +54,7 @@ Every MVP bet with all date columns. Source of truth for downstream tools.
 | Bet | Title | Depends on | Est. start | Est. end | Actual start | Actual end | Duration (wk) | Confidence | Last refined by |
 |-----|-------|------------|------------|----------|--------------|------------|---------------|------------|-----------------|
 | [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-21 | 2026-05-31 | 2026-06-05 | 3 (est) / 1 (actual ≈ 5 days) | high | stories |
-| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | 2026-06-06 | **2026-06-13** | — | — | **1** | **medium** | **brief-approval** |
+| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | 2026-06-06 | **2026-06-13** | **2026-06-06** | — | **1** | **high** | **build-actuals** |
 | [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | [CB-2] (CB-1 cleared) | **2026-06-15** | **2026-06-28** | — | — | 2 | low | stub |
 | [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | [CB-2, CB-3] | **2026-06-29** | **2026-07-19** | — | — | 3 | low | stub |
 | [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | [CB-4] (CB-1 cleared) | **2026-07-20** | **2026-08-09** | — | — | 3 | low | stub |
@@ -114,6 +114,10 @@ Each time a date moves, write a line here naming the **triggering artifact** (sp
 | 2026-06-06 | CB-4 | estimated_end | `2026-07-26` (v6) | **`2026-07-19`** | duration_weeks unchanged at 3 (stub); −7 days cascade. |
 | 2026-06-06 | CB-5 | estimated_start | `2026-07-27` (v6) | **`2026-07-20`** | Binding-dep CB-4 shifted; cascade −7 days. |
 | 2026-06-06 | CB-5 | estimated_end | `2026-08-16` (v6) | **`2026-08-09`** | duration_weeks unchanged at 3 (stub); −7 days cascade. **= new MVP target. First MVP-target compression in the bet's history.** |
+| 2026-06-06 | CB-2 | actual_start | — | **`2026-06-06`** | _v7 post-merge entries begin (post-PR-#27-round-1 review)._ **"First build PR merged" trigger fires.** CB-2.1 story shipped via [PR #26 `fc88b5f`](https://github.com/vivekschaudhary/crypto-bot/pull/26) on 2026-06-06 (same day as brief approval). Per workflow estimate model: write bet's `actual_start` + recompute remaining duration + confidence → `high`. CB-2 brief frontmatter `estimate.actual_start: 2026-06-06` set in the same review-cleanup cycle. |
+| 2026-06-06 | CB-2 | confidence | `medium` (brief-approval) | **`high`** | Same "First build PR merged" trigger row — "Confidence after" column advances `medium` → `high` once actual build evidence exists. |
+| 2026-06-06 | CB-2 | refined_by | `brief-approval` | **`build-actuals`** | Same trigger; enum advances per workflow estimate model. |
+| 2026-06-06 | CB-2 | duration_weeks (post-build-actuals recompute) | 1 | 1 | Recomputed remaining duration: 1 story shipped in ~1 calendar day (CB-2.1: branch created + PR #26 merged same day); 4 stories remaining (.2/.3/.4/.5) at ~1 day each per CB-2.1 actual ≈ 4 more days = ~5 days total. Round to integer weeks: 1 wk. Net movement: **0 days** — held at brief-approval value. Estimated_end stays 2026-06-13; downstream cascade unchanged. (Watch — if CB-2.2/.3 also ship in <1 day each, v8 may compress estimated_end further.) |
 
 _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions 1–5._
 
@@ -122,7 +126,7 @@ _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions
 - **Per-story velocity 3-days/story model still NOT retuned in v7 despite CB-1's data point** — unchanged from v6's DRI Decision (see [Decisions](#decisions) below: "Per-story velocity model NOT retuned in v6"). Watch through CB-2 + CB-3 actuals before considering an adjustment. If CB-2 also ships at <1 day/story (which is what scope-chop + foundation maturity suggests), v8 may justify retuning the model's per-story default downward. Expected outcome: another ~3-7 days compression on MVP target.
 - **CB-3/CB-4/CB-5 stub estimates dominate the remaining cascade** — three bets at stub `low` confidence (2 wk + 3 wk + 3 wk = 8 wk total). Each brief-approval will potentially compress further. The highest-leverage next move (after CB-2.1 ships) becomes **`/create-brief CB-3`** to refine CB-3's stub.
 - **CB-4 (bot runtime) carries the single-bet extension risk** (unchanged from v1+) — most surface area; may bump to 4 weeks at brief promotion. The most likely individual-bet expansion in the remaining cascade.
-- **CDP key provisioning is now an IMMEDIATE blocker for CB-2.1** (was Day-1 blocker; now Day-of) — Engineer cannot run the gated integration test in [CB-2.1 AC 5](../bets/CB-2/stories/CB-2.1/story.md) without a working CDP key in `.env.local`. If the operator has not yet rotated/created a Trade-only CDP key, this blocks CB-2.1's PR. Mitigation: PR #24's status sweep should have surfaced this; operator confirms CDP credentials present before `/build CB-2.1` fires. (See [Issues](#issues) below for the same item with full DRI metadata.)
+- ~~**CDP key provisioning is now an IMMEDIATE blocker for CB-2.1**~~ — **PARTIALLY RESOLVED 2026-06-06.** CB-2.1 shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) using a public endpoint for the integration test (`/api/v3/brokerage/market/products/BTC-USD` — no auth required), sidestepping the CDP credentials requirement entirely. The gated integration test now smoke-checks the wrapper end-to-end against real Coinbase without needing CDP keys provisioned. **Still required for CB-2.3 (auth'd reads) and CB-2.4 (auth'd writes / place order)** — those stories WILL need CDP credentials in `.env.local` for their integration tests. Tracked as still-open Issue below.
 - **All v6 forward-watch risks unchanged** — operator-cadence assumption (now genuinely sequential since portfolio has no remaining parallel pairs); post-MVP rails scheduling. (Live entries in [Risks](#risks) below.)
 - ~~**Migration 0003 (RLS) still not yet applied to production Supabase**~~ — **CLOSED 2026-06-06** during this same-day session: operator applied via `pnpm db:migrate` (after baseline-seeding the `_migrations` tracking table for 0001+0002 in Supabase SQL Editor). All four `auth_*` tables now show `rowsecurity = true`. (See [Issues](#issues) below — v6 issue marked closed.)
 
@@ -169,6 +173,12 @@ _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions
   - **Alternatives considered (required):** silently skip the trigger since the date didn't move (rejected — violates "no silent skips" per AGENTS.md principle #3; audit trail benefits from explicit no-op-net entries); shrink duration_weeks to 0.43 wk (rejected — that's a fractional value the integer-week reporting convention doesn't support, AND would author the date below brief-approval ceiling)
   - **Reversibility:** trivial.
 
+- [2026-06-06] [Project Manager] **CB-2.1's "First build PR merged" trigger fired same-day as brief approval; plan v7 must reflect both refinements + cascade source-of-truth updates across brief / story / architecture** — closes Codex PR #27 round-1 (re-run on 458bf4e) ISSUE
+  - **Rationale (required):** Codex's PR #27 review on commit 458bf4e flagged that plan.md/status.md had drifted from source-of-truth artifacts: status.md claimed CB-2.1 shipped + arch Issue #1 closed, but `docs/bets/CB-2/stories/CB-2.1/story.md` still had `status: ready`, footer "pending", and `docs/foundation/architecture.md` line 689 still showed Issue #1 open. Plan v7 also described pre-PR-#26 state (CB-2 in "Next up" with no commits; CDP creds named as Day-of blocker for CB-2.1). The proper fix per `/plan` workflow is **NOT** to author the closures in derived plan.md/status.md — it's to update the upstream artifacts first, then let plan.md derive. This commit does both: source artifacts get authoritative updates; plan/status reflect them. Refinement log adds the "First build PR merged" trigger rows (post-merge entries marked); Risks/Issues updated to reflect partial resolutions (CB-2.1 done; CB-2.3/2.4 still need CDP).
+  - **Area (required, tag):** scheduling / artifact-cascade
+  - **Alternatives considered (required):** roll back the status.md closures and re-open everything (rejected — CB-2.1 genuinely shipped; the artifacts SHOULD show it); leave the inconsistency and just file an Issue (rejected — that's the original Codex flag; not fixing it would burn the next review round too); add a "post-merge bookkeeping" PR pattern as standing convention (worth considering for the post-CB-2.1 retro, but doesn't help close this specific review)
+  - **Reversibility:** trivial — the cascade math is uniquely determined by which artifacts say what; if a later refresh contradicts this state, it'll surface as a new "First build PR merged" trigger row in the next /plan refresh.
+
 ### Risks
 
 - [2026-06-06] [Project Manager] **CB-2 stub-vs-actual delta is now the single highest-leverage uncertainty in the cascade** (v6 entry; v7 PARTIALLY RESOLVED — brief-approval refinement closed the stub-vs-brief delta; build-actuals delta still open)
@@ -190,11 +200,12 @@ _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions
   - **Mitigation (required):** unchanged from v5 — re-run `/plan` after each brief approval; refinement log captures every movement.
   - **Area (required, tag):** scheduling / estimation
 
-- [2026-06-06] [Project Manager] **CB-2.1 SDK pick is the single highest-leverage uncertainty in the CB-2 build path**
+- [2026-06-06] [Project Manager] **CB-2.1 SDK pick is the single highest-leverage uncertainty in the CB-2 build path** (**RESOLVED 2026-06-06**)
   - **Likelihood (required):** medium (three viable SDKs; their endpoint-coverage maps may differ in surprising ways at implementation time)
   - **Impact (required):** medium (mid-story SDK swap is a half-day of work + re-running tests; rare in practice but real)
   - **Mitigation (required):** Engineer DRI Decision on CB-2.1's first commit names ONE SDK with documented rationale + alternatives; if a later CB-2.x story surfaces an endpoint the chosen SDK doesn't support, the swap is the Decision-supersession pattern (per Compass append-only DRI convention)
   - **Area (required, tag):** scheduling / technical
+  - **Resolution (filled when closed):** 2026-06-06 — Engineer DRI Decision on PR #26: **no SDK at all.** Direct REST + JWT via `node:crypto`. All three SDK alternatives explicitly rejected. Closes [foundation architecture.md DRI Issue #1](../foundation/architecture.md#issues). New Risk surfaced in its place: EdDSA path unverified for `/api/v3/brokerage/*` endpoints — tracked in CB-2.1 story DRI; resolution deferred to CB-2.5 trace.ts integration test.
 
 ### Issues
 
@@ -208,9 +219,9 @@ _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions
 - [2026-06-06] [Project Manager] **CDP API key Day-of blocker for CB-2.1** — Engineer needs working CDP credentials in `.env.local` to run the gated integration test (AC 5)
   - **Severity (required, mandatory):** P2 (blocks `/build CB-2.1` integration test; doesn't block the PR if integration test is locally-skipped per CB-2.1 PM Risk #2)
   - **Owner (required, mandatory):** operator
-  - **Status:** open
+  - **Status:** **CLOSED 2026-06-06** for CB-2.1 (story shipped); **REOPENED for CB-2.3 / CB-2.4** scope
   - **Area (required, tag):** infra / dependency
-  - **Resolution (filled when closed):** operator confirms CDP key present in local env before `/build CB-2.1` starts. If not yet provisioned: follow [runbook step 4](../ops/runbook.md#4-coinbase-api-key-cdp--trade-only) (Trade-only CDP key creation at portal.cdp.coinbase.com).
+  - **Resolution (filled when closed):** 2026-06-06 — CB-2.1 shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) without needing CDP credentials: Engineer's no-SDK pivot let the integration test target a public Coinbase endpoint (`/api/v3/brokerage/market/products/BTC-USD`) that doesn't require auth. The CB-2.1 scope (JWT minting + transport layer) was verifiable end-to-end via the public path without exercising CDP-authenticated brokerage endpoints. **Still required for CB-2.3 (account balances + history) and CB-2.4 (place / cancel order)** — those stories WILL need a Trade-only CDP key in `.env.local` to run their integration tests. Per [runbook step 4](../ops/runbook.md#4-coinbase-api-key-cdp--trade-only) (Trade-only CDP key creation at portal.cdp.coinbase.com). Operator confirms CDP credentials present before `/build CB-2.3` fires.
 
 ---
 

@@ -689,9 +689,9 @@ _Populated automatically by `/measure` cron._
 - [2026-05-29] [Enterprise Architect] Coinbase TS SDK final pick deferred to Phase B scaffold
   - **Severity (required, mandatory):** P3
   - **Owner (required, mandatory):** Enterprise Architect
-  - **Status:** open
+  - **Status:** **CLOSED 2026-06-06**
   - **Area (required, tag):** architectural
-  - **Resolution (filled when closed):** [to be filled during Phase B scaffold — current lean is tiagosiebler/`coinbase-api` based on activity signal per [arch-research.md §1.3](architecture-research.md#1-prior-art), but final pick made after trying the SDKs against actual endpoint surface]
+  - **Resolution (filled when closed):** 2026-06-06 — resolved via [CB-2.1 Engineer DRI Decision](../bets/CB-2/stories/CB-2.1/story.md#decisions): **NO SDK** — direct fetch to Coinbase Advanced Trade REST + per-request JWT minted with `node:crypto` (ES256 for PEM EC keys; EdDSA for raw base64 Ed25519, auto-detected from key format). Three SDK alternatives explicitly rejected: `tiagosiebler/coinbase-api` (vendor in auth path; EdDSA support uncertain), `coinbase-samples/advanced-sdk-ts` (8+ months stale, no test suite), `JoshJancula/coinbase-advanced-node` (CDP JWT support not explicit). The "minimize vendor surface" stance from § Decision above + the operator's working sibling-app pattern + node:crypto's native ES256/Ed25519 support made direct-fetch the right answer. Shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26).
 
 - [2026-05-29] [Enterprise Architect] Backup recovery code UX (display-once-at-setup ceremony + operator-confirmation flow) deferred to Phase B scaffold
   - **Severity (required, mandatory):** P3

@@ -2,9 +2,10 @@
 id: CB-2.1
 bet: CB-2
 type: story
-status: ready
+status: shipped
 priority: P0
 created: 2026-06-06
+shipped: 2026-06-06
 author: PM
 design_link: n/a (no UI surface — pure library)
 area_tags: [coinbase-integration, library, backend, dependency-management]
@@ -122,7 +123,7 @@ Test count expected: ~8-12 new unit tests + 1 integration. Should bring the code
 
 ## PRs
 
-_Auto-populated as PRs open._
+- **[PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26)** — `feat(CB-2.1): Coinbase Advanced Trade wrapper — direct REST + JWT (no SDK)` — merged 2026-06-06 (squash commit `fc88b5f`). 2 commits across 2 review rounds: round-1 build commit (`186346c`); round-1 BLOCKER fixes (`8eca227`: transport-failure `safeFetch` wrap + EdDSA brokerage caveat). Round-2 code + security reviews clean.
 
 ## Tests
 
@@ -195,10 +196,10 @@ _If post-merge bugs are found, story is re-opened and fixes live under `docs/bet
 - [2026-06-06] [PM] **Final SDK pick deferred to Engineer DRI on this story** (inherited from [CB-2 brief Issue #1](../../brief.md#issues))
   - **Severity (required, mandatory):** P3 (closes naturally on this story's PR merge)
   - **Owner (required, mandatory):** Engineer at first commit
-  - **Status:** open
+  - **Status:** **CLOSED 2026-06-06**
   - **Area (required, tag):** architectural / dependency
-  - **Resolution (filled when closed):** [to be filled when Engineer commits the AC 1 Decision and the package.json dependency lands]
+  - **Resolution (filled when closed):** 2026-06-06 — Engineer DRI Decision (see [Decisions](#decisions) above) selected **NO SDK** — direct fetch + per-request JWT via `node:crypto`. Three SDK alternatives explicitly rejected (`tiagosiebler/coinbase-api`, `coinbase-samples/advanced-sdk-ts`, `JoshJancula/coinbase-advanced-node`). `package.json` does NOT add any Coinbase SDK dependency (no `dependencies` change in this story). Closes [foundation architecture.md DRI Issue #1](../../../foundation/architecture.md#issues) via the same Engineer DRI Decision. Shipped via PR #26 `fc88b5f`.
 
 ---
 
-_Story closed: <pending>, brief link: docs/bets/CB-2/brief.md_
+_Story closed: 2026-06-06, brief link: docs/bets/CB-2/brief.md_
