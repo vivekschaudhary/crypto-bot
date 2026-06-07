@@ -83,13 +83,14 @@ describe.skipIf(!RUN)("lib/coinbase/client — integration (real Coinbase)", () 
     const product = await getProduct("BTC-USD");
 
     expect(product.product_id).toBe("BTC-USD");
-    // Coinbase returns numeric fields as strings; if volume_24h is present
-    // it should parse as a finite non-negative number.
-    if (product.volume_24h) {
-      const parsed = Number(product.volume_24h);
-      expect(Number.isFinite(parsed)).toBe(true);
-      expect(parsed).toBeGreaterThanOrEqual(0);
-    }
+    // volume_24h is a required field per Coinbase's public product contract
+    // and is load-bearing for CB-3's top-5-by-24h-volume ranking. Assert
+    // unconditionally — Zod schema already requires it, but the integration
+    // test makes the contract explicit against a live response.
+    expect(product.volume_24h).toBeTruthy();
+    const parsed = Number(product.volume_24h);
+    expect(Number.isFinite(parsed)).toBe(true);
+    expect(parsed).toBeGreaterThanOrEqual(0);
   }, 15_000);
 
   it("getProductCandles() returns OHLCV rows for the last 24h at ONE_HOUR granularity", async () => {

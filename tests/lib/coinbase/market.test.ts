@@ -31,8 +31,8 @@ describe("getProducts — happy path + pagination", () => {
   it("returns the products array when the response has no cursor (single page)", async () => {
     publicRequest.mockResolvedValueOnce({
       products: [
-        { product_id: "BTC-USD", price: "60000" },
-        { product_id: "ETH-USD", price: "3000" },
+        { product_id: "BTC-USD", price: "60000", volume_24h: "12345.67" },
+        { product_id: "ETH-USD", price: "3000", volume_24h: "5678.9" },
       ],
       num_products: 2,
     });
@@ -54,11 +54,14 @@ describe("getProducts — happy path + pagination", () => {
   it("auto-paginates and merges when the response carries a cursor", async () => {
     publicRequest
       .mockResolvedValueOnce({
-        products: [{ product_id: "BTC-USD" }, { product_id: "ETH-USD" }],
+        products: [
+          { product_id: "BTC-USD", volume_24h: "12345.67" },
+          { product_id: "ETH-USD", volume_24h: "5678.9" },
+        ],
         cursor: "next-page-token",
       })
       .mockResolvedValueOnce({
-        products: [{ product_id: "SOL-USD" }],
+        products: [{ product_id: "SOL-USD", volume_24h: "100.5" }],
         cursor: "",
       });
 
@@ -75,7 +78,18 @@ describe("getProducts — happy path + pagination", () => {
   });
 
   it("wraps a Zod validation failure as CoinbaseClientError({code: 'validation-failed'})", async () => {
-    publicRequest.mockResolvedValueOnce({ products: [{ price: "60000" }] }); // missing product_id
+    publicRequest.mockResolvedValueOnce({ products: [{ price: "60000" }] }); // missing product_id + volume_24h
+
+    await expect(getProducts()).rejects.toMatchObject({
+      name: "CoinbaseClientError",
+      code: "validation-failed",
+    });
+  });
+
+  it("rejects products missing volume_24h (load-bearing for CB-3 top-5 ranking)", async () => {
+    publicRequest.mockResolvedValueOnce({
+      products: [{ product_id: "BTC-USD", price: "60000" /* no volume_24h */ }],
+    });
 
     await expect(getProducts()).rejects.toMatchObject({
       name: "CoinbaseClientError",
@@ -111,6 +125,18 @@ describe("getProduct — happy path + validation", () => {
 
   it("wraps Zod validation failure as CoinbaseClientError({code: 'validation-failed'})", async () => {
     publicRequest.mockResolvedValueOnce({ not_a_product: true });
+
+    await expect(getProduct("BTC-USD")).rejects.toMatchObject({
+      name: "CoinbaseClientError",
+      code: "validation-failed",
+    });
+  });
+
+  it("rejects a product missing volume_24h (load-bearing for CB-3 top-5 ranking)", async () => {
+    publicRequest.mockResolvedValueOnce({
+      product_id: "BTC-USD",
+      price: "60000" /* no volume_24h */,
+    });
 
     await expect(getProduct("BTC-USD")).rejects.toMatchObject({
       name: "CoinbaseClientError",
@@ -223,7 +249,10 @@ describe("getProductCandles — Date conversion + range validation", () => {
 
 describe("URL encoding edge cases", () => {
   it("URL-encodes special characters in productId for getProduct", async () => {
-    publicRequest.mockResolvedValueOnce({ product_id: "FOO/BAR" });
+    publicRequest.mockResolvedValueOnce({
+      product_id: "FOO/BAR",
+      volume_24h: "0",
+    });
 
     await getProduct("FOO/BAR").catch(() => {
       /* schema may fail; we only care about the called URL */

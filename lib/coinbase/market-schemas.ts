@@ -19,7 +19,7 @@ import { z } from "zod";
 /**
  * Coinbase Advanced Trade granularity enum for the candles endpoint.
  * Per [Coinbase Advanced Trade public-product-candles docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/public/get-public-product-candles)
- * — 8 string-literal values.
+ * — 9 string-literal values.
  */
 export const GranularitySchema = z.enum([
   "ONE_MINUTE",
@@ -28,6 +28,7 @@ export const GranularitySchema = z.enum([
   "THIRTY_MINUTE",
   "ONE_HOUR",
   "TWO_HOUR",
+  "FOUR_HOUR",
   "SIX_HOUR",
   "ONE_DAY",
 ]);
@@ -42,24 +43,34 @@ export const GRANULARITY_SECONDS: Record<Granularity, number> = {
   THIRTY_MINUTE: 30 * 60,
   ONE_HOUR: 60 * 60,
   TWO_HOUR: 2 * 60 * 60,
+  FOUR_HOUR: 4 * 60 * 60,
   SIX_HOUR: 6 * 60 * 60,
   ONE_DAY: 24 * 60 * 60,
 };
 
 /**
- * A single product entry. `product_id` is the only strict-required field
- * (downstream consumers key off it). Other fields are loose-optional with
- * `.passthrough()` for forward-compat.
+ * A single product entry. Two strict-required fields per Coinbase's public
+ * product contract:
+ *   * `product_id` — downstream consumers key off it
+ *   * `volume_24h` — load-bearing for CB-3's top-5-by-24h-volume ranking
+ *
+ * Other fields are loose-optional with `.passthrough()` at the object
+ * level for forward-compat (CB-2 brief PM Risk #2).
+ *
+ * Per [Coinbase Get Public Product docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/public/get-public-product),
+ * `volume_24h` is a string field consistently returned in the response —
+ * making it required surfaces an API contract change loudly if Coinbase
+ * ever removes it.
  */
 export const ProductSchema = z
   .object({
     product_id: z.string().min(1),
+    volume_24h: z.string().min(1),
     base_currency_id: z.string().optional(),
     quote_currency_id: z.string().optional(),
     base_name: z.string().optional(),
     quote_name: z.string().optional(),
     price: z.string().optional(),
-    volume_24h: z.string().optional(),
     price_percentage_change_24h: z.string().optional(),
     status: z.string().optional(),
     trading_disabled: z.boolean().optional(),
@@ -127,9 +138,11 @@ export const CandlesResponseSchema = z
 export type CandlesResponse = z.infer<typeof CandlesResponseSchema>;
 
 /**
- * Coinbase Advanced Trade's per-request candle cap. If a requested range
- * implies more candles than this, `getProductCandles()` throws
+ * Coinbase Advanced Trade's per-request candle cap. Per
+ * [Coinbase Get Public Product Candles docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/public/get-public-product-candles)
+ * the endpoint returns at most 350 candles per request. If a requested
+ * range implies more, `getProductCandles()` throws
  * `CoinbaseClientError({code: "range-too-wide"})` (fail-loud) rather than
  * silently truncating.
  */
-export const COINBASE_MAX_CANDLES_PER_REQUEST = 300;
+export const COINBASE_MAX_CANDLES_PER_REQUEST = 350;
