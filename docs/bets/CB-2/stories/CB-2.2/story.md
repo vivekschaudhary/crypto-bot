@@ -2,7 +2,8 @@
 id: CB-2.2
 bet: CB-2
 type: story
-status: ready
+status: shipped
+shipped: 2026-06-07
 priority: P0
 created: 2026-06-06
 author: PM
@@ -133,7 +134,7 @@ Engineer makes the call on inner-object passthrough placement during implementat
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #32](https://github.com/vivekschaudhary/crypto-bot/pull/32) — `feat(CB-2.2): lib/coinbase/market.ts — public market data wrappers`. Squash-merged 2026-06-07 (commit `c86991a`). 3 review rounds: round-1 BLOCKER on Coinbase contract drift (FOUR_HOUR granularity missing + max 300 should be 350 + `volume_24h` should be required); round-2 ISSUE on stale narrative comments still naming 300; round-3 clean. Ships `lib/coinbase/{market,market-schemas}.ts` + 15 unit tests + 3 gated integration tests. Live integration verified all 5 tests pass against real Coinbase public endpoints.
 
 ## Tests
 
@@ -181,4 +182,4 @@ _None at story-creation time. Engineer + Researcher open questions tracked at CB
 
 ---
 
-_Story closed: <pending>, brief link: docs/bets/CB-2/brief.md_
+_Story closed: 2026-06-07 (via PR #32 squash merge commit `c86991a`), brief link: docs/bets/CB-2/brief.md_

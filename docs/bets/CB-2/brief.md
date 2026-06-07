@@ -37,12 +37,12 @@ estimate:
   duration_weeks: 1
   confidence: high
   refined_by: build-actuals
-  refined_at: 2026-06-06
+  refined_at: 2026-06-07
   estimated_start: 2026-06-06
   estimated_end: 2026-06-13
   actual_start: 2026-06-06
-  stories_shipped: 1
-  stories_remaining_forecast: 4
+  stories_shipped: 2
+  stories_remaining_forecast: 3
 ---
 
 # CB-2 — Typed `lib/coinbase/` Wrapper Around Coinbase Advanced Trade
@@ -88,7 +88,7 @@ Not a moat. Coinbase has multiple actively-maintained TS SDKs ([arch-research.md
 - **`lib/coinbase/`** typed wrapper module:
   - `lib/coinbase/client.ts` — single Coinbase client instance (CDP JWT auth via env-injected `COINBASE_API_KEY_NAME` + `COINBASE_API_PRIVATE_KEY` per [runbook step 4 + 6](../../ops/runbook.md))
   - `lib/coinbase/market.ts` — public market data: `getProducts()`, `getProduct(productId)` (single product detail; response includes 24h volume + price stats — used by CB-3 for top-5 ranking), `getProductCandles(productId, granularity, window)` (signal-input for CB-4). **Amended 2026-06-06 (post-promotion) — see PM DRI Decision below:** the original wording said `getProductStats(productId)`, but Coinbase Advanced Trade v3 does NOT expose a separate stats endpoint — the 24h-volume + price stats are returned by the single-product endpoint (`GET /api/v3/brokerage/market/products/{product_id}`). The wrapper method name is renamed to `getProduct(productId)` to match the actual API surface. The downstream consumer (CB-3 top-5 algorithm) reads the same response fields it would have read from a `getProductStats` method; functionally identical.
-  - `lib/coinbase/accounts.ts` — authenticated read: `getAccountBalances()`, `getAccountTradeHistory({assetId?, from?, to?})`
+  - `lib/coinbase/accounts.ts` — authenticated read: `getAccountBalances()`, `getAccount(accountUuid)`, `getAccountTradeHistory({productId?, start?, end?, cursor?, limit?})`. **Amended 2026-06-07 (during `/create-story CB-2.3`) — see PM DRI Decision below:** the original wording used `getAccountTradeHistory({assetId?, from?, to?})` with bare-asset filter, but Coinbase Advanced Trade's `/orders/historical/fills` endpoint actually filters by `product_id` (the trading pair like `BTC-USD`), not by bare asset. `from`/`to` renamed to `start`/`end` for consistency with CB-2.2's `getProductCandles` signature. Added `getAccount(accountUuid)` to match Coinbase's `GET /accounts/{account_uuid}` surface (parallels `getProduct(productId)` from CB-2.2).
   - `lib/coinbase/orders.ts` — authenticated write: `placeOrder({productId, side, amount, type})`, `cancelOrder(orderId)`. **No `LIVE_MODE` check inside.** Consumer (CB-4) owns the policy.
   - `lib/coinbase/types.ts` — Zod schemas at the wrapper boundary; typed errors via custom class (`CoinbaseClientError` with `code`, `message`, `cause`, `status`)
   - `lib/coinbase/trace.ts` — structured-log breadcrumb helper: emits one log line per request with `{method, endpoint, status, duration_ms}` for the success-rate metric
@@ -135,8 +135,8 @@ _n=1 single-operator product — Support pain mirrors the operator's own develop
 _Decomposed one at a time via `/create-story CB-2`. Forecast: 3–5 stories. Not authoritative; the workflow estimate model fires the "Stories created" trigger as each story.md file lands._
 
 - **CB-2.1 — `client.ts` + `jwt.ts` + `types.ts` foundation** — **SHIPPED 2026-06-06** via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) (commit `fc88b5f`). [Engineer DRI Decision: no SDK](stories/CB-2.1/story.md#decisions) — direct REST + per-request JWT via `node:crypto` (ES256/EdDSA auto-detect). Closes [foundation architecture DRI Issue #1](../../foundation/architecture.md#issues). Ships `lib/coinbase/{client,jwt,types}.ts` + 46 unit tests + 2 gated integration tests against real Coinbase public endpoint (no CDP creds required for smoke). 2 Codex round-1 BLOCKERs closed (transport-failure `safeFetch` wrap + EdDSA brokerage caveat).
-- **CB-2.2 — `market.ts` + Zod types for public endpoints** — `getProducts`, `getProduct(productId)` (single product including 24h volume + price stats — used by CB-3 for top-5 ranking), `getProductCandles`; the typed surface CB-3 (next bet) reads from. Rides `publicRequest()` from CB-2.1; no JWT exercise. **`ready` 2026-06-06** via [PR #31](https://github.com/vivekschaudhary/crypto-bot/pull/31) (`docs/cb-2.2-story-ready`); see [story.md](stories/CB-2.2/story.md). Method-name `getProduct` reflects the 2026-06-06 PM DRI Decision below (no separate stats endpoint exists at the Advanced Trade v3 surface; the In-scope bullet above was amended in the same Decision).
-- **CB-2.3 — `accounts.ts` for authenticated reads** — `getAccountBalances`, `getAccountTradeHistory`; the typed surface CB-5 reads from. First story that exercises `request()` + JWT auth against `/api/v3/brokerage/*` endpoints. Requires CDP credentials in `.env.local` for the integration test.
+- **CB-2.2 — `market.ts` + Zod types for public endpoints** — `getProducts`, `getProduct(productId)`, `getProductCandles`; the typed surface CB-3 reads from. Rides `publicRequest()` from CB-2.1; no JWT exercise. **SHIPPED 2026-06-07** via [PR #32](https://github.com/vivekschaudhary/crypto-bot/pull/32) (commit `c86991a`). Ships `lib/coinbase/{market,market-schemas}.ts` + 15 unit tests + 3 gated integration tests against real Coinbase public endpoints. 5 Engineer DRI Decisions: auto-paginate at limit=250; Unix-seconds time format; 9 granularity enum values; Zod failures → `CoinbaseClientError({code: "validation-failed"})`; fail-loud on > 350-candle range (no auto-chunk). Codex round-1 BLOCKER: FOUR_HOUR granularity + 350-candle max + `volume_24h` required (matched current docs vs the original 300/8-granularity assumptions). Method-name `getProduct` reflects the 2026-06-06 PM DRI Decision above.
+- **CB-2.3 — `accounts.ts` for authenticated reads** — `getAccountBalances()`, `getAccount(uuid)`, `getAccountTradeHistory({productId?, start?, end?, cursor?, limit?})`; the typed surface CB-5 (dashboard ledger) reads from. **First story that exercises `request()` + JWT auth against `/api/v3/brokerage/*` endpoints** — load-bearing EdDSA brokerage caveat verification per [CB-2.1 Risk](stories/CB-2.1/story.md#risks-engineer-round-1-then-pm-pre-existing-for-audit). Requires CDP credentials in `.env.local` for the integration test (operator runs locally; CI skips). Parameter names (`productId` not `assetId`; `start`/`end` not `from`/`to`; new `getAccount(uuid)`) reflect the 2026-06-07 PM DRI Decision above. **`ready` 2026-06-07** via [PR #33](https://github.com/vivekschaudhary/crypto-bot/pull/33); see [story.md](stories/CB-2.3/story.md).
 - **CB-2.4 — `orders.ts` for authenticated writes** — `placeOrder`, `cancelOrder`; no policy; the typed surface CB-4 reads from
 - **CB-2.5 — `trace.ts` + Sentry integration** — structured-log breadcrumbs; the success-rate metric instrumentation; resolves the EdDSA brokerage uncertainty surfaced in CB-2.1 (real auth'd integration test against brokerage with EdDSA credentials)
 
@@ -144,8 +144,8 @@ Per the operator's [CB-1 actual-velocity signal](../../foundation/plan.md#risks-
 
 ## Scan summary
 
-- **Last scanned:** n/a (no scan-report yet — first scan happens after first story shipped per `/scan` pattern; CB-2.1 shipped 2026-06-06 but `/scan CB-2` not yet fired)
-- **Current phase:** in-build (CB-2.1 shipped 2026-06-06 via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26); 1 of ~5 stories done; `/create-story CB-2` for CB-2.2 is next)
+- **Last scanned:** n/a (no scan-report yet — first scan happens after the first story shipped per `/scan` pattern; CB-2.1 shipped 2026-06-06 and CB-2.2 shipped 2026-06-07 but `/scan CB-2` not yet fired)
+- **Current phase:** in-build (CB-2.1 + CB-2.2 shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) + [PR #32](https://github.com/vivekschaudhary/crypto-bot/pull/32); 2 of ~5 stories done; CB-2.3 story `ready` 2026-06-07; `/build CB-2.3` is the next workflow)
 - **Open findings:** n/a (no `/scan` run yet)
 - **Blocking advance:** no
 - **Full report:** [`scan-report.md`](./scan-report.md) (will exist after the first `/scan CB-2` fires)
@@ -194,6 +194,17 @@ _Populated automatically by `/measure` cron once the wrapper has accrued ≥ 100
   - **Alternatives considered (required):** keep the `getProductStats` name as a thin wrapper around `getProduct` and return only the stats fields (rejected — adds an unnecessary intermediate method with no semantic value over picking response fields at the call site); ship both methods (`getProduct` AND `getProductStats`, with `getProductStats` returning a subset of `getProduct`'s response) (rejected — two methods for one endpoint, future-reader confusion); add a separate Researcher Open Question about whether Coinbase has a stats endpoint we missed (rejected — endpoint surface is documented; no separate stats endpoint exists)
   - **Reversibility:** easy at this story-creation moment (rename the method in CB-2.2 story.md AC 1 + brief In scope). Harder later if CB-3's call-site is already written against `getProduct` — would require coordinated rename across consumer + wrapper.
   - **Surfaced by:** Codex review of PR #31 round-1 — flagged the brief / story drift
+
+- [2026-06-07] [PM] **`accounts.ts` `getAccountTradeHistory` parameter renames + new `getAccount(uuid)` method** — surfaced during `/create-story CB-2.3` (next slice; bundled with the CB-2.2 status-flip cascade)
+  - **Rationale (required):** the original [In scope](#in-scope) bullet for `accounts.ts` listed `getAccountTradeHistory({assetId?, from?, to?})`. Three issues against Coinbase's actual API surface:
+    1. **`assetId` → `productId`**: Coinbase Advanced Trade's `/api/v3/brokerage/orders/historical/fills` filters by `product_id` (the trading pair, e.g., `BTC-USD`), not by bare asset (`BTC`). A bare-asset filter would require post-fetch aggregation across all trading pairs an asset appears in — that's CB-5 dashboard's concern, not CB-2.3's. Renaming to `productId` matches the actual API and pushes asset-level aggregation to the consumer (CB-5) where it belongs.
+    2. **`from`/`to` → `start`/`end`**: parameter-naming consistency with CB-2.2's `getProductCandles({start, end, ...})`. Same `Date` semantics. One naming convention across the wrapper.
+    3. **Add `getAccount(accountUuid)`**: parallels CB-2.2's `getProduct(productId)` and Coinbase's `GET /accounts/{account_uuid}` endpoint. The original brief omitted it; consumers needing a single-account detail (e.g., CB-5 ledger drill-down) would otherwise pick the account out of `getAccountBalances()`'s list, which is inefficient.
+  - **Area (required, tag):** product / api-surface
+  - **Alternatives considered (required):** keep `assetId` and translate to `productId` internally by iterating all trading pairs for the asset (rejected — wrapper would silently fan out N requests; rate-limit exposure + unbounded latency); leave `from`/`to` for "operator-friendly" naming (rejected — inconsistency with CB-2.2's `getProductCandles` is worse for next-engineer than the rename one-time cost); omit `getAccount(uuid)` and let consumers filter `getAccountBalances()` client-side (rejected — wastes pagination loop bandwidth when consumer only needs one account); add a separate `getAccountTradeHistoryByAsset({asset, ...})` convenience method (rejected — two methods for one endpoint; future-reader confusion; CB-5 owns asset-level aggregation if it surfaces as a real need)
+  - **Reversibility:** easy at this story-creation moment (rename in CB-2.3 story.md AC 1 + brief In scope). Harder later if CB-5's call-site is already written. CB-5 not yet drafted; safe to rename now.
+  - **Lesson tag:** same pattern as the 2026-06-06 `getProductStats → getProduct` rename — original brief wording assumed an SDK-shaped surface that doesn't exist in Coinbase's actual API. For CB-2.4 (`orders.ts`), worth re-verifying `placeOrder({productId, side, amount, type})` parameter shape against the live `/orders` endpoint BEFORE drafting that story.
+  - **Surfaced by:** Web research on the live Coinbase docs during `/create-story CB-2.3` drafting (proactive — applying CB-2.2 round-1 lesson up-front this time)
 
 - [2026-06-06] [PM] **SDK pick may surface mid-implementation — picking too early makes a rewrite painful; picking too late blocks CB-3** (**RESOLVED 2026-06-06**)
   - **Likelihood (required):** medium (three viable TS SDKs; their endpoint-coverage maps may differ in surprising ways)
