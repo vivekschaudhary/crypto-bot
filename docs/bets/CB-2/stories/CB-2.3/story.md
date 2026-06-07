@@ -42,7 +42,7 @@ This is also **the first integration test that requires CDP credentials** — op
     start?: Date;             // filters fills where trade_time >= start
     end?: Date;               // filters fills where trade_time <= end
     cursor?: string;          // pagination — pass cursor from prior response to get next page
-    limit?: number;           // default 100, max 1000 per Coinbase docs (Engineer verifies + pins)
+    limit?: number;           // default 100 per Coinbase docs; max value not stated in the primary docs we've cited — Engineer verifies + pins against the live `/orders/historical/fills` endpoint at first commit
   }): Promise<{ fills: Fill[]; cursor?: string }>
   ```
 
@@ -151,7 +151,7 @@ _To be filled by Engineer at first PR commit. Required entries:_
 
 1. **Pagination loop limit for `getAccountBalances`** (per AC 3) — exact `limit` per request pinned against Coinbase docs (likely 250)
 2. **Time-range format for `getAccountTradeHistory`** (per AC 1) — `Date` → Coinbase format string (RFC3339 / ISO-8601 — pin against docs)
-3. **`limit` default + max for `getAccountTradeHistory`** (per AC 1) — pinned against Coinbase docs (default 100; max likely 1000)
+3. **`limit` default + max for `getAccountTradeHistory`** (per AC 1) — pinned against Coinbase docs. Default is 100 per the cited [List Fills docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/orders/list-fills); the max value is NOT stated in the primary docs we've reviewed — Engineer verifies the max by either (a) finding it in a different docs page during build, or (b) probing the live endpoint and recording the rejection threshold. Do NOT hardcode an assumed max in the wrapper without primary-source citation.
 4. **Required-field set for `AccountSchema` + `FillSchema`** (per AC 2) — pinned against live Coinbase response inspection during integration test
 5. **Zod validation failure error shape** (per AC 4) — inherits from CB-2.2: `CoinbaseClientError({code: "validation-failed"})` with first-3-issues summary
 6. **Sensitive-data redaction strategy in `parseOrThrow`-style helper** (per AC 4 + AC 6) — if `request()` body contains balance fields, suppress them from the error message; pass through to `cause` for debugging-at-call-site

@@ -144,8 +144,8 @@ Per the operator's [CB-1 actual-velocity signal](../../foundation/plan.md#risks-
 
 ## Scan summary
 
-- **Last scanned:** n/a (no scan-report yet — first scan happens after first story shipped per `/scan` pattern; CB-2.1 shipped 2026-06-06 but `/scan CB-2` not yet fired)
-- **Current phase:** in-build (CB-2.1 shipped 2026-06-06 via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26); 1 of ~5 stories done; `/create-story CB-2` for CB-2.2 is next)
+- **Last scanned:** n/a (no scan-report yet — first scan happens after the first story shipped per `/scan` pattern; CB-2.1 shipped 2026-06-06 and CB-2.2 shipped 2026-06-07 but `/scan CB-2` not yet fired)
+- **Current phase:** in-build (CB-2.1 + CB-2.2 shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) + [PR #32](https://github.com/vivekschaudhary/crypto-bot/pull/32); 2 of ~5 stories done; CB-2.3 story `ready` 2026-06-07; `/build CB-2.3` is the next workflow)
 - **Open findings:** n/a (no `/scan` run yet)
 - **Blocking advance:** no
 - **Full report:** [`scan-report.md`](./scan-report.md) (will exist after the first `/scan CB-2` fires)
