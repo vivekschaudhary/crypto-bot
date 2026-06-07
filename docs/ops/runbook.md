@@ -90,6 +90,7 @@ In Vercel dashboard → Project → Settings → Environment Variables, add (set
 | `CRON_SECRET` | from step 3 | Vercel auto-injects on cron invocations |
 | `DATABASE_URL` | from step 2 | Supabase transaction-mode pooler URI |
 | `APP_ORIGIN` | `https://<your-app>.vercel.app` | needed for WebAuthn RP + CSRF check |
+| `MIGRATE_DESTINATION` | `production` | **Production scope ONLY** — do NOT set on Preview or Development. Gates `pnpm db:migrate` from auto-applying schema changes during preview deploys against the production DB. Fail-closed: absence of var on a build = migrations skip. See [docs/ops/2026-06-06-db-migrate-env-and-build.md](2026-06-06-db-migrate-env-and-build.md). Also add to `.env.local` for local dev workflows. |
 
 Or via CLI:
 
