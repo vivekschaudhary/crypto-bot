@@ -7,14 +7,14 @@ _Last updated: 2026-06-06_
 | Bet | Phase | Owner role | Awaiting | Started | ETA |
 |---|---|---|---|---|---|
 | [CB-1](bets/CB-1/brief.md) | **SHIPPED 2026-06-05** — all 7 stories (CB-1.1 + CB-1.1.1 + CB-1.2 + CB-1.3 + CB-1.4 + CB-1.5 + CB-1.6) + 1 security follow-up PR. Foundational auth bet complete; downstream bets (CB-2..CB-5) now unblocked. | — | `/measure CB-1` cron picks up + `/create-brief CB-2` promotion is next-on-deck | 2026-05-31 | 2026-06-05 actual (2.3 weeks ahead of plan v5's 06-21) |
-| [CB-2](bets/CB-2/brief.md) | **CB-2.1 SHIPPED 2026-06-06 via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) (commit `fc88b5f`)** — `lib/coinbase/{client,jwt,types}.ts` direct REST + JWT (no SDK; Engineer DRI Decision closes [foundation arch Issue #1](foundation/architecture.md#issues)). 1 of ~5 stories done. | PM → Engineer | `/create-story CB-2` for CB-2.2 (`lib/coinbase/market.ts` — public market data wrappers via `publicRequest()` from CB-2.1; no JWT needed) | 2026-06-06 actual | 2026-06-13 (est end; build-actuals refinement — 1 wk high-confidence per CB-2 brief frontmatter) |
+| [CB-2](bets/CB-2/brief.md) | **CB-2.1 SHIPPED 2026-06-06 via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26)** (no-SDK direct REST + JWT). **[CB-2.2 story](bets/CB-2/stories/CB-2.2/story.md) `ready` 2026-06-06** — `lib/coinbase/market.ts` (`getProducts`, `getProduct`, `getProductCandles`) + Zod schemas + 10-15 unit tests + integration test extension. 1 of ~5 stories shipped; .2 ready for `/build`. | PM → Engineer | `/build CB-2.2` — Engineer commits Pagination + Granularity + Zod-error DRI Decisions at first commit | 2026-06-06 actual | 2026-06-13 (est end; build-actuals refinement — 1 wk high-confidence per CB-2 brief frontmatter) |
 | [CB-3](bets/CB-3/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-3` promotion (after CB-1 + CB-2) | 2026-05-31 | tbd at promotion |
 | [CB-4](bets/CB-4/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-4` promotion (after CB-2 + CB-3) | 2026-05-31 | tbd at promotion |
 | [CB-5](bets/CB-5/brief.md) | Portfolio stub — proposed | PM | `/create-brief CB-5` promotion (after CB-1 + CB-4) | 2026-05-31 | tbd at promotion |
 
 ## Awaiting human approval
 
-_None — CB-2 brief approved 2026-06-06; CB-2.1 shipped same day via PR #26. CB-2.2 will be drafted via `/create-story CB-2` (no further HITL gate before `/build CB-2.2` per `hitl_level: milestones`; story-ready is auto-advanced). Each subsequent CB-2.x story (.3/.4/.5) drafted one at a time as the prior ships per `/create-story` discipline._
+_None — CB-2 brief approved 2026-06-06; CB-2.1 shipped same day via PR #26; **CB-2.2 story drafted at `status: ready` (no further HITL gate before `/build CB-2.2` per `hitl_level: milestones`).** Each subsequent CB-2.x story (.3/.4/.5) drafted one at a time as the prior ships per `/create-story` discipline._
 
 ## Recently shipped
 
