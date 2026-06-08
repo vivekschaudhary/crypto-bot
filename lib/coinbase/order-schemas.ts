@@ -112,7 +112,31 @@ export const OrderResponseSchema = z
       .passthrough()
       .optional(),
   })
-  .passthrough();
+  .passthrough()
+  // Success-gated nested envelope: when `success === true`, success_response
+  // MUST be present; when `success === false`, error_response MUST be
+  // present. Without this refinement, `{success: true}` (no payload) or
+  // `{success: false}` (no error details) would pass Zod validation and
+  // leave placeOrder()'s callers unable to extract the response. Per
+  // Codex PR #39 round-1 BLOCKER.
+  .superRefine((data, ctx) => {
+    if (data.success && !data.success_response) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["success_response"],
+        message:
+          "OrderResponseSchema: success_response is required when success=true",
+      });
+    }
+    if (!data.success && !data.error_response) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["error_response"],
+        message:
+          "OrderResponseSchema: error_response is required when success=false",
+      });
+    }
+  });
 
 export type OrderResponse = z.infer<typeof OrderResponseSchema>;
 

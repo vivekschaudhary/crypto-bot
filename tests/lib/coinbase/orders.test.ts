@@ -204,6 +204,36 @@ describe("placeOrder — Zod validation failure", () => {
       code: "validation-failed",
     });
   });
+
+  it("rejects {success: true} WITHOUT success_response (success-gated envelope contract)", async () => {
+    request.mockResolvedValueOnce({ success: true /* no success_response */ });
+
+    await expect(
+      placeOrder({
+        productId: "BTC-USD",
+        side: "BUY",
+        orderConfiguration: { market_market_ioc: { quote_size: "10" } },
+      }),
+    ).rejects.toMatchObject({
+      name: "CoinbaseClientError",
+      code: "validation-failed",
+    });
+  });
+
+  it("rejects {success: false} WITHOUT error_response (success-gated envelope contract)", async () => {
+    request.mockResolvedValueOnce({ success: false /* no error_response */ });
+
+    await expect(
+      placeOrder({
+        productId: "BTC-USD",
+        side: "BUY",
+        orderConfiguration: { market_market_ioc: { quote_size: "10" } },
+      }),
+    ).rejects.toMatchObject({
+      name: "CoinbaseClientError",
+      code: "validation-failed",
+    });
+  });
 });
 
 describe("cancelOrders — happy paths", () => {

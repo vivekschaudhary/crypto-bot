@@ -3,10 +3,17 @@
 // ⚠️ THIS TEST PLACES A REAL ORDER ON YOUR COINBASE ACCOUNT ⚠️
 //
 // Strategy (Option A from CB-2.4 story AC 5, per Engineer DRI Decision
-// #3): place a LIMIT BUY at $1 BTC with post_only=true (cannot fill —
-// no one will sell BTC at $1), then immediately cancel via cancelOrders.
-// Verifies both `POST /orders` and `POST /orders/batch_cancel` end-to-
-// end against the live API. Zero commission cost. No asset acquired.
+// #3): place a LIMIT BUY at 50% BELOW current market price (queried via
+// getProduct first) with post_only=true (can't fill since limit is far
+// below the bid; post_only ensures Coinbase rejects if it WOULD cross),
+// then immediately cancel via cancelOrders. Verifies both `POST /orders`
+// and `POST /orders/batch_cancel` end-to-end against the live API. Zero
+// commission cost. No asset acquired.
+//
+// Calibration note: initial attempts used $1 BTC limit, which Coinbase
+// rejected with PREVIEW_LIMIT_PRICE_TOO_FAR_FROM_MARKET. 50% below
+// market is well within Coinbase's accepted distance and still
+// guaranteed no-fill given current spreads.
 //
 // Triple-gated:
 //   1. RUN_INTEGRATION_TESTS=1 (CI lacks reliable network egress + by
@@ -99,7 +106,6 @@ describe.skipIf(!RUN || !HAS_CREDS || !REAL_ORDERS)(
       if (!result.success) {
         // Debug: surface Coinbase's rejection reason so we can adjust the
         // test parameters (e.g., min size, allowed limit-price range).
-        // eslint-disable-next-line no-console
         console.log(
           "[orders.integration] placeOrder returned success=false. error_response:",
           JSON.stringify(result.error_response, null, 2),
