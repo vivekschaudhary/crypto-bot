@@ -70,13 +70,26 @@ describe.skipIf(!RUN || !HAS_CREDS)(
       expect(single.available_balance.value).toBe(first!.available_balance.value);
     }, 30_000);
 
-    it("getAccountTradeHistory({productId:'BTC-USD'}) returns a {fills, cursor?} shape", async () => {
+    it("getAccountTradeHistory({productIds:['BTC-USD']}) returns a {fills, cursor?} shape AND filters apply", async () => {
       const { getAccountTradeHistory } = await import("@/lib/coinbase/accounts");
-      const result = await getAccountTradeHistory({ productId: "BTC-USD" });
+
+      // Use an obvious sentinel pair that the operator very likely has NO
+      // trades for. If the wrapper sends the wrong filter (e.g., singular
+      // product_id silently match-all), this would return fills for OTHER
+      // products. By picking a sentinel that's almost certainly empty for
+      // this account, an empty result is the expected outcome — anything
+      // non-empty would signal the filter is being ignored.
+      const sentinelResult = await getAccountTradeHistory({
+        productIds: ["ZZZ-USDT-SENTINEL-NO-TRADES"],
+      });
+      expect(Array.isArray(sentinelResult.fills)).toBe(true);
+      expect(sentinelResult.fills.length).toBe(0);
+
+      // Now test the real shape with BTC-USD (which may or may not have fills).
+      const result = await getAccountTradeHistory({ productIds: ["BTC-USD"] });
 
       expect(result).toBeDefined();
       expect(Array.isArray(result.fills)).toBe(true);
-      // Cursor may or may not be present depending on whether more pages exist.
       // No assertion on fills.length — operator may have zero BTC-USD trades.
 
       // If there ARE fills, each one has the load-bearing required fields populated.
@@ -87,6 +100,7 @@ describe.skipIf(!RUN || !HAS_CREDS)(
         expect(fill.trade_time).toBeTruthy();
         expect(fill.price).toBeTruthy();
         expect(fill.size).toBeTruthy();
+        // Filter actually applied: every returned fill is BTC-USD.
         expect(fill.product_id).toBe("BTC-USD");
         expect(fill.side).toBeTruthy();
       }

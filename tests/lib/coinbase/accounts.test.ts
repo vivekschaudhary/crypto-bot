@@ -92,6 +92,19 @@ describe("getAccountBalances — happy path + pagination", () => {
     expect(accounts.map((a) => a.uuid)).toEqual(["u1", "u2"]);
   });
 
+  it("throws CoinbaseClientError({code:'pagination-contract-violation'}) when has_next=true but cursor is missing (fail-loud on upstream contract violation)", async () => {
+    request.mockResolvedValueOnce({
+      accounts: [makeAccount({ uuid: "u1" })],
+      has_next: true,
+      // cursor intentionally omitted — Coinbase contract violation
+    });
+
+    await expect(getAccountBalances()).rejects.toMatchObject({
+      name: "CoinbaseClientError",
+      code: "pagination-contract-violation",
+    });
+  });
+
   it("wraps Zod validation failure as CoinbaseClientError({code:'validation-failed'})", async () => {
     // Missing required `name` field — Coinbase docs mark it required.
     request.mockResolvedValueOnce({
@@ -165,17 +178,30 @@ describe("getAccountTradeHistory — RFC3339 conversion + cursor + filters + val
     expect(result.cursor).toBe("next-page");
   });
 
-  it("converts Date start/end to RFC3339 query params", async () => {
+  it("converts Date start/end to RFC3339 query params + serializes productIds as repeated `product_ids` params", async () => {
     request.mockResolvedValueOnce({ fills: [] });
 
     const start = new Date("2026-06-01T00:00:00Z");
     const end = new Date("2026-06-07T00:00:00Z");
-    await getAccountTradeHistory({ productId: "BTC-USD", start, end });
+    await getAccountTradeHistory({ productIds: ["BTC-USD"], start, end });
 
     const path = request.mock.calls[0]?.[1] as string;
-    expect(path).toContain("product_id=BTC-USD");
+    expect(path).toContain("product_ids=BTC-USD");
+    expect(path).not.toContain("product_id="); // singular form must NOT appear
     expect(path).toContain(`start_sequence_timestamp=${encodeURIComponent(start.toISOString())}`);
     expect(path).toContain(`end_sequence_timestamp=${encodeURIComponent(end.toISOString())}`);
+  });
+
+  it("serializes multiple productIds as repeated `product_ids` query params", async () => {
+    request.mockResolvedValueOnce({ fills: [] });
+
+    await getAccountTradeHistory({ productIds: ["BTC-USD", "ETH-USD"] });
+
+    const path = request.mock.calls[0]?.[1] as string;
+    const productIdsMatches = path.match(/product_ids=/g) ?? [];
+    expect(productIdsMatches.length).toBe(2);
+    expect(path).toContain("product_ids=BTC-USD");
+    expect(path).toContain("product_ids=ETH-USD");
   });
 
   it("passes cursor + limit through verbatim", async () => {
@@ -188,8 +214,18 @@ describe("getAccountTradeHistory — RFC3339 conversion + cursor + filters + val
     expect(path).toContain("limit=50");
   });
 
-  it("throws CoinbaseClientError({code:'invalid-argument'}) on empty productId (explicit empty string)", async () => {
-    await expect(getAccountTradeHistory({ productId: "" })).rejects.toMatchObject({
+  it("throws CoinbaseClientError({code:'invalid-argument'}) on empty productIds array", async () => {
+    await expect(getAccountTradeHistory({ productIds: [] })).rejects.toMatchObject({
+      name: "CoinbaseClientError",
+      code: "invalid-argument",
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("throws CoinbaseClientError({code:'invalid-argument'}) when productIds contains an empty string", async () => {
+    await expect(
+      getAccountTradeHistory({ productIds: ["BTC-USD", ""] }),
+    ).rejects.toMatchObject({
       name: "CoinbaseClientError",
       code: "invalid-argument",
     });
@@ -199,7 +235,7 @@ describe("getAccountTradeHistory — RFC3339 conversion + cursor + filters + val
   it("throws CoinbaseClientError({code:'invalid-argument'}) when end <= start", async () => {
     const t = new Date("2026-06-07T12:00:00Z");
     await expect(
-      getAccountTradeHistory({ productId: "BTC-USD", start: t, end: t }),
+      getAccountTradeHistory({ productIds: ["BTC-USD"], start: t, end: t }),
     ).rejects.toMatchObject({
       name: "CoinbaseClientError",
       code: "invalid-argument",
