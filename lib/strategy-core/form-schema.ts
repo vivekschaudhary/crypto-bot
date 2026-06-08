@@ -10,8 +10,10 @@
 //                      checks (entry RSI < exit RSI) + range enforcement
 //                      that's not expressible at shape level.
 //
-// Form actions wire both: Zod parse FIRST (typed payload), then validate
-// SECOND (business rules), surfacing all errors to the form.
+// FIELD NAMING — snake_case across the wire/store contract per AC 6 +
+// Tech notes Decision #1. The form HTML submits names matching the DB
+// columns (`entry_rules.rsi_threshold`, `selected_assets`, etc.); the
+// server action consumes them without translation.
 
 import { z } from "zod";
 
@@ -22,25 +24,26 @@ import {
 } from "./types";
 
 /**
- * Zod schema for the form-submitted payload before id/createdAt/createdByUserId
- * are assigned (those come from the server action; form doesn't submit them).
+ * Zod schema for the form-submitted payload before id/created_at/created_
+ * by_user_id are assigned (those come from the server action; form doesn't
+ * submit them).
  *
- * Cardinality of `selectedAssets` (1-5) is enforced here so the form UI's
+ * Cardinality of `selected_assets` (1-5) is enforced here so the form UI's
  * "select 1-5 cryptos from top-5" rule surfaces immediately; the same rule
  * is also re-checked in `validateStrategyPayload` for defense-in-depth.
  */
 export const StrategyFormPayloadSchema = z.object({
   name: z.string().min(1).max(120),
-  assetClass: z.string().min(1),
-  selectedAssets: z.array(AssetSchema).min(1).max(5),
-  entryRules: EntryRulesSchema,
-  exitRules: ExitRulesSchema,
-  positionSizeUsd: z.number().positive(),
-  perSessionBuyCountCap: z.number().int().positive(),
-  perSessionDollarCap: z.number().positive(),
+  asset_class: z.string().min(1),
+  selected_assets: z.array(AssetSchema).min(1).max(5),
+  entry_rules: EntryRulesSchema,
+  exit_rules: ExitRulesSchema,
+  position_size_usd: z.number().positive(),
+  per_session_buy_count_cap: z.number().int().positive(),
+  per_session_dollar_cap: z.number().positive(),
   // If revising an existing strategy, the form submits the old id so the
   // server action can wire supersession. First-time authoring submits null.
-  supersedesStrategyId: z.string().min(26).max(26).nullable(),
+  supersedes_strategy_id: z.string().min(26).max(26).nullable(),
 });
 
 export type StrategyFormPayload = z.infer<typeof StrategyFormPayloadSchema>;

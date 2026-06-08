@@ -1,6 +1,8 @@
 // Unit tests for `lib/strategy-core/types.ts`.
 //
 // Verifies Zod roundtrip per exported schema + branded-ULID type tagging.
+// Field shapes use snake_case per round-1 BLOCKER fix (AC 6 + Tech notes
+// Decision #1).
 
 import { describe, expect, it } from "vitest";
 
@@ -23,7 +25,6 @@ describe("StrategyIdSchema / UserIdSchema — branded ULIDs", () => {
   it("accepts a 26-char string and brands it as StrategyId", () => {
     const parsed = StrategyIdSchema.parse(VALID_ULID);
     expect(parsed).toBe(VALID_ULID);
-    // The brand is a TS-level phantom; at runtime, it's just a string.
     expect(typeof parsed).toBe("string");
   });
 
@@ -35,13 +36,10 @@ describe("StrategyIdSchema / UserIdSchema — branded ULIDs", () => {
     const uid = UserIdSchema.parse(VALID_ULID);
     const sid = StrategyIdSchema.parse(VALID_ULID);
     expect(uid).toBe(sid);
-    // At the type level, sid is not assignable to UserId. We can't test
-    // that at runtime; the existence of `.brand<"StrategyId">()` in the
-    // schema is the contract.
   });
 });
 
-describe("AssetClassSchema + AssetSchema — open-ended asset classes", () => {
+describe("AssetClassSchema + AssetSchema — open-ended asset classes (snake_case shape)", () => {
   it("AssetClass accepts arbitrary non-empty strings (per Engineer DRI Decision #2)", () => {
     expect(AssetClassSchema.parse("crypto-coinbase")).toBe("crypto-coinbase");
     expect(AssetClassSchema.parse("equity-mock")).toBe("equity-mock");
@@ -51,8 +49,8 @@ describe("AssetClassSchema + AssetSchema — open-ended asset classes", () => {
     expect(() => AssetClassSchema.parse("")).toThrow();
   });
 
-  it("AssetSchema roundtrips cleanly", () => {
-    const asset = { assetClass: "crypto-coinbase", identifier: "BTC-USD" };
+  it("AssetSchema roundtrips cleanly with snake_case shape", () => {
+    const asset = { asset_class: "crypto-coinbase", identifier: "BTC-USD" };
     const parsed = AssetSchema.parse(asset);
     expect(parsed).toEqual(asset);
     expect(JSON.parse(JSON.stringify(parsed))).toEqual(asset);
@@ -74,70 +72,70 @@ describe("MaPeriodSchema — strict-set validation (Engineer DRI Decision #3)", 
   });
 });
 
-describe("EntryRulesSchema + ExitRulesSchema", () => {
+describe("EntryRulesSchema + ExitRulesSchema — snake_case fields", () => {
   it("EntryRulesSchema roundtrips a happy-path config", () => {
-    const rules = { rsiThreshold: 30, maPeriod: 20 as const, maReinforcement: true };
+    const rules = { rsi_threshold: 30, ma_period: 20 as const, ma_reinforcement: true };
     expect(EntryRulesSchema.parse(rules)).toEqual(rules);
   });
 
   it("ExitRulesSchema roundtrips a happy-path config", () => {
-    const rules = { rsiThreshold: 70, minProfitPct: 1.5, sellFraction: 0.5 };
+    const rules = { rsi_threshold: 70, min_profit_pct: 1.5, sell_fraction: 0.5 };
     expect(ExitRulesSchema.parse(rules)).toEqual(rules);
   });
 
   it("EntryRulesSchema rejects out-of-range RSI", () => {
     expect(() =>
-      EntryRulesSchema.parse({ rsiThreshold: 150, maPeriod: 20 }),
+      EntryRulesSchema.parse({ rsi_threshold: 150, ma_period: 20 }),
     ).toThrow();
     expect(() =>
-      EntryRulesSchema.parse({ rsiThreshold: -1, maPeriod: 20 }),
+      EntryRulesSchema.parse({ rsi_threshold: -1, ma_period: 20 }),
     ).toThrow();
   });
 });
 
-describe("StrategySchema — full row roundtrip", () => {
+describe("StrategySchema — full row roundtrip with snake_case shape", () => {
   it("roundtrips a fully-formed strategy row", () => {
     const strategy = {
       id: VALID_ULID,
       name: "Test Strategy",
-      assetClass: "crypto-coinbase",
-      selectedAssets: [
-        { assetClass: "crypto-coinbase", identifier: "BTC-USD" },
-        { assetClass: "crypto-coinbase", identifier: "ETH-USD" },
+      asset_class: "crypto-coinbase",
+      selected_assets: [
+        { asset_class: "crypto-coinbase", identifier: "BTC-USD" },
+        { asset_class: "crypto-coinbase", identifier: "ETH-USD" },
       ],
-      entryRules: { rsiThreshold: 30, maPeriod: 20 as const, maReinforcement: true },
-      exitRules: { rsiThreshold: 70, minProfitPct: 1.5, sellFraction: 0.5 },
-      positionSizeUsd: 50,
-      perSessionBuyCountCap: 10,
-      perSessionDollarCap: 500,
-      createdAt: new Date("2026-06-08T00:00:00Z"),
-      createdByUserId: VALID_ULID,
-      supersededByStrategyId: null,
+      entry_rules: { rsi_threshold: 30, ma_period: 20 as const, ma_reinforcement: true },
+      exit_rules: { rsi_threshold: 70, min_profit_pct: 1.5, sell_fraction: 0.5 },
+      position_size_usd: 50,
+      per_session_buy_count_cap: 10,
+      per_session_dollar_cap: 500,
+      created_at: new Date("2026-06-08T00:00:00Z"),
+      created_by_user_id: VALID_ULID,
+      superseded_by_strategy_id: null,
     };
     const parsed = StrategySchema.parse(strategy);
     expect(parsed.name).toBe("Test Strategy");
-    expect(parsed.selectedAssets).toHaveLength(2);
-    expect(parsed.supersededByStrategyId).toBeNull();
+    expect(parsed.selected_assets).toHaveLength(2);
+    expect(parsed.superseded_by_strategy_id).toBeNull();
   });
 
-  it("rejects selectedAssets count > 5", () => {
-    const selectedAssets = Array.from({ length: 6 }, (_, i) => ({
-      assetClass: "crypto-coinbase",
+  it("rejects selected_assets count > 5", () => {
+    const selected_assets = Array.from({ length: 6 }, (_, i) => ({
+      asset_class: "crypto-coinbase",
       identifier: `PAIR-${i}-USD`,
     }));
     const strategy = {
       id: VALID_ULID,
       name: "Test",
-      assetClass: "crypto-coinbase",
-      selectedAssets,
-      entryRules: { rsiThreshold: 30, maPeriod: 20 as const },
-      exitRules: { rsiThreshold: 70, minProfitPct: 1, sellFraction: 0.5 },
-      positionSizeUsd: 50,
-      perSessionBuyCountCap: 10,
-      perSessionDollarCap: 500,
-      createdAt: new Date(),
-      createdByUserId: VALID_ULID,
-      supersededByStrategyId: null,
+      asset_class: "crypto-coinbase",
+      selected_assets,
+      entry_rules: { rsi_threshold: 30, ma_period: 20 as const },
+      exit_rules: { rsi_threshold: 70, min_profit_pct: 1, sell_fraction: 0.5 },
+      position_size_usd: 50,
+      per_session_buy_count_cap: 10,
+      per_session_dollar_cap: 500,
+      created_at: new Date(),
+      created_by_user_id: VALID_ULID,
+      superseded_by_strategy_id: null,
     };
     expect(() => StrategySchema.parse(strategy)).toThrow();
   });

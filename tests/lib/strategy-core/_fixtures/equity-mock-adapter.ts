@@ -12,6 +12,8 @@
 //
 // Reused by CB-3.3+ form UI tests when the form swap-adapter behavior gets
 // tested with a non-real-broker class.
+//
+// FIELD NAMING — snake_case across Asset shape per AC 6.
 
 import type { AssetAdapter } from "@/lib/strategy-core/adapter";
 import type { Asset } from "@/lib/strategy-core/types";
@@ -23,15 +25,15 @@ import type { Asset } from "@/lib/strategy-core/types";
  * Volume ordering: AAPL > MSFT > GOOG > AMZN > META > TSLA > NVDA > BRK.B.
  * Numbers are arbitrary; the descending order is the contract.
  */
-const FIXTURE_DATA: ReadonlyArray<{ symbol: string; volume24h: number }> = [
-  { symbol: "AAPL", volume24h: 80_000_000 },
-  { symbol: "MSFT", volume24h: 60_000_000 },
-  { symbol: "GOOG", volume24h: 50_000_000 },
-  { symbol: "AMZN", volume24h: 40_000_000 },
-  { symbol: "META", volume24h: 30_000_000 },
-  { symbol: "TSLA", volume24h: 20_000_000 },
-  { symbol: "NVDA", volume24h: 15_000_000 },
-  { symbol: "BRK.B", volume24h: 10_000_000 },
+const FIXTURE_DATA: ReadonlyArray<{ symbol: string; volume_24h: number }> = [
+  { symbol: "AAPL", volume_24h: 80_000_000 },
+  { symbol: "MSFT", volume_24h: 60_000_000 },
+  { symbol: "GOOG", volume_24h: 50_000_000 },
+  { symbol: "AMZN", volume_24h: 40_000_000 },
+  { symbol: "META", volume_24h: 30_000_000 },
+  { symbol: "TSLA", volume_24h: 20_000_000 },
+  { symbol: "NVDA", volume_24h: 15_000_000 },
+  { symbol: "BRK.B", volume_24h: 10_000_000 },
 ];
 
 const MOCK_ASSET_CLASS = "equity-mock" as const;
@@ -46,7 +48,7 @@ export function makeMockEquityAdapter(): AssetAdapter {
 
     async getCandidateAssets(): Promise<Asset[]> {
       return FIXTURE_DATA.map(({ symbol }) => ({
-        assetClass: MOCK_ASSET_CLASS,
+        asset_class: MOCK_ASSET_CLASS,
         identifier: symbol,
       }));
     },
@@ -55,7 +57,7 @@ export function makeMockEquityAdapter(): AssetAdapter {
       // Sort by the fixture's known volume; preserves the proven-descending
       // ordering. Any asset not in FIXTURE_DATA gets volume 0 (sorts last).
       const volumeByIdentifier = new Map(
-        FIXTURE_DATA.map(({ symbol, volume24h }) => [symbol, volume24h]),
+        FIXTURE_DATA.map(({ symbol, volume_24h }) => [symbol, volume_24h]),
       );
       return [...assets].sort((a, b) => {
         const va = volumeByIdentifier.get(a.identifier) ?? 0;

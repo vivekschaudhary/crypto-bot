@@ -1,46 +1,46 @@
 // Unit tests for `lib/strategy-core/supersession.ts`.
+// Round-1 BLOCKER 2 fix: contract is now `supersede({oldStrategyId, newPayload})`
+// → `{newRow, oldRowSupersessionUpdate: {id, superseded_by_strategy_id}}`.
 
 import { describe, expect, it } from "vitest";
 
 import {
   assertSupersessionOnlyUpdate,
-  superseed,
+  supersede,
 } from "@/lib/strategy-core/supersession";
 import { StrategyIdSchema } from "@/lib/strategy-core/types";
 
-// Two 26-char ULID-shaped strings; parsed through the schema so the branded
-// type alignment satisfies TypeScript.
 // 26-char ULIDs (Crockford base32 = 26 chars exact)
 const OLD_ID = StrategyIdSchema.parse("01H8XGJWBWBAQ4N7CHR3M9OLDX");
 const NEW_ID = StrategyIdSchema.parse("01H8XGJWBWBAQ4N7CHR3M9NEWA");
 
-describe("superseed — pure function; emits the plan for caller to apply", () => {
-  it("happy path: returns newRow + oldRowSupersessionUpdate referencing the new id", () => {
-    const plan = superseed({
+describe("supersede — pure function; emits the plan for caller to apply", () => {
+  it("happy path: returns newRow + oldRowSupersessionUpdate referencing the new id (snake_case)", () => {
+    const plan = supersede({
       oldStrategyId: OLD_ID,
-      newRow: { id: NEW_ID, name: "v2" },
+      newPayload: { id: NEW_ID, name: "v2" },
     });
     expect(plan.newRow).toEqual({ id: NEW_ID, name: "v2" });
     expect(plan.oldRowSupersessionUpdate).toEqual({
       id: OLD_ID,
-      supersededByStrategyId: NEW_ID,
+      superseded_by_strategy_id: NEW_ID,
     });
   });
 
   it("first-time authoring: oldStrategyId null → oldRowSupersessionUpdate null", () => {
-    const plan = superseed({
+    const plan = supersede({
       oldStrategyId: null,
-      newRow: { id: NEW_ID, name: "first strategy ever" },
+      newPayload: { id: NEW_ID, name: "first strategy ever" },
     });
     expect(plan.newRow).toEqual({ id: NEW_ID, name: "first strategy ever" });
     expect(plan.oldRowSupersessionUpdate).toBeNull();
   });
 });
 
-describe("assertSupersessionOnlyUpdate — guards the append-only invariant", () => {
-  it("accepts an update touching ONLY supersededByStrategyId", () => {
+describe("assertSupersessionOnlyUpdate — guards the append-only invariant (snake_case field name)", () => {
+  it("accepts an update touching ONLY superseded_by_strategy_id", () => {
     expect(() =>
-      assertSupersessionOnlyUpdate(["supersededByStrategyId"]),
+      assertSupersessionOnlyUpdate(["superseded_by_strategy_id"]),
     ).not.toThrow();
   });
 
@@ -53,9 +53,9 @@ describe("assertSupersessionOnlyUpdate — guards the append-only invariant", ()
       /append-only invariant violated/i,
     );
     expect(() =>
-      assertSupersessionOnlyUpdate(["supersededByStrategyId", "positionSizeUsd"]),
+      assertSupersessionOnlyUpdate(["superseded_by_strategy_id", "position_size_usd"]),
     ).toThrow(/append-only invariant violated/i);
-    expect(() => assertSupersessionOnlyUpdate(["entryRules"])).toThrow(
+    expect(() => assertSupersessionOnlyUpdate(["entry_rules"])).toThrow(
       /append-only invariant violated/i,
     );
   });

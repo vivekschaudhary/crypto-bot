@@ -1,4 +1,5 @@
 // Unit tests for `lib/strategy-core/form-schema.ts`.
+// Snake_case shape per round-1 BLOCKER 1 fix.
 
 import { describe, expect, it } from "vitest";
 
@@ -6,43 +7,43 @@ import { StrategyFormPayloadSchema } from "@/lib/strategy-core/form-schema";
 
 const VALID_ULID = "01H8XGJWBWBAQ4N7CHR3M9YT8K";
 
-describe("StrategyFormPayloadSchema — Zod for form-submitted payload", () => {
+describe("StrategyFormPayloadSchema — Zod for form-submitted payload (snake_case)", () => {
   it("roundtrips a happy-path form payload (first-time authoring; null supersedes)", () => {
     const payload = {
       name: "First strategy",
-      assetClass: "crypto-coinbase",
-      selectedAssets: [
-        { assetClass: "crypto-coinbase", identifier: "BTC-USD" },
+      asset_class: "crypto-coinbase",
+      selected_assets: [
+        { asset_class: "crypto-coinbase", identifier: "BTC-USD" },
       ],
-      entryRules: { rsiThreshold: 30, maPeriod: 20 as const },
-      exitRules: { rsiThreshold: 70, minProfitPct: 1.5, sellFraction: 0.5 },
-      positionSizeUsd: 50,
-      perSessionBuyCountCap: 10,
-      perSessionDollarCap: 500,
-      supersedesStrategyId: null,
+      entry_rules: { rsi_threshold: 30, ma_period: 20 as const },
+      exit_rules: { rsi_threshold: 70, min_profit_pct: 1.5, sell_fraction: 0.5 },
+      position_size_usd: 50,
+      per_session_buy_count_cap: 10,
+      per_session_dollar_cap: 500,
+      supersedes_strategy_id: null,
     };
     const parsed = StrategyFormPayloadSchema.parse(payload);
     expect(parsed.name).toBe("First strategy");
-    expect(parsed.supersedesStrategyId).toBeNull();
+    expect(parsed.supersedes_strategy_id).toBeNull();
   });
 
-  it("roundtrips a revision form payload (supersedesStrategyId set)", () => {
+  it("roundtrips a revision form payload (supersedes_strategy_id set)", () => {
     const payload = {
       name: "Strategy v2",
-      assetClass: "crypto-coinbase",
-      selectedAssets: [
-        { assetClass: "crypto-coinbase", identifier: "BTC-USD" },
-        { assetClass: "crypto-coinbase", identifier: "ETH-USD" },
+      asset_class: "crypto-coinbase",
+      selected_assets: [
+        { asset_class: "crypto-coinbase", identifier: "BTC-USD" },
+        { asset_class: "crypto-coinbase", identifier: "ETH-USD" },
       ],
-      entryRules: { rsiThreshold: 25, maPeriod: 10 as const, maReinforcement: true },
-      exitRules: { rsiThreshold: 65, minProfitPct: 2, sellFraction: 0.75 },
-      positionSizeUsd: 100,
-      perSessionBuyCountCap: 5,
-      perSessionDollarCap: 1000,
-      supersedesStrategyId: VALID_ULID,
+      entry_rules: { rsi_threshold: 25, ma_period: 10 as const, ma_reinforcement: true },
+      exit_rules: { rsi_threshold: 65, min_profit_pct: 2, sell_fraction: 0.75 },
+      position_size_usd: 100,
+      per_session_buy_count_cap: 5,
+      per_session_dollar_cap: 1000,
+      supersedes_strategy_id: VALID_ULID,
     };
     const parsed = StrategyFormPayloadSchema.parse(payload);
-    expect(parsed.supersedesStrategyId).toBe(VALID_ULID);
-    expect(parsed.selectedAssets).toHaveLength(2);
+    expect(parsed.supersedes_strategy_id).toBe(VALID_ULID);
+    expect(parsed.selected_assets).toHaveLength(2);
   });
 });
