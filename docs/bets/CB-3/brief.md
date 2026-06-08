@@ -7,7 +7,7 @@ parent: FOUNDATION-PRODUCT
 portfolio_stub: false
 depends_on: [CB-1, CB-2]
 parallel_with: []
-architecture_required: false
+architecture_required: true
 created: 2026-05-31
 promoted: 2026-06-08
 author: PM
@@ -84,7 +84,7 @@ If we ship a strategy-authoring form UI at `/dashboard/strategy` (Server Compone
 
 ### In scope
 
-**Architectural pivot (PM DRI Decision #6 below):** CB-3 ships a **pluggable strategy core** designed for extraction to a shared npm package later — same pattern as `@vc1023/passkey-2fa`. Crypto-coinbase adapter is the only consumer in this bet; equity adapter slots in via a future bet when the operator's equity app is ready to consume.
+**Architectural pivot (PM DRI Decision #6 below):** CB-3 ships a **pluggable strategy core** designed for extraction to a shared npm package later — same pattern as `@vc1023/passkey-2fa`. Crypto-coinbase adapter is the only consumer in this bet; equity adapter slots in via a future bet when the operator's equity app is ready to consume. **All architectural shapes (`lib/strategy-core/` boundary, `AssetAdapter` interface, DB schema, form architecture) are defined in [`docs/bets/CB-3/architecture.md`](architecture.md)** — the brief lists scope, the architecture file defines structure.
 
 - **`lib/strategy-core/`** — portable; asset-class-agnostic; designed for extraction:
   - `types.ts` — `Strategy`, `Asset` (`{assetClass, identifier}`), `AssetClass` (enum), `EntryRules`, `ExitRules` + Zod schemas
@@ -169,7 +169,8 @@ Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this 
 
 | Date | Phase | Notes |
 |------|-------|-------|
-| 2026-06-08 | Promotion + HITL approval | Operator fires `/create-brief CB-3` immediately after CB-2 ship (PR #41 merged 2026-06-08). All 4 PM DRI Decisions explicit in the brief. Stories forecast 3-4. Estimate refined from stub (2 wk / `low`) to brief-approval (2 wk / `medium`) — held duration at 2 wk pending build-actuals trigger from CB-3.1 ship. |
+| 2026-06-08 | Promotion + HITL approval | Operator fires `/create-brief CB-3` immediately after CB-2 ship (PR #41 merged 2026-06-08). Initial brief had 4 PM DRI Decisions / 3-4 stories forecast / 2 wk medium-confidence estimate. Estimate refined from stub (2 wk / `low`) to brief-approval (2 wk / `medium`). |
+| 2026-06-08 | Same-session pivot to pluggable architecture | Operator surfaced (during PR #42 review) that the second app they're building (equity trading) needs the same strategy authoring UX, and they've already lived the build-twice-extract-later pattern with [`@vc1023/passkey-2fa`](https://www.npmjs.com/package/@vc1023/passkey-2fa). Brief amended same-session: NEW PM DRI Decision #6 (pluggable strategy authoring via `lib/strategy-core/` + `AssetAdapter` interface) + NEW PM Risk (pluggable scope cost if equity app never ships) + Stories forecast bumped 3-4 → 5 (added CB-3.0 strategy-core foundation as first story) + estimate refined 2 wk → 3 wk medium-confidence + `architecture_required: false → true` (Codex PR #42 round-1 BLOCKER on widening architecture scope inside brief — bet-specific architecture artifact created at `docs/bets/CB-3/architecture.md`). |
 
 ## DRI Log
 
@@ -193,11 +194,19 @@ Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this 
   - **Alternatives considered (required):** in-place UPDATE with a `updated_at` timestamp (rejected — loses the strategy-at-decision-time context CB-5 needs); soft-delete with `deleted_at` (rejected — semantically wrong; old strategies aren't "deleted," they're "superseded"); fully-versioned table separate from active-state table (rejected — adds join complexity for marginal benefit at MVP scale)
   - **Reversibility:** hard once CB-4 + CB-5 consume the supersession semantics (their reads assume the model). Easy to add now; coordinated rewrite later.
 
-- [2026-06-08] [PM] **`architecture_required: false`** — CB-3 inherits the foundation architecture; no per-bet architecture file needed
+- [2026-06-08] [PM] **`architecture_required: false`** — CB-3 inherits the foundation architecture; no per-bet architecture file needed (**SUPERSEDED 2026-06-08 by the same-session pluggable-pivot — see entry below**)
   - **Rationale (required):** [Architecture.md § Foundational Data Model](../../foundation/architecture.md#foundational-data-model) already names `strategies`, `bot_sessions`, append-only event log, ULID identity — CB-3's schema is a direct materialization of decisions made there. No new architectural ground.
   - **Area (required, tag):** architectural / scope-boundary
   - **Alternatives considered (required):** require a CB-3 bet-architecture file (rejected — duplicates foundation arch's coverage); defer the call to first story (rejected — `architecture_required: false` is a brief-frontmatter field; setting it now is the honest call)
   - **Reversibility:** trivial — set to `true` later if CB-3 surfaces an architectural decision outside foundation scope
+  - **Superseded by:** the pluggable-pivot Decision #6 below introduces new architectural concepts (`lib/strategy-core/` module boundary, `AssetAdapter` interface contract, `asset_class` discriminator + `selected_assets: jsonb` data model that foundation architecture doesn't define, extraction path to `@vc1023/strategy-core` npm package). Per Codex PR #42 round-1 BLOCKER: widening architecture scope inside a brief without a bet-architecture artifact is a discipline violation. Flipping `architecture_required: false → true` 2026-06-08 + creating [`docs/bets/CB-3/architecture.md`](architecture.md) which captures the new architectural decisions explicitly.
+
+- [2026-06-08] [PM] **`architecture_required: true`** — pluggable pivot introduces architectural concepts outside the foundation architecture's scope
+  - **Rationale (required):** Decision #6 (pluggable architecture) introduces `lib/strategy-core/` as a portable module boundary, the `AssetAdapter` interface contract that defines how non-coinbase asset classes plug in, and a data model (`asset_class` discriminator + `selected_assets: jsonb [{assetClass, identifier}]`) that the foundation architecture's mention of "strategies" table does NOT actually specify. These are architectural decisions, not implementation details. Per Compass discipline, architectural decisions live in a bet-architecture artifact, not in the brief's DRI Decisions section.
+  - **Area (required, tag):** architectural / scope-boundary / compass-discipline
+  - **Alternatives considered (required):** keep `architecture_required: false` and embed the architectural decisions in PM DRI Decision #6's body (rejected — Codex's PR #42 round-1 BLOCKER correctly identifies this as widening architecture scope inside a brief; brief Decisions are PM-owned, architecture Decisions are Architect-owned); flip but defer creating the architecture file to `/build CB-3.0` (rejected — the architecture decisions are LOAD-BEARING for CB-3.0's design and the whole pluggable-extraction path; the artifact MUST exist before the first story is built); amend `docs/foundation/architecture.md` directly to add the new concepts (rejected — these are bet-specific, not foundation-level; bloating the foundation artifact is the wrong shape)
+  - **Reversibility:** moderate (architecture file lives at the bet scope; can be deprecated if CB-3 scope changes)
+  - **Surfaced by:** Codex code review of PR #42 round-1 BLOCKER on architecture scope widening
 
 - [2026-06-08] [PM] **`duration_weeks: 3` and `confidence: medium`** at brief-approval — bumped from stub's 2 wk by the pluggability pivot (Decision #6 below); confidence advances `low` → `medium`
   - **Rationale (required):** Workflow estimate model: brief-approval → small/medium/large → 1/2/4 weeks. CB-3 with the pluggability pivot is **medium-to-large** — 5 stories (was 4) at ~0.6-0.8 days/story per CB-2's actuals + the new `lib/strategy-core/` foundation story (CB-3.0) + careful API surface design at every story to preserve future-extraction shape. Bumped from 2 wk → 3 wk to honestly capture +3-5 days for the pluggability scope.
@@ -213,6 +222,7 @@ Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this 
   - **Scope cost:** +1 story (CB-3.0); +3-5 days estimated; estimate bumped from 2 wk to 3 wk at brief-approval per Decision #5 above. Operator confirmed cost acceptance.
   - **Extraction path (forward-looking):** when the equity app is ready to consume — (1) move `lib/strategy-core/` to a separate repo (or this repo's `packages/strategy-core/` workspace), (2) publish as `@vc1023/strategy-core`, (3) crypto-app find/replace `from "@/lib/strategy-core/..."` → `from "@vc1023/strategy-core"` (~30 min), (4) equity-app consumes directly. Half-day extraction job vs the multi-day re-architecting that single-purpose CB-3 would have required.
   - **Lesson tag for future bets:** when a UI/data-model layer has plausible reuse value across multiple operator apps + the operator has direct evidence of "build-twice-then-extract" being expensive, **design for extraction at brief-approval time** even if the second consumer isn't ready yet. Costs +3-5 days; saves 1-2 weeks of re-architecting later.
+  - **Architectural decisions live in [`docs/bets/CB-3/architecture.md`](architecture.md)** — `lib/strategy-core/` module boundary, `AssetAdapter` interface, `strategies` table schema with `asset_class` discriminator, extraction path, form-layer architecture, and observability shape. The brief states the WHAT and WHY; architecture.md states the HOW. Per Compass discipline (Codex PR #42 round-1 BLOCKER on widening architecture scope inside brief): the brief flipped `architecture_required: false → true` 2026-06-08 and the artifact was created in the same session.
 
 ### Risks
 
