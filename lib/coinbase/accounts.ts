@@ -58,8 +58,20 @@ export async function getAccountBalances(): Promise<Account[]> {
     collected.push(...parsed.accounts);
 
     if (!parsed.has_next) break;
+
+    // Coinbase contract: when has_next is true, cursor MUST be present.
+    // If we get here without a cursor, the upstream contract is broken —
+    // fail loud rather than silently returning a partial list (which a
+    // caller might mistake for the operator's complete account set).
+    if (!parsed.cursor) {
+      throw new CoinbaseClientError({
+        code: "pagination-contract-violation",
+        message:
+          "Coinbase /accounts: response has has_next=true but cursor is missing; " +
+          "cannot fetch next page. Refusing to return a partial account list.",
+      });
+    }
     cursor = parsed.cursor;
-    if (!cursor) break; // defensive: has_next true but no cursor → Coinbase contract violation; break to avoid infinite loop
   }
 
   return collected;
@@ -102,19 +114,27 @@ export async function getAccount(accountUuid: string): Promise<Account> {
  * per Coinbase's actual API).
  */
 export async function getAccountTradeHistory(args: {
-  productId?: string;
+  productIds?: string[];
   start?: Date;
   end?: Date;
   cursor?: string;
   limit?: number;
 }): Promise<{ fills: Fill[]; cursor?: string }> {
-  const { productId, start, end, cursor, limit } = args;
+  const { productIds, start, end, cursor, limit } = args;
 
-  if (productId === "") {
-    throw new CoinbaseClientError({
-      code: "invalid-argument",
-      message: "getAccountTradeHistory: productId must be a non-empty string when provided",
-    });
+  if (productIds !== undefined) {
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      throw new CoinbaseClientError({
+        code: "invalid-argument",
+        message: "getAccountTradeHistory: productIds must be a non-empty array when provided",
+      });
+    }
+    if (productIds.some((p) => !p || typeof p !== "string")) {
+      throw new CoinbaseClientError({
+        code: "invalid-argument",
+        message: "getAccountTradeHistory: productIds entries must be non-empty strings",
+      });
+    }
   }
 
   if (start && end && end.getTime() <= start.getTime()) {
@@ -124,8 +144,16 @@ export async function getAccountTradeHistory(args: {
     });
   }
 
+  // Coinbase's List Fills filter is `product_ids` (plural array) — pass
+  // each id as a repeated query param so URLSearchParams encodes it as
+  // `?product_ids=BTC-USD&product_ids=ETH-USD`. The historical singular
+  // `product_id` is undocumented and may silently ignore/match-all,
+  // which would cause filters to noop without erroring (caught by Codex
+  // PR #34 round-1 BLOCKER).
   const qs = new URLSearchParams();
-  if (productId) qs.set("product_id", productId);
+  if (productIds) {
+    for (const id of productIds) qs.append("product_ids", id);
+  }
   if (start) qs.set("start_sequence_timestamp", start.toISOString());
   if (end) qs.set("end_sequence_timestamp", end.toISOString());
   if (cursor) qs.set("cursor", cursor);

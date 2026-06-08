@@ -38,7 +38,7 @@ This is also **the first integration test that requires CDP credentials** — op
   export async function getAccountBalances(): Promise<Account[]>
   export async function getAccount(accountUuid: string): Promise<Account>
   export async function getAccountTradeHistory(args: {
-    productId?: string;       // e.g., "BTC-USD" — filters fills to one trading pair
+    productIds?: string[];    // e.g., ["BTC-USD"] or ["BTC-USD", "ETH-USD"] — filters fills to one or more trading pairs
     start?: Date;             // filters fills where trade_time >= start
     end?: Date;               // filters fills where trade_time <= end
     cursor?: string;          // pagination — pass cursor from prior response to get next page
@@ -48,7 +48,7 @@ This is also **the first integration test that requires CDP credentials** — op
 
   Time parameters convert to Coinbase's expected format (RFC3339 / ISO-8601 string — Engineer DRI Decision at first commit; CB-2.2's candles endpoint uses Unix-seconds string, but fills uses a different format per docs).
 
-  **Naming note:** `getAccountTradeHistory` accepts `productId`, NOT `assetId` (as the [CB-2 brief In-scope wording](../../brief.md#in-scope) originally said). Reason: Coinbase Advanced Trade's `/orders/historical/fills` filters by `product_id` (the trading pair, e.g., `BTC-USD`), not by bare asset. See [CB-2 brief PM DRI Decision: "getAccountTradeHistory `assetId` → `productId` rename"](../../brief.md#decisions).
+  **Naming note:** `getAccountTradeHistory` accepts `productIds` (array), NOT `assetId` (as the original brief said) and NOT `productId` (singular — as a prior amendment said). Reason: Coinbase Advanced Trade's `/orders/historical/fills` filters via `product_ids` (plural, array) query parameter per the [List Fills docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/orders/list-fills). Sending the undocumented singular `product_id` may silently noop or match-all. See [CB-2 brief PM DRI Decisions](../../brief.md#decisions) for the rename history (assetId → productId → productIds).
 
 - [ ] **AC 2** — `lib/coinbase/account-schemas.ts` exports Zod schemas at the wrapper boundary with `.passthrough()` for forward-compat per [CB-2 brief PM Risk #2](../../brief.md#risks):
   - `MoneyValueSchema` — Coinbase's `{value: string, currency: string}` shape used by `available_balance` + `hold` (Engineer verifies the exact field name per docs at build time)
