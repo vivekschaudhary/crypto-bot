@@ -40,3 +40,16 @@ Full brief content filled when promoted via `/create-brief CB-5`.
 ## Out of MVP (per portfolio)
 
 Auto-pause on drawdown and reserve floor enforcement are deliberately deferred per [portfolio.md § Deliberately out of MVP](../../foundation/portfolio.md). Operator self-monitors during dry-run phase.
+
+## E2E test expectation (forward-reference, captured 2026-06-08)
+
+**CB-5 ships the dashboard** — the largest UI surface of MVP. Every story that touches a rendered view MUST include at least one Playwright spec covering the operator's golden path through that view. Specific high-value e2e candidates per the Quick scope sketch above:
+
+- **Live state view**: load dashboard → assert balances + average cost + buy count render from real `bot_sessions` + `auth_*` data (Server Component data flow)
+- **Decision-trace log**: load dashboard → click a `bot_ticks` row → assert reason + signals render with the dry-run badge visible
+- **Override buttons**: pause/resume/force-buy/sell-N/reset-session — golden path per button (assert UI confirmation → API call → state update)
+- **LIVE_MODE banner**: assert banner visibly reflects current env state (load with `LIVE_MODE=false` and `LIVE_MODE=true`, verify the banner color/text matches)
+
+**CB-1.6's lesson applies in full force here.** Static mocks of `@simplewebauthn/browser@11` masked real bugs that only surfaced under Playwright. CB-5's React + Server Component + Client Component data hand-offs are exactly the kind of seam where mocks-only tests give false confidence — e2e is load-bearing for the dashboard's correctness.
+
+Story-level Standard Experience Checklist categories (Navigation / States / Feedback / Accessibility / Edge cases / Cross-surface consistency) should NOT all be `n/a` — most are load-bearing for the dashboard's user-facing nature. Operator-confirmed pattern (2026-06-08): CB-2.x deliberately marked `e2e: false` because it's pure library code; the discipline re-engages here.
