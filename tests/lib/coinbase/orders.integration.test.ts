@@ -31,7 +31,9 @@
 //       pnpm test:integration tests/lib/coinbase/orders.integration.test.ts
 //
 // After the test passes, operator should verify via Coinbase web UI:
-//   - The limit order was placed at $1 (visible in order history)
+//   - A limit BUY order for 0.0001 BTC was placed at ~50% of current
+//     market price (visible in order history with the sentinel
+//     client_order_id `cb-2.4-integration-test-<unix-seconds>`)
 //   - The order was immediately cancelled (status = CANCELLED)
 //   - No fill occurred (no asset acquired)
 
@@ -146,8 +148,9 @@ describe.skipIf(!RUN || !HAS_CREDS || !REAL_ORDERS)(
       );
 
       // Fills are filtered by product_id; if the order had filled, it
-      // would show up here. Since post_only=true + price=$1, it could
-      // never fill — but verify to be safe.
+      // would show up here. Since post_only=true + limit-price ~50%
+      // below current market (per Decision #3), the order couldn't have
+      // crossed the spread — but verify to be safe.
       const result = await getAccountTradeHistory({
         productIds: ["BTC-USD"],
         // Last few minutes only — narrow the search window
