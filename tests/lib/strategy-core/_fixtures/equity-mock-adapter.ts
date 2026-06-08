@@ -13,7 +13,10 @@
 // Reused by CB-3.3+ form UI tests when the form swap-adapter behavior gets
 // tested with a non-real-broker class.
 //
-// FIELD NAMING — snake_case across Asset shape per AC 6.
+// FIELD NAMING — inner Asset shape is camelCase {assetClass, identifier}
+// per architecture Decision #4 + types.ts convention split (round-2 BLOCKER
+// fix). Only TOP-LEVEL row fields are snake_case; inner jsonb shapes are
+// camelCase.
 
 import type { AssetAdapter } from "@/lib/strategy-core/adapter";
 import type { Asset } from "@/lib/strategy-core/types";
@@ -48,7 +51,7 @@ export function makeMockEquityAdapter(): AssetAdapter {
 
     async getCandidateAssets(): Promise<Asset[]> {
       return FIXTURE_DATA.map(({ symbol }) => ({
-        asset_class: MOCK_ASSET_CLASS,
+        assetClass: MOCK_ASSET_CLASS,
         identifier: symbol,
       }));
     },

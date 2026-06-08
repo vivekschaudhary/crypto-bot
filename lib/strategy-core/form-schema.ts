@@ -10,10 +10,13 @@
 //                      checks (entry RSI < exit RSI) + range enforcement
 //                      that's not expressible at shape level.
 //
-// FIELD NAMING — snake_case across the wire/store contract per AC 6 +
-// Tech notes Decision #1. The form HTML submits names matching the DB
-// columns (`entry_rules.rsi_threshold`, `selected_assets`, etc.); the
-// server action consumes them without translation.
+// FIELD NAMING CONVENTION (round-2 BLOCKER fix):
+//   * TOP-LEVEL form fields use snake_case (matches DB column names).
+//   * INNER jsonb shapes (selected_assets array items, entry_rules,
+//     exit_rules contents) use camelCase per the docs (architecture
+//     Decision #4 + AssetSchema/EntryRulesSchema/ExitRulesSchema in
+//     types.ts).
+// See types.ts top-of-file comment for the full split rationale.
 
 import { z } from "zod";
 

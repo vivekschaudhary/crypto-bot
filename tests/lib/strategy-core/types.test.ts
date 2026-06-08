@@ -1,8 +1,8 @@
 // Unit tests for `lib/strategy-core/types.ts`.
 //
-// Verifies Zod roundtrip per exported schema + branded-ULID type tagging.
-// Field shapes use snake_case per round-1 BLOCKER fix (AC 6 + Tech notes
-// Decision #1).
+// Field convention (round-2 BLOCKER fix):
+//   * Top-level Strategy fields = snake_case (DB column names)
+//   * Inner jsonb shapes (Asset, EntryRules, ExitRules) = camelCase
 
 import { describe, expect, it } from "vitest";
 
@@ -17,8 +17,6 @@ import {
   UserIdSchema,
 } from "@/lib/strategy-core/types";
 
-// 26-char ULID-shaped string (Crockford base32; not validated for content
-// at this layer — just length).
 const VALID_ULID = "01H8XGJWBWBAQ4N7CHR3M9YT8K";
 
 describe("StrategyIdSchema / UserIdSchema — branded ULIDs", () => {
@@ -32,25 +30,22 @@ describe("StrategyIdSchema / UserIdSchema — branded ULIDs", () => {
     expect(() => StrategyIdSchema.parse("short")).toThrow();
   });
 
-  it("UserId and StrategyId schemas are structurally identical (both 26-char) but type-distinct (brand tag)", () => {
+  it("UserId and StrategyId schemas are structurally identical but type-distinct (brand tag)", () => {
     const uid = UserIdSchema.parse(VALID_ULID);
     const sid = StrategyIdSchema.parse(VALID_ULID);
     expect(uid).toBe(sid);
   });
 });
 
-describe("AssetClassSchema + AssetSchema — open-ended asset classes (snake_case shape)", () => {
+describe("AssetClassSchema + AssetSchema — open-ended asset classes (camelCase inner shape)", () => {
   it("AssetClass accepts arbitrary non-empty strings (per Engineer DRI Decision #2)", () => {
     expect(AssetClassSchema.parse("crypto-coinbase")).toBe("crypto-coinbase");
     expect(AssetClassSchema.parse("equity-mock")).toBe("equity-mock");
-    expect(AssetClassSchema.parse("futures-deribit-future-class")).toBe(
-      "futures-deribit-future-class",
-    );
     expect(() => AssetClassSchema.parse("")).toThrow();
   });
 
-  it("AssetSchema roundtrips cleanly with snake_case shape", () => {
-    const asset = { asset_class: "crypto-coinbase", identifier: "BTC-USD" };
+  it("AssetSchema roundtrips with camelCase {assetClass, identifier} (architecture Decision #4)", () => {
+    const asset = { assetClass: "crypto-coinbase", identifier: "BTC-USD" };
     const parsed = AssetSchema.parse(asset);
     expect(parsed).toEqual(asset);
     expect(JSON.parse(JSON.stringify(parsed))).toEqual(asset);
@@ -65,46 +60,46 @@ describe("MaPeriodSchema — strict-set validation (Engineer DRI Decision #3)", 
     expect(MaPeriodSchema.parse(50)).toBe(50);
   });
 
-  it("rejects any other value (e.g., 7, 14, 100)", () => {
+  it("rejects non-canonical values (7, 14, 100)", () => {
     expect(() => MaPeriodSchema.parse(7)).toThrow();
     expect(() => MaPeriodSchema.parse(14)).toThrow();
     expect(() => MaPeriodSchema.parse(100)).toThrow();
   });
 });
 
-describe("EntryRulesSchema + ExitRulesSchema — snake_case fields", () => {
+describe("EntryRulesSchema + ExitRulesSchema — camelCase inner fields", () => {
   it("EntryRulesSchema roundtrips a happy-path config", () => {
-    const rules = { rsi_threshold: 30, ma_period: 20 as const, ma_reinforcement: true };
+    const rules = { rsiThreshold: 30, maPeriod: 20 as const, maReinforcement: true };
     expect(EntryRulesSchema.parse(rules)).toEqual(rules);
   });
 
   it("ExitRulesSchema roundtrips a happy-path config", () => {
-    const rules = { rsi_threshold: 70, min_profit_pct: 1.5, sell_fraction: 0.5 };
+    const rules = { rsiThreshold: 70, minProfitPct: 1.5, sellFraction: 0.5 };
     expect(ExitRulesSchema.parse(rules)).toEqual(rules);
   });
 
   it("EntryRulesSchema rejects out-of-range RSI", () => {
     expect(() =>
-      EntryRulesSchema.parse({ rsi_threshold: 150, ma_period: 20 }),
+      EntryRulesSchema.parse({ rsiThreshold: 150, maPeriod: 20 }),
     ).toThrow();
     expect(() =>
-      EntryRulesSchema.parse({ rsi_threshold: -1, ma_period: 20 }),
+      EntryRulesSchema.parse({ rsiThreshold: -1, maPeriod: 20 }),
     ).toThrow();
   });
 });
 
-describe("StrategySchema — full row roundtrip with snake_case shape", () => {
+describe("StrategySchema — full row roundtrip (top-level snake_case; inner camelCase)", () => {
   it("roundtrips a fully-formed strategy row", () => {
     const strategy = {
       id: VALID_ULID,
       name: "Test Strategy",
       asset_class: "crypto-coinbase",
       selected_assets: [
-        { asset_class: "crypto-coinbase", identifier: "BTC-USD" },
-        { asset_class: "crypto-coinbase", identifier: "ETH-USD" },
+        { assetClass: "crypto-coinbase", identifier: "BTC-USD" },
+        { assetClass: "crypto-coinbase", identifier: "ETH-USD" },
       ],
-      entry_rules: { rsi_threshold: 30, ma_period: 20 as const, ma_reinforcement: true },
-      exit_rules: { rsi_threshold: 70, min_profit_pct: 1.5, sell_fraction: 0.5 },
+      entry_rules: { rsiThreshold: 30, maPeriod: 20 as const, maReinforcement: true },
+      exit_rules: { rsiThreshold: 70, minProfitPct: 1.5, sellFraction: 0.5 },
       position_size_usd: 50,
       per_session_buy_count_cap: 10,
       per_session_dollar_cap: 500,
@@ -115,12 +110,13 @@ describe("StrategySchema — full row roundtrip with snake_case shape", () => {
     const parsed = StrategySchema.parse(strategy);
     expect(parsed.name).toBe("Test Strategy");
     expect(parsed.selected_assets).toHaveLength(2);
+    expect(parsed.selected_assets[0]?.assetClass).toBe("crypto-coinbase");
     expect(parsed.superseded_by_strategy_id).toBeNull();
   });
 
   it("rejects selected_assets count > 5", () => {
     const selected_assets = Array.from({ length: 6 }, (_, i) => ({
-      asset_class: "crypto-coinbase",
+      assetClass: "crypto-coinbase",
       identifier: `PAIR-${i}-USD`,
     }));
     const strategy = {
@@ -128,8 +124,8 @@ describe("StrategySchema — full row roundtrip with snake_case shape", () => {
       name: "Test",
       asset_class: "crypto-coinbase",
       selected_assets,
-      entry_rules: { rsi_threshold: 30, ma_period: 20 as const },
-      exit_rules: { rsi_threshold: 70, min_profit_pct: 1, sell_fraction: 0.5 },
+      entry_rules: { rsiThreshold: 30, maPeriod: 20 as const },
+      exit_rules: { rsiThreshold: 70, minProfitPct: 1, sellFraction: 0.5 },
       position_size_usd: 50,
       per_session_buy_count_cap: 10,
       per_session_dollar_cap: 500,

@@ -11,8 +11,9 @@
 // The fact that this test exists + passes + is wired through `topN()`
 // without any Coinbase imports is the proof.
 //
-// Asset shape uses snake_case (`asset_class`, `identifier`) per round-1
-// BLOCKER 1 fix.
+// Asset shape uses camelCase (`assetClass`, `identifier`) per round-2
+// BLOCKER fix — inner jsonb shapes are camelCase; only top-level row
+// fields are snake_case.
 
 import { describe, expect, it } from "vitest";
 
@@ -31,7 +32,7 @@ describe("AC 8 — mock equity adapter proves AssetAdapter seam is honest", () =
     const assets = await adapter.getCandidateAssets();
     expect(assets).toHaveLength(8);
     for (const a of assets) {
-      expect(a.asset_class).toBe("equity-mock");
+      expect(a.assetClass).toBe("equity-mock");
     }
     expect(assets.map((a) => a.identifier)).toEqual(
       expect.arrayContaining(["AAPL", "MSFT", "GOOG", "AMZN", "META", "TSLA", "NVDA", "BRK.B"]),
@@ -47,14 +48,14 @@ describe("AC 8 — mock equity adapter proves AssetAdapter seam is honest", () =
     // Every result still tagged with equity-mock (NOT silently coerced
     // to crypto-coinbase or anything Coinbase-shaped)
     for (const a of top3) {
-      expect(a.asset_class).toBe("equity-mock");
+      expect(a.assetClass).toBe("equity-mock");
     }
   });
 
   it("getAssetIdentifier returns the broker symbol verbatim (no Coinbase product_id transformation)", () => {
     const adapter = makeMockEquityAdapter();
     expect(
-      adapter.getAssetIdentifier({ asset_class: "equity-mock", identifier: "AAPL" }),
+      adapter.getAssetIdentifier({ assetClass: "equity-mock", identifier: "AAPL" }),
     ).toBe("AAPL");
     // No -USD suffix; no Coinbase-shaped transformation. Identifier
     // shape is asset-class-specific and the adapter owns it.

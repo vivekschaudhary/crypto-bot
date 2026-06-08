@@ -6,17 +6,25 @@
 // ARCHITECTURAL INVARIANT: this file (and all of `lib/strategy-core/`) has
 // ZERO dependencies on `lib/coinbase/*`, `lib/env/*`, `lib/db/*`, or any
 // in-repo singleton. Verified mechanically by:
-//   * tests/lib/strategy-core/no-coupling.test.ts (forbids ANY @/lib/... import)
+//   * tests/lib/strategy-core/no-coupling.test.ts (transitive walk; forbids
+//     ANY @/lib/... import outside strategy-core)
 //   * tests/lib/strategy-core/no-live-mode.test.ts (LIVE_MODE-free invariant)
 //
-// FIELD NAMING — snake_case across the wire/store contract.
-// Per CB-3.0 story AC 6 + Tech notes Decision #1 ("match the DB column
-// shape from bet architecture Decision #4 exactly"). The Strategy +
-// EntryRules + ExitRules + Asset shapes serialize/persist as snake_case
-// to match the `strategies` DB table's column names + the form's
-// submission payload. No camelCase ↔ snake_case translation layer needed
-// at any boundary (form → server action → Zod → DB) — the contract is
-// uniform.
+// FIELD NAMING CONVENTION — round-2 BLOCKER fix:
+//
+//   * TOP-LEVEL row fields (Strategy + StrategyFormPayload) use snake_case
+//     to match the `strategies` DB column names from bet architecture
+//     Decision #4 (selected_assets, entry_rules, exit_rules,
+//     position_size_usd, per_session_buy_count_cap, per_session_dollar_cap,
+//     created_at, created_by_user_id, superseded_by_strategy_id, asset_class).
+//
+//   * INNER jsonb shapes (Asset, EntryRules, ExitRules contents) use
+//     camelCase to match the approved docs. Specifically, the architecture's
+//     DDL comment says: `selected_assets jsonb NOT NULL, -- array of
+//     {assetClass, identifier}; validated app-layer`. The inner shape is
+//     a TS/JSON convention; the DB column name is a Postgres convention.
+//     Mixed-but-principled split: row-level structure = snake_case,
+//     within-jsonb-object structure = camelCase.
 //
 // Designed for extraction to the `@vc1023/strategy-core` npm package when
 // the operator's equity app is ready to consume (per the @vc1023/passkey-2fa
@@ -29,8 +37,7 @@ import { z } from "zod";
 // ──────────────────────────────────────────────────────────────────────────
 // ULIDs are Crockford base32, 26 chars. Stored as Postgres `text` per
 // foundation architecture § Identity strategy. Branding prevents accidental
-// mixing of `StrategyId` and `UserId` at the type level — passing a user
-// uuid where a strategy id is expected fails to compile.
+// mixing of `StrategyId` and `UserId` at the type level.
 
 export const StrategyIdSchema = z.string().min(26).max(26).brand<"StrategyId">();
 export type StrategyId = z.infer<typeof StrategyIdSchema>;
@@ -42,36 +49,32 @@ export type UserId = z.infer<typeof UserIdSchema>;
 // AssetClass (Engineer DRI Decision #2)
 // ──────────────────────────────────────────────────────────────────────────
 // Open-ended string, NOT z.enum(). Future adapters add their own class
-// strings without re-publishing strategy-core. Each adapter declares its
-// `asset_class` constant at the adapter level; code that needs to dispatch
-// uses a discriminated union over the SET of installed adapters at runtime.
-//
-// Known values at MVP scope: "crypto-coinbase", "equity-mock" (test only).
-// Future: "equity-alpaca", "equity-tradier", "futures-deribit", etc.
+// strings without re-publishing strategy-core.
 
 export const AssetClassSchema = z.string().min(1);
 export type AssetClass = z.infer<typeof AssetClassSchema>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// Asset — the abstract pair (asset_class, identifier)
+// Asset — the abstract pair (assetClass, identifier)
 // ──────────────────────────────────────────────────────────────────────────
-// `identifier` is the external-system ID for this asset (Coinbase product_id
-// for crypto-coinbase; broker symbol for equity). Opaque to strategy-core;
-// adapters parse/validate per asset class.
+// camelCase inner shape per bet architecture Decision #4 comment:
+//   "selected_assets jsonb NOT NULL, -- array of {assetClass, identifier}"
+// The top-level COLUMN is snake_case (`selected_assets`); the inner OBJECT
+// is camelCase. Both true at once; not a contradiction.
 
 export const AssetSchema = z.object({
-  asset_class: AssetClassSchema,
+  assetClass: AssetClassSchema,
   identifier: z.string().min(1),
 });
 export type Asset = z.infer<typeof AssetSchema>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// EntryRules + ExitRules (signal config)
+// EntryRules + ExitRules (signal config — camelCase inner shape)
 // ──────────────────────────────────────────────────────────────────────────
-// Indicator math is universal across asset classes (RSI on BTC = RSI on AAPL).
 // MA period is a strict set per Engineer DRI Decision #3 — z.union of
 // literals preserves Zod's discriminated-union inference + TypeScript
-// narrowing on consumers.
+// narrowing on consumers. Stored within jsonb columns; inner field names
+// use camelCase per the same principle as Asset.
 
 export const MaPeriodSchema = z.union([
   z.literal(5),
@@ -82,28 +85,27 @@ export const MaPeriodSchema = z.union([
 export type MaPeriod = z.infer<typeof MaPeriodSchema>;
 
 export const EntryRulesSchema = z.object({
-  rsi_threshold: z.number().min(0).max(100),
-  ma_period: MaPeriodSchema,
+  rsiThreshold: z.number().min(0).max(100),
+  maPeriod: MaPeriodSchema,
   // Optional MA reinforcement: only buy when price < MA(period)
-  ma_reinforcement: z.boolean().optional(),
+  maReinforcement: z.boolean().optional(),
 });
 export type EntryRules = z.infer<typeof EntryRulesSchema>;
 
 export const ExitRulesSchema = z.object({
-  rsi_threshold: z.number().min(0).max(100),
-  min_profit_pct: z.number().min(0),
+  rsiThreshold: z.number().min(0).max(100),
+  minProfitPct: z.number().min(0),
   // Fraction of position to sell when exit fires; 0..1 (e.g., 0.5 = sell half)
-  sell_fraction: z.number().min(0).max(1),
+  sellFraction: z.number().min(0).max(1),
 });
 export type ExitRules = z.infer<typeof ExitRulesSchema>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// Strategy — the full row shape (mirrors `strategies` DB table columns)
+// Strategy — the full row shape (top-level fields snake_case = DB columns)
 // ──────────────────────────────────────────────────────────────────────────
-// Field names match the DB columns from bet architecture Decision #4
-// (ULIDs as text; selected_assets as jsonb array of Asset; rules as jsonb).
-// Append-only at the application layer — revisions create new rows with
-// `superseded_by_strategy_id` linking back.
+// Field names match the DB columns from bet architecture Decision #4.
+// Inner jsonb shapes (selected_assets, entry_rules, exit_rules) are
+// camelCase per the convention split documented at the top.
 
 export const StrategySchema = z.object({
   id: StrategyIdSchema,
