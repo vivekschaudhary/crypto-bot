@@ -24,6 +24,7 @@
 // The wrapper is policy-free; CB-4 owns the gate.
 
 import { mintJWT } from "@/lib/coinbase/jwt";
+import { emitRequestTrace, extractRateLimit, type RateLimit } from "@/lib/coinbase/trace";
 import { CoinbaseClientError } from "@/lib/coinbase/types";
 
 const COINBASE_BASE_URL = "https://api.coinbase.com";
@@ -62,24 +63,56 @@ export function coinbase(): CoinbaseClient {
 function makeClient(): CoinbaseClient {
   return {
     async request<T = unknown>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
-      const jwt = mintJWT(method, path);
-      const res = await safeFetch(method, path, `${COINBASE_BASE_URL}${path}`, {
-        method,
-        headers: {
-          authorization: `Bearer ${jwt}`,
-          "content-type": "application/json",
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-      return handleResponse<T>(method, path, res);
+      const start = Date.now();
+      let status = 0;
+      let rateLimit: RateLimit | undefined;
+      try {
+        const jwt = mintJWT(method, path);
+        const res = await safeFetch(method, path, `${COINBASE_BASE_URL}${path}`, {
+          method,
+          headers: {
+            authorization: `Bearer ${jwt}`,
+            "content-type": "application/json",
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        status = res.status;
+        rateLimit = extractRateLimit(res.headers);
+        return await handleResponse<T>(method, path, res);
+      } catch (err) {
+        // 4xx/5xx paths: handleResponse throws CoinbaseClientError with
+        // `.status` set; reuse it. Transport failures: safeFetch throws
+        // CoinbaseClientError({code: "network"}) without `.status`; keep
+        // status=0 (set above).
+        if (err instanceof CoinbaseClientError && typeof err.status === "number") {
+          status = err.status;
+        }
+        throw err;
+      } finally {
+        emitRequestTrace({ method, path, status, durationMs: Date.now() - start, rateLimit });
+      }
     },
 
     async publicRequest<T = unknown>(method: HttpMethod, path: string): Promise<T> {
-      const res = await safeFetch(method, path, `${COINBASE_BASE_URL}${path}`, {
-        method,
-        headers: { "content-type": "application/json" },
-      });
-      return handleResponse<T>(method, path, res);
+      const start = Date.now();
+      let status = 0;
+      let rateLimit: RateLimit | undefined;
+      try {
+        const res = await safeFetch(method, path, `${COINBASE_BASE_URL}${path}`, {
+          method,
+          headers: { "content-type": "application/json" },
+        });
+        status = res.status;
+        rateLimit = extractRateLimit(res.headers);
+        return await handleResponse<T>(method, path, res);
+      } catch (err) {
+        if (err instanceof CoinbaseClientError && typeof err.status === "number") {
+          status = err.status;
+        }
+        throw err;
+      } finally {
+        emitRequestTrace({ method, path, status, durationMs: Date.now() - start, rateLimit });
+      }
     },
   };
 }
