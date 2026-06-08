@@ -117,7 +117,13 @@ export const StrategySchema = z.object({
   position_size_usd: z.number().positive(),
   per_session_buy_count_cap: z.number().int().positive(),
   per_session_dollar_cap: z.number().positive(),
-  created_at: z.date(),
+  // z.coerce.date() (NOT z.date()) so the schema accepts both a Date
+  // (from in-memory construction) AND an ISO string (from JSON.parse of
+  // a serialized strategy or from a DB driver that returns timestamptz
+  // as a string). Round-trip stays clean: parse(date) → stringify → JSON
+  // parse → coerce-date → equivalent Date instant. AC 1 explicitly
+  // required this property.
+  created_at: z.coerce.date(),
   created_by_user_id: UserIdSchema,
   superseded_by_strategy_id: StrategyIdSchema.nullable(),
 });

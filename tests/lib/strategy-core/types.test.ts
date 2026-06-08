@@ -114,6 +114,52 @@ describe("StrategySchema — full row roundtrip (top-level snake_case; inner cam
     expect(parsed.superseded_by_strategy_id).toBeNull();
   });
 
+  it("AC 1 roundtrip: parse → JSON.stringify → JSON.parse → re-parse → equivalent (z.coerce.date handles created_at)", () => {
+    const original = {
+      id: VALID_ULID,
+      name: "Roundtrip Test",
+      asset_class: "crypto-coinbase",
+      selected_assets: [
+        { assetClass: "crypto-coinbase", identifier: "BTC-USD" },
+      ],
+      entry_rules: { rsiThreshold: 30, maPeriod: 20 as const },
+      exit_rules: { rsiThreshold: 70, minProfitPct: 1.5, sellFraction: 0.5 },
+      position_size_usd: 50,
+      per_session_buy_count_cap: 10,
+      per_session_dollar_cap: 500,
+      created_at: new Date("2026-06-08T12:34:56.000Z"),
+      created_by_user_id: VALID_ULID,
+      superseded_by_strategy_id: null,
+    };
+
+    // Step 1: parse the original
+    const parsed1 = StrategySchema.parse(original);
+
+    // Step 2: stringify (created_at becomes ISO string in the JSON)
+    const serialized = JSON.stringify(parsed1);
+
+    // Step 3: parse the JSON (created_at is now a string)
+    const fromJson = JSON.parse(serialized);
+    expect(typeof fromJson.created_at).toBe("string");
+
+    // Step 4: re-parse via Zod — z.coerce.date() coerces the string back
+    const parsed2 = StrategySchema.parse(fromJson);
+
+    // Equivalence: every field matches, including the Date instant
+    expect(parsed2.id).toBe(parsed1.id);
+    expect(parsed2.name).toBe(parsed1.name);
+    expect(parsed2.asset_class).toBe(parsed1.asset_class);
+    expect(parsed2.selected_assets).toEqual(parsed1.selected_assets);
+    expect(parsed2.entry_rules).toEqual(parsed1.entry_rules);
+    expect(parsed2.exit_rules).toEqual(parsed1.exit_rules);
+    expect(parsed2.position_size_usd).toBe(parsed1.position_size_usd);
+    expect(parsed2.per_session_buy_count_cap).toBe(parsed1.per_session_buy_count_cap);
+    expect(parsed2.per_session_dollar_cap).toBe(parsed1.per_session_dollar_cap);
+    expect(parsed2.created_at.getTime()).toBe(parsed1.created_at.getTime());
+    expect(parsed2.created_by_user_id).toBe(parsed1.created_by_user_id);
+    expect(parsed2.superseded_by_strategy_id).toBe(parsed1.superseded_by_strategy_id);
+  });
+
   it("rejects selected_assets count > 5", () => {
     const selected_assets = Array.from({ length: 6 }, (_, i) => ({
       assetClass: "crypto-coinbase",
