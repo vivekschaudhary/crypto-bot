@@ -2,7 +2,8 @@
 id: CB-2.5
 bet: CB-2
 type: story
-status: ready
+status: shipped
+shipped: 2026-06-08
 priority: P0
 created: 2026-06-08
 author: PM
@@ -125,7 +126,7 @@ If the operator wants Sentry sooner: a future `/ops` PR adds `@sentry/nextjs`, r
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #41](https://github.com/vivekschaudhary/crypto-bot/pull/41) — `feat(CB-2.5): lib/coinbase/trace.ts — observability + rate-limit awareness (LAST CB-2 STORY; CB-2 DONE on merge)`. Squash-merged 2026-06-08 (commit `e343f7e`). 1 review round + 1 brief-drift round: BLOCKER on cross-section drift (Researcher items 1+3 closed in one section but still open in two others) — fixed by sweeping all 3 sections uniformly. Codex security review clean. **Live integration empirically resolved Researcher #1**: auth'd brokerage returns `x-ratelimit-*` headers (30 RPS global limit via RFC 7234-ish format `"30, 30;w=1;name=\"global_limit\""`); public market endpoints do NOT return them. **Squash-merge race STREAK extended to 3 PRs clean** (#39 + #40 + #41) via pre-merge `headRefOid` ritual.
 
 ## Tests
 
@@ -183,4 +184,4 @@ _None at story-creation time. Researcher Open Questions #1 + #3 resolve at AC 6 
 
 ---
 
-_Story closed: <pending>, brief link: docs/bets/CB-2/brief.md_
+_Story closed: 2026-06-08 (via PR #41 squash merge commit `e343f7e`), brief link: docs/bets/CB-2/brief.md_
