@@ -20,7 +20,7 @@ Ship the authenticated-reads layer of `lib/coinbase/`. Three typed wrappers cons
 
 - `getAccountBalances()` — list all the operator's Coinbase accounts (one per currency held)
 - `getAccount(accountUuid)` — single account detail by uuid
-- `getAccountTradeHistory({productId?, start?, end?, cursor?})` — historical fills (executed trades), filterable by product + time range
+- `getAccountTradeHistory({productIds?: string[], start?, end?, cursor?, limit?})` — historical fills (executed trades), filterable by trading-pair(s) + time range. Plural `productIds` array matches Coinbase's `product_ids` query param per the [List Fills docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/orders/list-fills); singular `productId` was the original draft but corrected to plural during PR #34 round-1 review.
 
 The wrapper response shape carries the operator's **real-money balances** + trade history. Two architectural invariants from the CB-2 brief get their first real exercise here:
 
@@ -70,7 +70,7 @@ This is also **the first integration test that requires CDP credentials** — op
   - Cursor pass-through for `getAccountTradeHistory`: single-page with no cursor; returns `{fills, cursor}` shape verified (1 test)
   - Time-range conversion for `getAccountTradeHistory`: verifies `Date` → Coinbase format (1 test)
   - Zod validation failure per method → `CoinbaseClientError({code: "validation-failed"})` (3 tests; one per method)
-  - Invalid-argument guards: empty `accountUuid`, empty `productId` (when explicitly passed as empty string) → `CoinbaseClientError({code: "invalid-argument"})` (2 tests)
+  - Invalid-argument guards: empty `accountUuid`, empty `productIds` array, `productIds` containing an empty string, `end <= start` → `CoinbaseClientError({code: "invalid-argument"})` (multiple tests)
   - URL-encoding for `accountUuid` (1 test)
   - Sensitive-data hygiene: when `request` throws with a body containing balance values, the wrapped error message does NOT echo the balance value (1 test). This is the test that proves the architectural invariant from the Description.
   - Total: ~14-16 new tests in this file.
@@ -80,7 +80,7 @@ This is also **the first integration test that requires CDP credentials** — op
   - Engineer DRI Decision at first commit on how to load `.env.local` for the test run — options: (a) document the inline shell pattern (e.g., `RUN_INTEGRATION_TESTS=1 source .env.local && pnpm test ...`), (b) add a small `pnpm test:integration` script that wraps env loading, (c) use vitest's env-file config. Pick whichever reads cleanest given the existing test infrastructure.
   - `getAccountBalances()` returns at least 1 account; every account has a valid `uuid` (non-empty string) and `available_balance` with a parseable numeric `value` field
   - `getAccount(uuid)` returns the same shape when given a uuid from the list call
-  - `getAccountTradeHistory({productId: "BTC-USD"})` returns a `{fills, cursor?}` shape; if `fills.length > 0`, each fill has the required fields populated. If `fills.length === 0`, that's also acceptable (operator may not have BTC-USD trades) — the test just asserts the shape.
+  - `getAccountTradeHistory({productIds: ["BTC-USD"]})` returns a `{fills, cursor?}` shape; if `fills.length > 0`, each fill has the required fields populated. If `fills.length === 0`, that's also acceptable (operator may not have BTC-USD trades) — the test just asserts the shape. **Plus sentinel-empty filter check**: an additional call with `productIds: ["ZZZ-USDT-SENTINEL-NO-TRADES"]` asserts `fills.length === 0` — proves the filter actually applies vs silently match-all (pattern from PR #35).
   - **EdDSA brokerage caveat verification (load-bearing):** if `getAccountBalances()` returns 2xx → caveat resolved; the wrapper auth'd-reads path works with the operator's key format. If it returns 401 + Coinbase responds with an Ed25519-specific error message → the [CB-2.1 PM Risk on EdDSA brokerage compatibility](../CB-2.1/story.md#risks-engineer-round-1-then-pm-pre-existing-for-audit) escalates; story status pauses to revisit auth approach (e.g., regenerate CDP key with ES256 / PEM format).
 
 - [ ] **AC 6** — Architectural invariants from CB-2 brief hold (verified by existing tests; no new test files needed):
@@ -105,7 +105,7 @@ Five categories explicitly `n/a` with reason per [CB-2.1's precedent](../CB-2.1/
 
 ### Brief + CB-2.1 + CB-2.2 references
 
-- [CB-2 brief § In scope](../../brief.md#in-scope) — names `accounts.ts` with `getAccountBalances()` and `getAccountTradeHistory({assetId?, from?, to?})`. The `assetId` parameter renamed to `productId` via a PM DRI Decision on 2026-06-07 (Coinbase's `/orders/historical/fills` endpoint filters by `product_id`, the trading pair, not by bare asset). The `from?, to?` parameters renamed to `start?, end?` for consistency with CB-2.2's `getProductCandles` signature. See [CB-2 brief PM DRI Decision: "`getAccountTradeHistory` parameter renames"](../../brief.md#decisions) for the full rationale + alternatives rejected. CB-2.3's AC 1 below implements these renamed parameters accordingly.
+- [CB-2 brief § In scope](../../brief.md#in-scope) — names `accounts.ts` with `getAccountBalances()`, `getAccount(uuid)`, and `getAccountTradeHistory({productIds?: string[], start?, end?, cursor?, limit?})`. The parameter shape evolved through two renames documented in the brief's PM DRI Decisions: (1) `assetId` → `productId` (2026-06-07 during /create-story — Coinbase's `/orders/historical/fills` filters by trading pair, not bare asset); (2) `productId` (singular) → `productIds` (plural array) (2026-06-07 during PR #34 round-1 — Coinbase's actual query parameter is `product_ids` plural array per [List Fills docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/orders/list-fills); singular form was undocumented and risked silent match-all). `from`/`to` also renamed to `start`/`end` for consistency with CB-2.2's `getProductCandles` signature. See [CB-2 brief PM DRI Decisions](../../brief.md#decisions) for the full rationale + alternatives rejected. CB-2.3's AC 1 below implements the final shipped shape (`productIds: string[]` per PR #34/#35).
 - [CB-2 brief PM Risk #2 (response shape drift)](../../brief.md#risks) — load-bearing for AC 2's `.passthrough()` Zod posture and AC 5's required-field discipline.
 - [CB-2.1 story § DRI Decisions](../CB-2.1/story.md#decisions) — the no-SDK Engineer DRI Decision constrains CB-2.3 to direct `request()` calls; no SDK to wrap.
 - [CB-2.1 story § Risks](../CB-2.1/story.md#risks-engineer-round-1-then-pm-pre-existing-for-audit) — the EdDSA brokerage caveat. **CB-2.3 is the first chance to verify this end-to-end** against the operator's actual key format. AC 5's integration test is the verification.
@@ -116,18 +116,18 @@ Five categories explicitly `n/a` with reason per [CB-2.1's precedent](../CB-2.1/
 
 | Method | Coinbase endpoint | Notes |
 |---|---|---|
-| `getAccountBalances()` | `GET /api/v3/brokerage/accounts` | Paginated via `has_next` + `cursor`; auto-paginate internally |
-| `getAccount(uuid)` | `GET /api/v3/brokerage/accounts/{account_uuid}` | Single account |
-| `getAccountTradeHistory({...})` | `GET /api/v3/brokerage/orders/historical/fills` | Query params: `product_id`, `start_sequence_timestamp`, `end_sequence_timestamp`, `cursor`, `limit`. Returns `{fills, cursor?}` envelope. Single-page; caller pages. |
+| `getAccountBalances()` | `GET /api/v3/brokerage/accounts` | Paginated via `has_next` + top-level `cursor`; auto-paginate internally |
+| `getAccount(uuid)` | `GET /api/v3/brokerage/accounts/{account_uuid}` | Single account; response wrapped in `{account: {...}}` envelope (verified against live API; differs from `getProduct(id)` which is not wrapped) |
+| `getAccountTradeHistory({...})` | `GET /api/v3/brokerage/orders/historical/fills` | Query params: `product_ids` (plural — passed as repeated query params per trading pair), `start_sequence_timestamp` (RFC3339), `end_sequence_timestamp` (RFC3339), `cursor`, `limit`. Returns `{fills, cursor?}` envelope. Single-page; caller drives pagination. |
 
 Engineer freshens these against [List Accounts](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/accounts/list-accounts) + [List Fills](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/orders/list-fills) docs at first commit (per CB-2.2 round-1 lesson — verify contract values BEFORE committing schemas, not after Codex flags).
 
 ### What this story explicitly does NOT do
 
-- `lib/coinbase/orders.ts` (CB-2.4) — auth'd writes (`placeOrder`, `cancelOrder`); LIVE_MODE-free per architectural invariant; CB-4 owns the gate
+- `lib/coinbase/orders.ts` (CB-2.4) — auth'd writes (`placeOrder`, `cancelOrders`); LIVE_MODE-free per architectural invariant; CB-4 owns the gate
 - `lib/coinbase/trace.ts` (CB-2.5) — Sentry breadcrumbs + rate-limit-header awareness
 - Sensitive-data redaction in structured logs (CB-2.5; here we just don't log balance values at all)
-- Asset-level aggregation across trading pairs (deferred to CB-5 dashboard; `getAccountTradeHistory` takes `productId`, not bare asset)
+- Asset-level aggregation across trading pairs (deferred to CB-5 dashboard; `getAccountTradeHistory` takes `productIds: string[]` — trading-pair(s) — not bare asset)
 - Auto-pagination for `getAccountTradeHistory` (deferred; caller-driven cursor is the surface this story ships)
 - LIVE_MODE-gate-in-CB-4 architectural invariant verification (CB-2.4 ships orders.ts where this matters; CB-2.3's accounts surface is read-only)
 
