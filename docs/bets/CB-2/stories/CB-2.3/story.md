@@ -2,7 +2,8 @@
 id: CB-2.3
 bet: CB-2
 type: story
-status: ready
+status: shipped
+shipped: 2026-06-07
 priority: P0
 created: 2026-06-07
 author: PM
@@ -132,7 +133,8 @@ Engineer freshens these against [List Accounts](https://docs.cdp.coinbase.com/ap
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #34](https://github.com/vivekschaudhary/crypto-bot/pull/34) — `feat(CB-2.3): lib/coinbase/accounts.ts — auth'd reads (accounts + trade history)`. Squash-merged 2026-06-07 (commit `d642b99`). 2 review rounds: round-1 BLOCKER on `productId` (singular, undocumented; silent-match-all risk) + ISSUE on defensive `break` silently returning partial account list; round-2 ISSUE on Stories forecast still naming singular. **EdDSA brokerage caveat verified end-to-end against operator's actual key (Engineer DRI Decision #8 = `pass`)** — CB-2.1 PM Risk RESOLVED. Ships `lib/coinbase/{accounts,account-schemas}.ts` + initial 14 unit tests + 3 gated integration tests.
+- [PR #35](https://github.com/vivekschaudhary/crypto-bot/pull/35) — **URGENT** restoration of PR #34 round-1 + round-2 review fixes missed in squash-merge (3rd squash-merge race in this bet — triaged at [docs/incidents/2026-06-07-squash-merge-race/triage.md](../../../incidents/2026-06-07-squash-merge-race/triage.md)). Squash-merged 2026-06-08 (commit `925a187`). Restores: `productId → productIds: string[]` (Coinbase docs say plural `product_ids` array); URLSearchParams.append for repeated query params; fail-loud `pagination-contract-violation` error code; sentinel-empty-filter integration test pattern (productIds: ["ZZZ-USDT-SENTINEL-NO-TRADES"] → fills.length === 0); brief + story cascade-sync.
 
 ## Tests
 
@@ -184,4 +186,4 @@ _None at story-creation time. Engineer + Researcher open questions tracked at CB
 
 ---
 
-_Story closed: <pending>, brief link: docs/bets/CB-2/brief.md_
+_Story closed: 2026-06-07 (initial ship via PR #34 commit `d642b99`; missed-fixes restoration 2026-06-08 via PR #35 commit `925a187`), brief link: docs/bets/CB-2/brief.md_
