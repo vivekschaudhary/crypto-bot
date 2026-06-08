@@ -20,7 +20,7 @@ key_metric:
   name: Wrapper API success rate (Coinbase requests that return 2xx as a fraction of total requests, EXCLUDING 4xx caller errors which are bugs in the consumer, not the wrapper)
   baseline: n/a (greenfield — no Coinbase integration in production yet)
   target: ">= 99% over rolling 30-day window once the wrapper has accrued >= 100 real requests against the live Coinbase API"
-  source: derivable from Sentry breadcrumbs + structured logs emitted by `lib/coinbase/` request-trace helper
+  source: structured logs emitted by `lib/coinbase/` request-trace helper (CB-2.5). **Retention caveat (2026-06-08):** Vercel Pro retains runtime logs for only 1 day; 30-day retention requires Observability Plus (paid upgrade) OR an alternative sink. The 30-day window in the target is ASPIRATIONAL until one of three operator-decided paths lands: (a) Vercel Observability Plus upgrade (out-of-band), (b) Sentry SDK install in a follow-up `/ops` PR (deferred per operator 2026-06-08), or (c) a DB persistence layer (`wrapper_traces` table) added by a future story. Until then, the metric is measurable over a 1-day window from runtime logs. The trace emit shape from CB-2.5 is forward-compatible with any of the three paths.
 guardrails:
   - name: Coinbase rate-limit utilization (% of public endpoint ceiling consumed by our requests)
     threshold: stays < 10% of Coinbase ceiling per architecture.md Performance-Efficiency fitness function; alarms if > 25%

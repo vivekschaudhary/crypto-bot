@@ -23,7 +23,7 @@ This is the **last CB-2 story**. When it ships:
 - Two of the three Researcher Open Questions on the CB-2 brief close:
   - **#1 (rate-limit headers)** — resolved empirically by what the integration test observes
   - **#3 (CDP JWT rotation behavior of the direct-fetch path)** — resolved by Engineer code-review of `jwt.ts` mint-per-request semantics
-- `key_metric` ("Wrapper API success rate ≥ 99% over rolling 30-day window") becomes **derivable** from the emitted logs as the brief promised
+- `key_metric` ("Wrapper API success rate") becomes **measurable** from the emitted logs. **Retention caveat (per CB-2 brief amendment 2026-06-08):** Vercel Pro retains runtime logs for only 1 day. The brief's "30-day rolling window" target is ASPIRATIONAL until the operator picks one of: (a) Vercel Observability Plus upgrade, (b) Sentry SDK install in a follow-up `/ops` PR, or (c) a DB persistence layer in a future story. CB-2.5 ships the trace emission layer (forward-compatible with any of the three paths); 30-day persistence is an out-of-CB-2.5 scope decision. Day-1 measurement window is 1-day from runtime logs.
 
 The wrapper integration point requires a small modification to `lib/coinbase/client.ts` (the first CB-2 story to touch client.ts since CB-2.1) — `handleResponse` invokes `trace.emit()` with timing + headers data. The change is small + additive + LIVE_MODE-free, but it's not zero-impact like CB-2.2/2.3/2.4 were.
 
@@ -59,7 +59,7 @@ The wrapper integration point requires a small modification to `lib/coinbase/cli
   - **(b) — rejected** (per operator): install @sentry/nextjs in CB-2.5; wire breadcrumbs via `Sentry.addBreadcrumb({category: "coinbase.api", ...})` alongside the console.log; adds the SDK dep + config changes. Rejected: rich observability not needed at this time.
   - **(c) — rejected** (per operator): install @sentry/nextjs but only as a peer-dep; trace.ts probes for presence at runtime. Rejected: same reason as (b); adds dep complexity without operator-validated value.
 
-  Key_metric (success rate) is derivable from console.log JSON shape alone via Vercel runtime log queries. If/when CB-4 bot-tick observability surfaces a need for richer breadcrumb-chained traces, a separate `/ops` PR installs Sentry without breaking CB-2.5's trace emit shape (forward-compatible).
+  Key_metric (success rate) is derivable from console.log JSON shape via Vercel runtime log queries, **with the 30-day retention caveat above**. Day-1 measurement window is 1-day (Vercel Pro default). Extending to 30 days requires operator-decided sink: Observability Plus upgrade, Sentry SDK install (/ops PR), or DB persistence (`wrapper_traces` table; future story). If/when CB-4 bot-tick observability surfaces a need for richer breadcrumb-chained traces OR the 30-day metric becomes load-bearing for a check-in, a separate `/ops` PR adds the chosen sink without breaking CB-2.5's trace emit shape (forward-compatible).
 
 - [ ] **AC 4** — Unit tests at `tests/lib/coinbase/trace.test.ts`:
   - Mock `console.log` via `vi.spyOn(console, "log")` (vitest standard); verify the emit shape
@@ -102,7 +102,7 @@ Five categories explicitly `n/a` with reason per CB-2.1's precedent; Edge cases 
 ### Brief + sibling-story references
 
 - [CB-2 brief § In scope](../../brief.md#in-scope) — names `trace.ts` with the "structured-log breadcrumb helper" framing. The brief was written assuming Sentry would land alongside; this story defers Sentry SDK install per Engineer DRI Decision #3 option (a) recommendation.
-- [CB-2 brief § key_metric](../../brief.md) — "Wrapper API success rate" is derivable from the structured logs once trace.ts ships. trace.ts emits the data that downstream tools (Vercel dashboard, Sentry if/when installed, custom queries) compute the metric over.
+- [CB-2 brief § key_metric](../../brief.md) — "Wrapper API success rate" is measurable from the structured logs once trace.ts ships, WITHIN the constraints of the chosen log sink. brief's source field was amended 2026-06-08 to reflect Vercel Pro's 1-day retention; the brief's target 30-day-rolling-window is aspirational until operator picks Observability Plus / Sentry / DB persistence. trace.ts emits the data shape; downstream sink is the retention question.
 - [CB-2 brief PM Risk #2 (Coinbase rate-limit headers may not be returned)](../../brief.md#risks) — this story's AC 6 RESOLVES the open question empirically by inspecting what Coinbase actually returns.
 - [CB-2 brief Researcher Open Question #1 (rate-limit headers)](../../brief.md#open-questions-for-researcher) — RESOLVES at AC 6 ship.
 - [CB-2 brief Researcher Open Question #3 (CDP JWT rotation behavior of the direct path)](../../brief.md#open-questions-for-researcher) — RESOLVES via Engineer code-review at first commit: jwt.ts mints a fresh JWT per request from `env()` values, so env-var updates are picked up on the next request automatically (no process-restart needed). Documented as Engineer DRI Decision #5.
@@ -111,7 +111,7 @@ Five categories explicitly `n/a` with reason per CB-2.1's precedent; Edge cases 
 
 ### Sentry SDK install — out of scope
 
-@sentry/nextjs install + configuration is OUT of CB-2.5 scope per Engineer DRI Decision #3 option (a) recommendation. The structured-log approach satisfies the key_metric requirement; Sentry can be wired in a follow-up `/ops` PR if rich error tracking + breadcrumb-chained traces become load-bearing for CB-4's bot-tick observability.
+@sentry/nextjs install + configuration is OUT of CB-2.5 scope per operator confirmation 2026-06-08. The structured-log approach satisfies the key_metric DATA SHAPE; the 30-day retention question is the separate downstream-sink decision (see brief key_metric.source caveat). Sentry can be wired in a follow-up `/ops` PR if/when rich error tracking + breadcrumb-chained traces become load-bearing for CB-4's bot-tick observability OR when the 30-day metric becomes load-bearing for a check-in.
 
 If the operator wants Sentry sooner: a future `/ops` PR adds `@sentry/nextjs`, runs `npx @sentry/wizard`, and amends `trace.ts` to call `Sentry.addBreadcrumb` alongside the existing console.log. The trace.emit shape from this story is forward-compatible.
 
@@ -169,6 +169,13 @@ _To be filled by Engineer at first PR commit. Required entries:_
   - **Impact (required):** low-to-medium (would skew the success-rate metric calculation by a small fraction; metric is a 30-day rolling window so single-request loss is negligible)
   - **Mitigation (required):** if the metric proves unreliable in production observation, follow-up `/ops` PR installs Sentry SDK which has more robust delivery semantics. CB-2.5 ships the structured-log baseline; richer integration is incremental.
   - **Area (required, tag):** observability / delivery-reliability
+
+- [2026-06-08] [PM] **30-day key_metric retention gap** — Vercel Pro retains runtime logs for 1 day; brief's "30-day rolling window" target requires a longer-retention sink
+  - **Likelihood (required):** certain (this is the current Vercel Pro plan retention; not contingent on anything that might change)
+  - **Impact (required):** low at MVP time (the bet's check-in cadence is weekly, not daily-over-30-days; a 1-day window still surfaces immediate health). Becomes medium-impact if the operator wants to compute a true 30-day rolling window for trend analysis or external reporting.
+  - **Mitigation (required):** brief amended 2026-06-08 to mark the 30-day window as ASPIRATIONAL. Operator-decided forward path: (a) Vercel Observability Plus upgrade (out-of-band paid tier), (b) Sentry SDK install in a follow-up `/ops` PR (also adds richer breadcrumb-chained traces), or (c) DB persistence layer (`wrapper_traces` table; future story; full operator control over retention + queryability). trace.ts's emit shape is forward-compatible with all three. Until a path is chosen, the metric is measurable over a 1-day window from Vercel runtime logs (sufficient for weekly check-ins).
+  - **Area (required, tag):** observability / retention / out-of-band-decision
+  - **Surfaced by:** Codex PR #40 round-1 BLOCKER review
 
 ### Issues
 
