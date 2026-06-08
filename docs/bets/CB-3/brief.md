@@ -35,3 +35,11 @@ Full brief content filled when promoted via `/create-brief CB-3`.
 ## Open question (resolve at promotion)
 
 Single active strategy vs. multiple named strategies the operator can switch between? Default lean: **single active per bot session** for MVP simplicity. Strategy *versioning* (revisions persist; old ticks still trace to old config) handled via append-only audit posture in [architecture.md § Foundational Data Model](../../foundation/architecture.md#foundational-data-model).
+
+## E2E test expectation (forward-reference, captured 2026-06-08)
+
+**CB-3 ships a user-facing form** for authoring/editing strategies — the first UI surface since [CB-1.6 onboarding](../CB-1/stories/CB-1.6/story.md) (which used Playwright to validate the operator-onboarding flow end-to-end and surfaced 2 real production bugs static mocks had masked).
+
+When CB-3 stories are promoted, each story that touches a UI surface MUST include at least one Playwright spec covering the operator's golden path (author strategy → save → reload to verify persistence). Operator-confirmed pattern (2026-06-08): CB-2.x deliberately marked `e2e: false` because it's pure library code; the discipline re-engages for UI-bearing bets. Story-level Standard Experience Checklist categories (Navigation / States / Feedback / Accessibility / Edge cases / Cross-surface consistency) should NOT all be `n/a` here — most are load-bearing.
+
+CB-1.6's lesson: static mocks masked an `@simplewebauthn/browser@11` API drift + a begin-response shape mismatch that ONLY surfaced when E2E exercised the real browser path. Same risk class applies to CB-3 (e.g., Server Component → Client Component data hand-off; form validation; revalidation after mutate).

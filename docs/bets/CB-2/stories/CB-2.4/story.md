@@ -2,7 +2,8 @@
 id: CB-2.4
 bet: CB-2
 type: story
-status: ready
+status: shipped
+shipped: 2026-06-08
 priority: P0
 created: 2026-06-08
 author: PM
@@ -141,7 +142,7 @@ Engineer freshens against [Create Order docs](https://docs.cdp.coinbase.com/api-
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #39](https://github.com/vivekschaudhary/crypto-bot/pull/39) — `feat(CB-2.4): lib/coinbase/orders.ts — auth'd WRITES (placeOrder + cancelOrders; LIVE_MODE-free; real-money surface)`. Squash-merged 2026-06-08 (commit `51196f2`). 2 review rounds: round-1 BLOCKER on OrderResponseSchema's success-gated envelope (both nested objects were `.optional()` allowing incomplete responses to pass; fixed via `.superRefine()` that requires success_response when success=true and error_response when success=false) + ISSUE on stale `$1 BTC` runbook comments; round-2 ISSUE on 2 more stale `$1 BTC` comments; round-3 clean. Codex security review clean. **Real write path verified end-to-end** against live Coinbase: limit BUY at 50% below market with post_only=true accepted; cancelOrders returned `results[0].success === true`; getAccountTradeHistory confirmed no fill. Operator visually confirmed via Coinbase UI. **Squash-merge race STREAK BROKEN** — pre-merge `headRefOid` verification ritual from the triage note worked.
 
 ## Tests
 
@@ -196,4 +197,4 @@ _To be filled by Engineer at first PR commit. Required entries:_
 
 ---
 
-_Story closed: <pending>, brief link: docs/bets/CB-2/brief.md_
+_Story closed: 2026-06-08 (via PR #39 squash merge commit `51196f2`), brief link: docs/bets/CB-2/brief.md_
