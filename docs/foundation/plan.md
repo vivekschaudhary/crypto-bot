@@ -1,10 +1,10 @@
 ---
 id: PROJECT-PLAN
 type: plan
-version: 7
+version: 8
 status: living
 created: 2026-05-31
-last_refreshed: 2026-06-06
+last_refreshed: 2026-06-08
 parent: FOUNDATION-PRODUCT
 ---
 
@@ -12,7 +12,7 @@ parent: FOUNDATION-PRODUCT
 
 > Living, time-bound schedule for the MVP bet wedge. Derived from per-bet artifacts; refreshed by `/plan`. Never hand-edited — re-run `/plan` to refresh.
 
-**Last refreshed:** 2026-06-06 (version 7 — second refresh of the day; **first MVP-target compression in the bet's history**. CB-2 brief approved same day as promotion (`/create-brief CB-2` PR #24); the "Brief promoted + approved" trigger row fired, refining CB-2 from stub (2 wk / `low`) to brief-approval (1 wk / `medium`) — scope was chopped to data-layer-only per the operator's HITL Decision #1, justifying the smaller estimate. CB-2.1 story.md also landed in the same PR — fires the "Stories created" trigger for CB-2 as a no-op-net move (max() rule preserves the brief-approval value). Downstream cascade pulls **MVP target from 2026-08-16 to 2026-08-09 — 7 days earlier**.)
+**Last refreshed:** 2026-06-08 (version 8 — bundled refresh for CB-2 BET SHIPPED + CB-3 brief promoted + CB-3 pluggable pivot, all 2026-06-08 same-day milestone. CB-2 finished 5 days ahead of v7's estimated_end (2026-06-13 → 2026-06-08 actual); cascade pulls CB-3/4/5 forward 6 days. CB-3 promoted from stub + same-session pivoted to pluggable architecture (per `@vc1023/passkey-2fa` precedent — operator chose 3 wk estimate over single-purpose 2 wk, accepts +7 days for extraction-readiness). Net: MVP target moved 2026-08-03 → 2026-08-10 (-6 days from CB-2-shipped-early + +7 days from CB-3-pluggable = +1 day net vs v7's 2026-08-09, still ahead of v6's 08-16 baseline).
 
 ## Currently in flight
 
@@ -20,7 +20,8 @@ Bets with `actual_start` populated and `actual_end` still empty.
 
 | Bet | Title | Phase | Actual start | Estimated end | Owner |
 |-----|-------|-------|--------------|---------------|-------|
-| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | 1 of ~5 stories shipped ([CB-2.1](../bets/CB-2/stories/CB-2.1/story.md) via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26)); `/create-story CB-2` for CB-2.2 (`lib/coinbase/market.ts` — public endpoints) is next | 2026-06-06 | 2026-06-13 | PM → Engineer |
+
+_None — CB-2 ship 2026-06-08 cleared the only in-flight bet; CB-3 sits in "Next up" until its first build PR merges (which fires the "First build PR merged" trigger and writes `actual_start`). CB-4 + CB-5 remain Blocked._
 
 ## Next up (unblocked, not yet started)
 
@@ -28,24 +29,21 @@ Bets whose dependencies are satisfied (or have none) but `actual_start` is empty
 
 | Bet | Title | Estimated start | Estimated end | Estimated duration | Confidence | Promotion status |
 |-----|-------|-----------------|---------------|---------------------|------------|-------------------|
-
-_None — CB-2 has moved to "Currently in flight" via CB-2.1's PR #26 merge (writes `actual_start = 2026-06-06`; "First build PR merged" trigger fires per the workflow estimate model). CB-3..CB-5 remain in "Blocked"._
+| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence (**PLUGGABLE**) | 2026-06-09 | 2026-06-29 | 3 wk | medium | **brief approved + pluggable pivot 2026-06-08**; bet-architecture at [`docs/bets/CB-3/architecture.md`](../bets/CB-3/architecture.md); next workflow is `/create-story CB-3` for CB-3.0 (strategy-core foundation). 5 stories forecast: CB-3.0 → CB-3.1 coinbase adapter → CB-3.2 DB schema → CB-3.3 form UI + Playwright → CB-3.4 activation. |
 
 ## Blocked
 
-Bets waiting on dependencies, HITL approval, or external input.
-
 | Bet | Title | Blocked by | Since | Mitigation |
 |-----|-------|------------|-------|------------|
-| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | CB-2 (binding-dep from v6 onwards; CB-1 cleared) | 2026-05-31 | Unblocks when CB-2 ships. CB-2's compressed end (2026-06-13) pulls CB-3 start from v6's 2026-06-22 to **2026-06-15** (7-day pull-in). Stub estimate-only until promoted via `/create-brief CB-3`. |
-| [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | CB-2, CB-3 | 2026-05-31 | Unblocks when CB-3 completes (CB-3 is the binding dep — CB-2 finishes earlier). |
-| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | CB-4 (CB-1 dep cleared 2026-06-05) | 2026-05-31 | Unblocks when CB-4 completes (CB-4 is the sole binding dep now). |
+| [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | CB-3 (binding-dep; CB-2 already cleared) | 2026-05-31 | Unblocks when CB-3 ships. CB-3's compressed end (2026-06-29) pulls CB-4 start from v7's 2026-06-29 to (held at) **2026-06-30** (the +7-day pluggable pivot shifts CB-4 backward by 7 days but net cascade is +7 vs v7 baseline). Stub estimate-only until promoted via `/create-brief CB-4`. |
+| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | CB-4 | 2026-05-31 | Unblocks when CB-4 ships. CB-5 ships the largest UI surface of MVP; e2e tests load-bearing per the forward-reference note added during CB-2.5. |
 
 ## Done
 
 | Bet | Title | Actual start | Actual end | Duration (actual vs estimated) | Notes |
 |-----|-------|--------------|------------|--------------------------------|-------|
 | [CB-1](../bets/CB-1/brief.md) | Passkey authentication | 2026-05-31 | 2026-06-05 | **5 calendar days actual vs 21 estimated (3 wk = brief-approval × stories-refinement max() ceiling)** → 16 days ahead | 7 stories (CB-1.1 through CB-1.6) shipped via PRs #1, #2, #5, #6, #8, #9, #10, #13, #14, #16, #17 + post-merge security follow-up PR #18 (M1+M2 from 2026-06-04 codebase audit) + post-canary follow-ups PRs #20/#21/#22 from the 2026-06-05 canary verification retro. Per-story actual velocity ≈ 0.7 days vs the 3-days/story plan-model default. CB-1 brief frontmatter `estimate.duration_weeks` preserved at 3 (the stories-refinement value at last refresh); `actual_duration_days: 5` captures the actual side-by-side. |
+| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | 2026-06-06 | 2026-06-08 | **3 calendar days actual vs 7 estimated (1 wk = brief-approval refinement)** → 5 days ahead (5/7 of the budget unused) | 5 stories (CB-2.1 → CB-2.5) shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26), [#32](https://github.com/vivekschaudhary/crypto-bot/pull/32), [#34](https://github.com/vivekschaudhary/crypto-bot/pull/34), [#39](https://github.com/vivekschaudhary/crypto-bot/pull/39), [#41](https://github.com/vivekschaudhary/crypto-bot/pull/41). Per-story actual velocity ≈ 0.6 days vs the 3-days/story plan-model default. CB-2 brief frontmatter `estimate.duration_weeks` preserved at 1 (brief-approval value); `actual_duration_days: 3` captures the actual side-by-side. Headline closures: EdDSA brokerage caveat RESOLVED; real-money write path verified; rate-limit headers empirically discovered (30 RPS limit); all 3 Researcher Open Questions closed. |
 
 ## Full schedule
 
@@ -54,12 +52,12 @@ Every MVP bet with all date columns. Source of truth for downstream tools.
 | Bet | Title | Depends on | Est. start | Est. end | Actual start | Actual end | Duration (wk) | Confidence | Last refined by |
 |-----|-------|------------|------------|----------|--------------|------------|---------------|------------|-----------------|
 | [CB-1](../bets/CB-1/brief.md) | Passkey authentication | — | 2026-05-31 | 2026-06-21 | 2026-05-31 | 2026-06-05 | 3 (est) / 1 (actual ≈ 5 days) | high | stories |
-| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | 2026-06-06 | **2026-06-13** | **2026-06-06** | — | **1** | **high** | **build-actuals** |
-| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence | [CB-2] (CB-1 cleared) | **2026-06-15** | **2026-06-28** | — | — | 2 | low | stub |
-| [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | [CB-2, CB-3] | **2026-06-29** | **2026-07-19** | — | — | 3 | low | stub |
-| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | [CB-4] (CB-1 cleared) | **2026-07-20** | **2026-08-09** | — | — | 3 | low | stub |
+| [CB-2](../bets/CB-2/brief.md) | Coinbase data + top-5 discovery | — | 2026-06-06 | 2026-06-13 | 2026-06-06 | **2026-06-08** | 1 (est) / **0.4 wk (actual ≈ 3 days)** | high | **build-actuals (bet-done trigger)** |
+| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence (**PLUGGABLE**) | [CB-2] (cleared 2026-06-08) | **2026-06-09** | **2026-06-29** | — | — | **3** (was 2 in v7; bumped +1 wk by pluggable pivot) | medium | **brief-approval** |
+| [CB-4](../bets/CB-4/brief.md) | DCA bot runtime | [CB-2, CB-3] | **2026-06-30** | **2026-07-20** | — | — | 3 | low | stub |
+| [CB-5](../bets/CB-5/brief.md) | Transaction ledger + dashboard + override buttons | [CB-4] | **2026-07-21** | **2026-08-10** | — | — | 3 | low | stub |
 
-**MVP completion target:** **2026-08-09** (**compressed 7 days from v6's 2026-08-16 — first MVP-target compression**). CB-2 brief-approval refined `duration_weeks` from stub 2 → 1 (scope chopped to data-layer-only per [CB-2 brief PM DRI Decision #1](../bets/CB-2/brief.md#decisions)); confidence advanced `low` → `medium`. Cascade pulls all of CB-3 / CB-4 / CB-5 forward by 7 days. **Will further compress if** CB-3 / CB-4 / CB-5 promotions also refine their stubs below current values (likely per CB-1 velocity signal, but no data yet).
+**MVP completion target:** **2026-08-10** (v7 target was 2026-08-09; v8 shifts +1 day net = CB-2-shipped-early -6 days + CB-3-pluggable-pivot +7 days). Still ahead of v6's 2026-08-16 baseline. CB-3's pluggable pivot trades MVP target compression (+7 days) for cross-app reuse readiness when the operator's equity app consumes the `@vc1023/strategy-core` extraction (operator-accepted trade per [CB-3 brief PM DRI Decision #6](../bets/CB-3/brief.md#decisions); `@vc1023/passkey-2fa` precedent informs the choice).
 
 ## Calendar view
 
@@ -68,15 +66,15 @@ Week of:               | Wk 1    | Wk 2    | Wk 3    | Wk 4    | Wk 5    | Wk 6 
                        | 06-01   | 06-08   | 06-15   | 06-22   | 06-29   | 07-06   | 07-13   | 07-20   | 07-27   | 08-03   |
 -----------------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
 CB-1 (auth) ✓ shipped  |  ██     |         |         |         |         |         |         |         |         |         |
-CB-2 (data layer)      |         |  ██     |         |         |         |         |         |         |         |         |
-CB-3 (strategy)        |         |         |  ██     |  ██     |         |         |         |         |         |         |
-CB-4 (bot runtime)     |         |         |         |         |  ██     |  ██     |  ██     |         |         |         |
-CB-5 (ledger + dash)   |         |         |         |         |         |         |         |  ██     |  ██     |  ██     |
+CB-2 (data) ✓ shipped  |         |  █      |         |         |         |         |         |         |         |         |
+CB-3 (strategy + plug) |         |         |  ██     |  ██     |  ██     |         |         |         |         |         |
+CB-4 (bot runtime)     |         |         |         |         |         |  ██     |  ██     |  ██     |         |         |
+CB-5 (ledger + dash)   |         |         |         |         |         |         |         |         |  ██     |  ██     |
 ```
 
-Note: CB-2's 1-week stub now occupies just Wk 2 (06-08 onward); v6 had it in Wk 2+3. Downstream all pull forward one week. MVP fits in **10 weeks now (was 11 in v6)**. CB-1's actual_start 2026-05-31 (Sunday) → actual_end 2026-06-05 (Friday) = 5 calendar days, entirely within Wk 1 of the visualization.
+Note: CB-2 finished in 0.4 wk (3 days; Wk 2 partial — represented as `█` not `██`). CB-3 expanded from 2 wk to 3 wk by the pluggable pivot (occupies Wk 3-5 vs v7's Wk 3-4). Downstream cascade shifts CB-4 + CB-5 each forward +7 days. MVP still fits in **10 weeks** but the last week extends slightly into Wk 11 (2026-08-10 lands in Wk 11 in the Wk 10 = 08-03 grid).
 
-Critical path: **CB-2 → CB-3 → CB-4 → CB-5** (now 9.5 weeks from CB-2 start 2026-06-06 to CB-5 end 2026-08-09). v6 was 10.5 wk; v7's 7-day compression on CB-2 propagates to the same 7-day savings at the end.
+Critical path: **CB-2 → CB-3 → CB-4 → CB-5** (now 9.0 weeks from CB-3 start 2026-06-09 to CB-5 end 2026-08-10). v7 was 8.5 wk; v8's +7 days from CB-3 pluggable pivot extends it.
 
 ## Refinement log
 
@@ -139,12 +137,12 @@ _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions
 
 ## Risks to plan
 
-- **Per-story velocity 3-days/story model still NOT retuned in v7 despite CB-1's data point** — unchanged from v6's DRI Decision (see [Decisions](#decisions) below: "Per-story velocity model NOT retuned in v6"). Watch through CB-2 + CB-3 actuals before considering an adjustment. If CB-2 also ships at <1 day/story (which is what scope-chop + foundation maturity suggests), v8 may justify retuning the model's per-story default downward. Expected outcome: another ~3-7 days compression on MVP target.
-- **CB-3/CB-4/CB-5 stub estimates dominate the remaining cascade** — three bets at stub `low` confidence (2 wk + 3 wk + 3 wk = 8 wk total). Each brief-approval will potentially compress further. The highest-leverage next move (after CB-2.1 ships) becomes **`/create-brief CB-3`** to refine CB-3's stub.
-- **CB-4 (bot runtime) carries the single-bet extension risk** (unchanged from v1+) — most surface area; may bump to 4 weeks at brief promotion. The most likely individual-bet expansion in the remaining cascade.
-- ~~**CDP key provisioning is now an IMMEDIATE blocker for CB-2.1**~~ — **PARTIALLY RESOLVED 2026-06-06.** CB-2.1 shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) using a public endpoint for the integration test (`/api/v3/brokerage/market/products/BTC-USD` — no auth required), sidestepping the CDP credentials requirement entirely. The gated integration test now smoke-checks the wrapper end-to-end against real Coinbase without needing CDP keys provisioned. **Still required for CB-2.3 (auth'd reads) and CB-2.4 (auth'd writes / place order)** — those stories WILL need CDP credentials in `.env.local` for their integration tests. Tracked as still-open Issue below.
+- **Per-story velocity 3-days/story model STILL NOT retuned in v8 despite TWO bets of strong evidence** — both CB-1 (7 stories / 5 days = 0.7 days/story) and CB-2 (5 stories / 3 days = 0.6 days/story) have shipped at ~5× the modeled velocity. The model's 3-days/story default is now demonstrably wrong for this operator + this foundation maturity. Holding through CB-3 actuals before retuning to avoid n=1 → n=3 over-correction; if CB-3 also ships at <1 day/story, v9 will retune (likely to 1-day/story default). Expected outcome of the retune: another ~10-14 days compression across remaining cascade, pulling MVP target meaningfully forward.
+- **CB-4/CB-5 stub estimates dominate the remaining cascade** (was CB-3/4/5 in v7) — two bets at stub `low` confidence (3 wk + 3 wk = 6 wk). Each brief-approval will likely compress further per the CB-1 + CB-2 + (in-progress) CB-3 brief-approval pattern. Highest-leverage next move after CB-3 ships: **`/create-brief CB-4`** to refine CB-4's stub.
+- **CB-4 (bot runtime) carries the single-bet extension risk** (unchanged from v1+) — most surface area of the remaining bets; may bump to 4 weeks at brief promotion. The most likely individual-bet expansion in the remaining cascade. Mitigated partially by CB-4 inheriting CB-2's typed Coinbase wrapper (no API research) + CB-3's typed strategy contract (no schema design); core CB-4 work is signal evaluation + cron + `LIVE_MODE` gate.
+- **CB-3 pluggable-pivot scope cost (+7 days)** — operator-accepted at brief-approval 2026-06-08 per [CB-3 brief PM DRI Decision #6](../bets/CB-3/brief.md#decisions). Trade: +7 days MVP slip in exchange for `@vc1023/strategy-core` extraction-readiness when the equity app consumes (per `@vc1023/passkey-2fa` precedent). Mitigation if equity app stalls: collapse to single-purpose with 1-2 day refactor (re-evaluation gate before `/build CB-3.0`).
+- **CB-3 first UI re-engagement after 5 stories of pure library code** — context loss + Playwright e2e ramp-up at CB-3.3 form UI story. Mitigated by CB-1.6's onboarding-UX precedent + the forward-reference e2e expectation notes added to CB-3 stub during CB-2.5 (now amended into the full brief).
 - **All v6 forward-watch risks unchanged** — operator-cadence assumption (now genuinely sequential since portfolio has no remaining parallel pairs); post-MVP rails scheduling. (Live entries in [Risks](#risks) below.)
-- ~~**Migration 0003 (RLS) still not yet applied to production Supabase**~~ — **CLOSED 2026-06-06** during this same-day session: operator applied via `pnpm db:migrate` (after baseline-seeding the `_migrations` tracking table for 0001+0002 in Supabase SQL Editor). All four `auth_*` tables now show `rowsecurity = true`. (See [Issues](#issues) below — v6 issue marked closed.)
 
 ## DRI Log
 
