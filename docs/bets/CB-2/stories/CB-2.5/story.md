@@ -166,7 +166,7 @@ _To be filled by Engineer at first PR commit. Required entries:_
 
 - [2026-06-08] [PM] **console.log emission could be lost on serverless cold starts** — Vercel's log collection has caveats around buffered writes
   - **Likelihood (required):** low (Vercel docs confirm console.log is reliably collected for the duration of a function invocation)
-  - **Impact (required):** low-to-medium (would skew the success-rate metric calculation by a small fraction; metric is a 30-day rolling window so single-request loss is negligible)
+  - **Impact (required):** low-to-medium (would skew the success-rate metric calculation by a small fraction; metric window is currently 1-day from Vercel runtime logs — extending to the aspirational 30-day window depends on the retention-gap Risk below — so single-request loss is more visible in a 1-day window than it would be in 30, but still negligible at the operator's ~96 ticks/day cron rate per the CB-2.4 context)
   - **Mitigation (required):** if the metric proves unreliable in production observation, follow-up `/ops` PR installs Sentry SDK which has more robust delivery semantics. CB-2.5 ships the structured-log baseline; richer integration is incremental.
   - **Area (required, tag):** observability / delivery-reliability
 
