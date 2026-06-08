@@ -12,6 +12,27 @@
 // crypto" posture.
 //
 // ──────────────────────────────────────────────────────────────────────────
+// CDP JWT rotation behavior (CB-2 brief Researcher Open Question #3)
+// ──────────────────────────────────────────────────────────────────────────
+// `mintJWT` reads `env().COINBASE_API_KEY_NAME` + `COINBASE_API_PRIVATE_KEY`
+// on EVERY call (not cached at module load — `lib/env`'s own cache returns
+// the same env shape, but mintJWT performs a fresh read each invocation).
+// Implication for operational key rotation:
+//   * Mid-request rotation (env values change BETWEEN mintJWT execution
+//     and the response) → not possible to mid-flight switch; the single
+//     request uses the key that was active when mintJWT ran. That's fine
+//     for retry semantics — each retry is a fresh request and remints.
+//   * Inter-request rotation (operator updates Vercel env vars; new
+//     deploy injects the new values) → next request to lib/coinbase/*
+//     automatically picks up the new key via env(). **No process-restart
+//     needed.** Trace observability (CB-2.5) will show the same path/
+//     method/status pattern continuing across the rotation seam.
+// CB-2.5 build closes Researcher #3 with this inline note (code-review
+// resolution; no separate verification test required since the behavior
+// is purely a consequence of mintJWT's per-call env() read).
+// ──────────────────────────────────────────────────────────────────────────
+//
+// ──────────────────────────────────────────────────────────────────────────
 // EdDSA caveat — RESOLVED 2026-06-07 (works against brokerage)
 // ──────────────────────────────────────────────────────────────────────────
 // Historical context: Coinbase's brokerage-specific auth/CLI docs warned

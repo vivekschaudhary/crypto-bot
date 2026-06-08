@@ -208,3 +208,96 @@ describe("lib/coinbase/client — coinbase()", () => {
     });
   });
 });
+
+describe("lib/coinbase/client — trace integration (CB-2.5)", () => {
+  // Verify that request() and publicRequest() invoke emitRequestTrace
+  // for both success and failure paths. The trace.test.ts unit tests
+  // cover the emit shape; these tests cover the wiring from client.ts.
+
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  const lastTrace = (): Record<string, unknown> | undefined => {
+    // Find the most recent console.log call whose first arg parses as our
+    // trace JSON shape.
+    for (let i = logSpy.mock.calls.length - 1; i >= 0; i--) {
+      const arg = logSpy.mock.calls[i]?.[0];
+      if (typeof arg !== "string") continue;
+      try {
+        const parsed = JSON.parse(arg);
+        if (parsed?.event === "coinbase.request") return parsed;
+      } catch {
+        /* not our trace; skip */
+      }
+    }
+    return undefined;
+  };
+
+  describe("publicRequest success path", () => {
+    it("emits a trace with status, method, path, and durationMs > 0", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+
+      await coinbase().publicRequest("GET", "/api/v3/brokerage/market/products/BTC-USD");
+
+      const trace = lastTrace();
+      expect(trace).toBeDefined();
+      expect(trace?.method).toBe("GET");
+      expect(trace?.path).toBe("/api/v3/brokerage/market/products/BTC-USD");
+      expect(trace?.status).toBe(200);
+      expect(typeof trace?.duration_ms).toBe("number");
+      expect(trace?.duration_ms).toBeGreaterThanOrEqual(0);
+    });
+
+    it("includes rate_limit when Response provides the headers", async () => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "x-ratelimit-remaining": "42",
+            "x-ratelimit-limit": "100",
+          },
+        }),
+      );
+
+      await coinbase().publicRequest("GET", "/api/v3/brokerage/market/products/BTC-USD");
+
+      const trace = lastTrace();
+      expect(trace?.rate_limit).toEqual({ remaining: "42", limit: "100" });
+    });
+  });
+
+  describe("request (auth'd) failure paths", () => {
+    it("emits a trace with status from a 4xx CoinbaseClientError before re-throwing", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: "unauthenticated" }));
+
+      await expect(
+        coinbase().request("GET", "/api/v3/brokerage/accounts"),
+      ).rejects.toMatchObject({ status: 401 });
+
+      const trace = lastTrace();
+      expect(trace?.status).toBe(401);
+      expect(trace?.method).toBe("GET");
+      expect(trace?.path).toBe("/api/v3/brokerage/accounts");
+    });
+
+    it("emits a trace with status: 0 on transport-failure path", async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError("fetch failed: ECONNRESET"));
+
+      await expect(
+        coinbase().request("GET", "/api/v3/brokerage/accounts"),
+      ).rejects.toMatchObject({ code: "network" });
+
+      const trace = lastTrace();
+      expect(trace?.status).toBe(0);
+      expect(trace?.method).toBe("GET");
+    });
+  });
+});
