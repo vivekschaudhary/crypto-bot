@@ -34,12 +34,12 @@ measurement_window_days: 7
 check_in_cadence: weekly
 area_tags: [strategy, ui, validation, dependency-management, data-model]
 estimate:
-  duration_weeks: 2
+  duration_weeks: 3
   confidence: medium
   refined_by: brief-approval
   refined_at: 2026-06-08
   estimated_start: 2026-06-09
-  estimated_end: 2026-06-22
+  estimated_end: 2026-06-29
 ---
 
 # CB-3 — Strategy authoring + top-5 selection
@@ -84,34 +84,34 @@ If we ship a strategy-authoring form UI at `/dashboard/strategy` (Server Compone
 
 ### In scope
 
-- **Top-5 algorithm** at `lib/strategy/top5.ts`: ranks Coinbase products by 24h volume (per [PM DRI Decision #1 below](#decisions)); calls `lib/coinbase/getProducts()` + `lib/coinbase/getProduct(id)` from CB-2; emits a top-5 list of trading pairs (e.g., `["BTC-USD", "ETH-USD", "SOL-USD", "DOGE-USD", "ADA-USD"]`). NOT cached in DB at MVP (re-runs per dashboard render; CB-2's wrapper handles Coinbase-side caching). Top-5 algorithm is server-side only.
-- **Top-5 selection UI** at `/dashboard/strategy` Server Component: surfaces the algorithm's top-5 + lets the operator pick 1-5 of them to include in the strategy. Stores the selection as part of the strategy row.
+**Architectural pivot (PM DRI Decision #6 below):** CB-3 ships a **pluggable strategy core** designed for extraction to a shared npm package later — same pattern as `@vc1023/passkey-2fa`. Crypto-coinbase adapter is the only consumer in this bet; equity adapter slots in via a future bet when the operator's equity app is ready to consume.
+
+- **`lib/strategy-core/`** — portable; asset-class-agnostic; designed for extraction:
+  - `types.ts` — `Strategy`, `Asset` (`{assetClass, identifier}`), `AssetClass` (enum), `EntryRules`, `ExitRules` + Zod schemas
+  - `adapter.ts` — `AssetAdapter` interface: `getCandidateAssets()`, `rankByVolume(assets)`, `getAssetIdentifier(asset)`. Pure interface; no impl
+  - `validate.ts` — universal rule validation (RSI thresholds in [0, 100]; MA periods in {5, 10, 20, 50}; entry RSI < exit RSI; position size > 0; per-session caps > 0). Indicator math is asset-class-agnostic
+  - `supersession.ts` — pure-function versioning logic (DB-agnostic; caller wires); used by save action
+  - `top-n.ts` — generic top-N-by-volume ranking; takes an `AssetAdapter` + returns top-N assets
+  - `form-schema.ts` — Zod schema for form payload; consumes `Asset` types from `types.ts`
+- **`lib/strategy-coinbase/`** — crypto-coinbase adapter:
+  - `adapter.ts` — implements `AssetAdapter`: `getCandidateAssets()` calls `lib/coinbase/getProducts()`; `rankByVolume()` calls `lib/coinbase/getProduct(id)` for each; `getAssetIdentifier()` returns the Coinbase `product_id` (e.g., `"BTC-USD"`). The ONLY file in this story that imports from `lib/coinbase/`; `lib/strategy-core/` stays Coinbase-free.
 - **`strategies` DB schema** via a new migration (e.g., `0004-strategies.sql`):
   - Primary key: ULID (per [architecture.md § Identity strategy](../../foundation/architecture.md#identity-strategy))
-  - Columns: `id`, `name`, `selected_products` (text[]), `entry_rules` (jsonb — RSI threshold, MA period, MA reinforcement condition), `exit_rules` (jsonb — RSI threshold, min-profit threshold, sell-fraction), `position_size_usd` (numeric), `per_session_buy_count_cap` (int), `per_session_dollar_cap` (numeric), `created_at`, `created_by_user_id`, `superseded_by_strategy_id` (self-FK for versioning)
-  - Append-only at app layer (per [architecture.md § Append-only event log](../../foundation/architecture.md#identity-strategy)): no UPDATE paths; revisions create a new row with `superseded_by_strategy_id` set on the old row
-  - `bot_sessions.active_strategy_id` (FK to the latest revision; updated when the operator activates a new revision)
+  - Columns: `id`, `name`, `asset_class` (text — discriminator: `"crypto-coinbase" | "equity-broker" | ...`), `selected_assets` (jsonb — array of `{assetClass, identifier}`), `entry_rules` (jsonb), `exit_rules` (jsonb), `position_size_usd` (numeric), `per_session_buy_count_cap` (int), `per_session_dollar_cap` (numeric), `created_at`, `created_by_user_id`, `superseded_by_strategy_id` (self-FK for versioning)
+  - Append-only at app layer; supersession via the new row + FK pattern (per architecture.md)
+  - `bot_sessions.active_strategy_id` FK to latest revision
 - **Strategy authoring form** Client Component (`/dashboard/strategy/_form.tsx`):
-  - Name field (string; required)
-  - Selected products multi-select (1-5 from the top-5 list; required)
-  - Entry rules section (RSI threshold, MA period, optional MA reinforcement)
-  - Exit rules section (RSI threshold, min-profit %, sell-fraction)
-  - Position size (USD; per-buy amount)
-  - Per-session caps (max buys, max dollars deployed)
-  - Live preview / validation feedback (inline error messages, not blocking modals)
-- **Validation logic** at `lib/strategy/validate.ts`:
-  - Zod schema on the form-submitted payload
-  - Validation rules: RSI thresholds in [0, 100]; MA periods in {5, 10, 20, 50}; entry RSI < exit RSI; position size > 0; per-session caps > 0
-  - Rule-rejection messages mapped to UI inline-error display
+  - Takes an `adapter: AssetAdapter` prop — generic across asset classes
+  - Name field, asset multi-select (uses `adapter.getCandidateAssets()` for the dropdown options), entry rules, exit rules, position size, per-session caps, inline validation feedback
 - **Server action** at `/dashboard/strategy/_actions.ts`:
-  - `saveStrategy(formData)` — validates via Zod; inserts a new `strategies` row; if revising, sets `superseded_by_strategy_id` on the prior row; updates `bot_sessions.active_strategy_id`
-- **Structured-log emit** per submit: `{event: "strategy.save", success: boolean, validation_errors?: string[]}` to Vercel runtime logs (reuses CB-2.5's observability pattern)
+  - `saveStrategy(formData)` — generic; validates via `lib/strategy-core/validate`; inserts via `lib/strategy-core/supersession`; takes adapter param for any asset-class-specific transformation
+- **Structured-log emit** per submit: `{event: "strategy.save", success: boolean, asset_class: string, validation_errors?: string[]}` (reuses CB-2.5's pattern + adds `asset_class` discriminator)
 - **Test coverage:**
-  - Unit tests for `lib/strategy/top5.ts` (mocked CB-2 wrapper)
-  - Unit tests for `lib/strategy/validate.ts` (all rule branches)
+  - Unit tests for `lib/strategy-core/*` (asset-class-agnostic; both crypto-coinbase + a mock equity adapter to prove pluggability)
+  - Unit tests for `lib/strategy-coinbase/adapter.ts` (mocked CB-2 wrapper)
   - Unit tests for the server action (mocked DB)
-  - Integration tests against real Coinbase via the top-5 algorithm (operator-gated, like CB-2.3+)
-  - **Playwright e2e** for the authoring flow (CB-1.6 lesson load-bearing — see [forward-reference note added to this stub during CB-2.5](#))
+  - Integration tests against real Coinbase via the top-5 algorithm using the coinbase adapter (operator-gated)
+  - **Playwright e2e** for the authoring flow (CB-1.6 lesson load-bearing)
 
 ### Out of scope (deferred to other bets or follow-ups)
 
@@ -145,16 +145,17 @@ _n=1 single-operator product — Support pain mirrors the operator's own UX expe
 
 ## Stories (forecast — decomposed one at a time via `/create-story CB-3`)
 
-_3-4 stories likely. Not authoritative; the workflow estimate model fires the "Stories created" trigger as each story.md file lands._
+_5 stories likely (bumped from 3-4 by the pluggability pivot — see PM DRI Decision #6 below). Not authoritative; the workflow estimate model fires the "Stories created" trigger as each story.md file lands._
 
 Expected decomposition (forecast for planning only; not committed scope):
 
-- **CB-3.1 — Top-5 algorithm + first integration against CB-2** — `lib/strategy/top5.ts` ranks Coinbase products by 24h volume; calls `getProducts()` + `getProduct(id)` from CB-2; emits ordered list of 5 trading pairs. Integration test against real Coinbase confirms the top-5 set is stable + makes sense. Server-only — no UI yet.
-- **CB-3.2 — `strategies` DB schema + migration + Zod typings** — new migration creates the table; `lib/strategy/types.ts` exports the Zod schemas + inferred types. Wired through `lib/db/migrate.ts` (auto-applies on Vercel production deploys with `MIGRATE_DESTINATION=production`).
-- **CB-3.3 — Strategy authoring form UI + save action** — `/dashboard/strategy` Server Component + Client Component form + server action + validation logic + structured-log emit. **First Playwright e2e of CB-3** — operator authors a strategy → save → reload → strategy persists with all rules intact. CB-1.6 lesson applies in force.
-- **CB-3.4 — Strategy activation + bot_session wiring** — `bot_sessions.active_strategy_id` is set when the operator activates a saved strategy; transitions from "draft" to "active" persist. Maybe folded into CB-3.3 if scope is small enough; Engineer DRI Decision at /create-story time.
+- **CB-3.0 — `lib/strategy-core/` foundation (pluggability primitive)** — types + Zod schemas + `AssetAdapter` interface + universal validation + supersession + generic top-N ranking. NO Coinbase dependency at this layer; designed for extraction to `@vc1023/strategy-core` npm package when the equity app is ready to consume (per the [`@vc1023/passkey-2fa` precedent](https://www.npmjs.com/package/@vc1023/passkey-2fa)). Includes a mock equity adapter in tests to prove the abstraction holds.
+- **CB-3.1 — `lib/strategy-coinbase/` adapter + first integration against CB-2** — implements `AssetAdapter` for crypto-coinbase; ranks Coinbase products by 24h volume via the wrapped CB-2 calls. Integration test against real Coinbase confirms the top-5 set is stable. Server-only — no UI yet.
+- **CB-3.2 — `strategies` DB schema + migration** — new migration creates the table with `asset_class` discriminator + `selected_assets: jsonb`; reuses `lib/strategy-core/types.ts` Zod schemas (no duplicate type definitions). Wired through `lib/db/migrate.ts` (auto-applies on Vercel production deploys).
+- **CB-3.3 — Strategy authoring form UI + save action** — `/dashboard/strategy` Server Component + Client Component generic form (takes `adapter: AssetAdapter` prop) + server action + structured-log emit. **First Playwright e2e of CB-3** — operator authors a strategy → save → reload → strategy persists. CB-1.6 lesson applies in force. Form is asset-class-agnostic; CB-3 ships only the crypto-coinbase adapter wired into the route.
+- **CB-3.4 — Strategy activation + bot_session wiring** — `bot_sessions.active_strategy_id` is set when the operator activates a saved strategy. Maybe folded into CB-3.3 if scope is small enough; Engineer DRI Decision at /create-story time.
 
-Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this likely ships in 2-3 calendar days. Confidence holds at `medium` until first story merges (per workflow estimate model row "First build PR merged").
+Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this likely ships in 3-5 calendar days (bumped vs original forecast for the pluggability scope). Confidence holds at `medium` until first story merges.
 
 ## Scan summary
 
@@ -198,11 +199,20 @@ Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this 
   - **Alternatives considered (required):** require a CB-3 bet-architecture file (rejected — duplicates foundation arch's coverage); defer the call to first story (rejected — `architecture_required: false` is a brief-frontmatter field; setting it now is the honest call)
   - **Reversibility:** trivial — set to `true` later if CB-3 surfaces an architectural decision outside foundation scope
 
-- [2026-06-08] [PM] **`duration_weeks: 2` and `confidence: medium`** at brief-approval — held from stub's 2 wk; confidence advances `low` → `medium`
-  - **Rationale (required):** Workflow estimate model: brief-approval → small/medium/large → 1/2/4 weeks. CB-3 with scope = top-5 algorithm + DB schema + form UI + validation logic + activation wiring is **medium** — 4 stories at ~0.6 days/story per CB-2's actuals would be ~2.5 days, but CB-3 is the first UI re-engagement after 5 stories of pure library code so context loss + Playwright e2e work add buffer. Confidence advances from `low` (stub) to `medium` (brief-approval) per the model's confidence-after-trigger column.
+- [2026-06-08] [PM] **`duration_weeks: 3` and `confidence: medium`** at brief-approval — bumped from stub's 2 wk by the pluggability pivot (Decision #6 below); confidence advances `low` → `medium`
+  - **Rationale (required):** Workflow estimate model: brief-approval → small/medium/large → 1/2/4 weeks. CB-3 with the pluggability pivot is **medium-to-large** — 5 stories (was 4) at ~0.6-0.8 days/story per CB-2's actuals + the new `lib/strategy-core/` foundation story (CB-3.0) + careful API surface design at every story to preserve future-extraction shape. Bumped from 2 wk → 3 wk to honestly capture +3-5 days for the pluggability scope.
   - **Area (required, tag):** scheduling / estimation
-  - **Alternatives considered (required):** jump to 1 wk (rejected — CB-2's actual was 3 days for 5 stories, but CB-3's UI work is a different complexity class; holding 2 wk is honest); set confidence: high (rejected — model says brief-approval → medium; high is reserved for build-actuals trigger)
-  - **Reversibility:** trivial — next `/plan` after CB-3.1 ships will fire the "Stories created" trigger and recompute
+  - **Alternatives considered (required):** hold at 2 wk + absorb pluggability into existing story budget (rejected — would compress quality on a foundation story that downstream bets + the equity app both consume); jump to 4 wk (rejected — overstates; CB-2 velocity + the operator's clear scope vision suggest ~3 wk is honest); set confidence: high (rejected — pluggable abstraction has API surface risks that brief-approval can't predict; high is reserved for build-actuals)
+  - **Reversibility:** trivial — next `/plan` after CB-3.0 ships will fire the "Stories created" trigger and recompute
+
+- [2026-06-08] [PM] **Strategy authoring is pluggable from day-one (`lib/strategy-core/` + `AssetAdapter` interface); CB-3 ships only the crypto-coinbase adapter; extraction to npm package deferred until the equity app is ready to consume**
+  - **Rationale (required):** The operator is concurrently building a second app (equity trading) that needs the same strategy authoring UX (form structure + Zod validation + supersession versioning + universal RSI/MA validation). Per the operator's lived precedent with [`@vc1023/passkey-2fa`](https://www.npmjs.com/package/@vc1023/passkey-2fa) — passkey auth was first built in this crypto-app, then later extracted to a shared npm package when the equity app couldn't consume it. That extraction cost MORE than building pluggable from the start would have. CB-3 captures the lesson: design for extraction NOW (clean `AssetAdapter` interface; `lib/strategy-core/` Coinbase-free), ship only the crypto adapter, extract to npm later when the second consumer materializes. RSI/MA math + form schema + supersession logic are universal across asset classes; only the candidate-asset source + identifier shape differ. The abstraction is honest, not speculative.
+  - **Area (required, tag):** architecture / reuse / cross-app
+  - **Alternatives considered (required):** ship single-purpose crypto-only and extract later (rejected — the `@vc1023/passkey-2fa` precedent proves this is more expensive than pluggable-from-start; the operator has direct evidence); ship as a monorepo workspace with both apps under one repo (rejected — major restructuring; out of scope for CB-3; could land later); publish `@vc1023/strategy-core` from this repo NOW (rejected — npm publishing pipeline + versioning discipline + breaking-change management is overhead before the second consumer exists; defer until equity app actually consumes); make the form generic without the adapter layer (rejected — assets vary in identification shape and candidate-source provider; a single seam at the adapter is the right place to vary, NOT scattered through form internals)
+  - **Reversibility:** moderate — the API surface of `lib/strategy-core/` becomes load-bearing for two consumers (crypto + equity) once extracted. Breaking changes require coordinated rollout. Within this bet (only crypto consumer), reversibility is high.
+  - **Scope cost:** +1 story (CB-3.0); +3-5 days estimated; estimate bumped from 2 wk to 3 wk at brief-approval per Decision #5 above. Operator confirmed cost acceptance.
+  - **Extraction path (forward-looking):** when the equity app is ready to consume — (1) move `lib/strategy-core/` to a separate repo (or this repo's `packages/strategy-core/` workspace), (2) publish as `@vc1023/strategy-core`, (3) crypto-app find/replace `from "@/lib/strategy-core/..."` → `from "@vc1023/strategy-core"` (~30 min), (4) equity-app consumes directly. Half-day extraction job vs the multi-day re-architecting that single-purpose CB-3 would have required.
+  - **Lesson tag for future bets:** when a UI/data-model layer has plausible reuse value across multiple operator apps + the operator has direct evidence of "build-twice-then-extract" being expensive, **design for extraction at brief-approval time** even if the second consumer isn't ready yet. Costs +3-5 days; saves 1-2 weeks of re-architecting later.
 
 ### Risks
 
@@ -217,6 +227,12 @@ Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this 
   - **Impact (required):** medium (a strategy with overlap/contradiction would surface as unexpected bot behavior in CB-4 — not real-money loss in dry-run, but in `LIVE_MODE` could be real-money harm)
   - **Mitigation (required):** Zod schema + handwritten rule-validation tests cover EVERY documented rule branch; CB-3.3 + CB-3.4 ACs include "every validation rule has a unit test that triggers it" (every false-path is tested). CB-5's dashboard surfaces the strategy's rules verbatim so the operator can sanity-check what they authored before turning `LIVE_MODE=true`. Defense-in-depth via dry-run-first product principle.
   - **Area (required, tag):** validation / safety
+
+- [2026-06-08] [PM] **Pluggable abstraction has API surface that crypto-only would have skipped — if the equity app never ships, the `AssetAdapter` interface + `lib/strategy-core/` foundation is scope that didn't pay off**
+  - **Likelihood (required):** low (operator is actively building the equity app concurrent with this bet; the precedent of `@vc1023/passkey-2fa` extraction proves the operator's pattern of finishing what they start)
+  - **Impact (required):** medium (a wasted abstraction is +3-5 days of CB-3 scope; not catastrophic but real cost). Note: even crypto-only CB-3 would benefit from the cleaner `selected_assets: {assetClass, identifier}[]` shape vs the original `selected_products: string[]` — so some of the abstraction's value is captured even in the worst case.
+  - **Mitigation (required):** operator-accepted cost trade per Decision #6 above. Re-evaluation point: if the equity app stalls or pivots away from RSI/MA strategies before CB-3 ships, the pluggable scope can be collapsed to single-purpose with a 1-2 day refactor (the `AssetAdapter` indirection removed; types simplified). Earliest re-evaluation: before `/build CB-3.0` fires.
+  - **Area (required, tag):** architecture / scope-risk
 
 - [2026-06-08] [PM] **Top-5 churn surprise — operator authored a strategy when BTC/ETH/SOL/DOGE/ADA was top-5; next day's top-5 is different and operator doesn't notice**
   - **Likelihood (required):** low-to-medium (Researcher Open Question #1 explicitly tracks this; will be addressable empirically)

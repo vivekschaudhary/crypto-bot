@@ -127,6 +127,13 @@ Each time a date moves, write a line here naming the **triggering artifact** (sp
 | 2026-06-08 | CB-5 | estimated_end | 2026-08-09 (v7) | **2026-08-03** | duration_weeks unchanged at 3 (stub); start shifted -6 days, end shifts -6 days. |
 | 2026-06-08 | MVP | target_end | 2026-08-09 | **2026-08-03** | Cascade from CB-5's pull-in. **MVP compressed 6 days from v7's 08-09 — second MVP-target compression in the bet's history.** Critical path remains CB-2 → CB-3 → CB-4 → CB-5 (now ~8 weeks from CB-3 start 2026-06-09 to CB-5 end 2026-08-03). |
 | 2026-06-08 | CB-3 | brief status | `proposed` (stub) | **`approved`** | Operator HITL approval at `/create-brief CB-3` session 2026-06-08. Fires the "Brief promoted + approved" trigger row. Stub → full brief; awaiting Engineer DRI Decisions to refine estimate from stub-defaults further at first-story time. |
+| 2026-06-08 | CB-3 | duration_weeks (post-brief-approval mid-session amendment) | 2 | **3** | Operator chose pluggable strategy authoring architecture (per [CB-3 brief PM DRI Decision #6](../bets/CB-3/brief.md#decisions)). Adds `lib/strategy-core/` foundation story (CB-3.0) — pure interfaces + Zod schemas + `AssetAdapter`; designed for npm package extraction when equity app consumes (precedent: [`@vc1023/passkey-2fa`](https://www.npmjs.com/package/@vc1023/passkey-2fa)). +1 story; +3-5 days; estimate bumped 2 wk → 3 wk. |
+| 2026-06-08 | CB-3 | estimated_end (cascade from duration bump) | 2026-06-22 | **2026-06-29** | duration_weeks 2 → 3; start held at 2026-06-09; end shifts +7 days. |
+| 2026-06-08 | CB-4 | estimated_start (cascade from CB-3 +7) | 2026-06-23 | **2026-06-30** | CB-3 binding-dep ends +7 days later. |
+| 2026-06-08 | CB-4 | estimated_end (cascade from CB-3) | 2026-07-13 | **2026-07-20** | start shifted +7 days; end shifts +7 days. |
+| 2026-06-08 | CB-5 | estimated_start (cascade from CB-4) | 2026-07-14 | **2026-07-21** | Same +7 days cascade. |
+| 2026-06-08 | CB-5 | estimated_end (cascade from CB-4) | 2026-08-03 | **2026-08-10** | start shifted +7 days; end shifts +7 days. |
+| 2026-06-08 | MVP | target_end | 2026-08-03 | **2026-08-10** | Pluggable strategy authoring choice slips MVP target +7 days back to 08-10 — STILL ahead of v6/v7's 2026-08-09 baseline. Operator-accepted trade per CB-3 brief Decision #6 — pluggability saves multi-day extraction effort later when the equity app consumes the shared core. Net trade favorable assuming the equity app reaches that consumption point (per the `@vc1023/passkey-2fa` precedent which the operator has direct evidence of). |
 
 _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions 1–5._
 
