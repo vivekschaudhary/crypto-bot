@@ -20,14 +20,16 @@ Bets with `actual_start` populated and `actual_end` still empty.
 
 | Bet | Title | Phase | Actual start | Estimated end | Owner |
 |-----|-------|-------|--------------|---------------|-------|
-| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence (PLUGGABLE) | Brief `approved` 2026-06-08; same-session pivot to pluggable architecture per [CB-3 brief PM DRI Decision #6](../bets/CB-3/brief.md#decisions); 5 stories forecast (CB-3.0 strategy-core foundation → CB-3.1 coinbase adapter → CB-3.2 DB schema → CB-3.3 form UI + Playwright → CB-3.4 activation); `/create-story CB-3` for CB-3.0 is next workflow | — (story-creation pending; actual_start writes on CB-3.0 PR merge) | 2026-06-29 | PM → Engineer |
+
+_None — CB-2 ship 2026-06-08 cleared the only in-flight bet; CB-3 sits in "Next up" until its first build PR merges (which fires the "First build PR merged" trigger and writes `actual_start`). CB-4 + CB-5 remain Blocked._
 
 ## Next up (unblocked, not yet started)
 
+Bets whose dependencies are satisfied (or have none) but `actual_start` is empty. Includes both stub bets and brief-approved-and-story-ready bets that have not yet had a build PR merged.
+
 | Bet | Title | Estimated start | Estimated end | Estimated duration | Confidence | Promotion status |
 |-----|-------|-----------------|---------------|---------------------|------------|-------------------|
-
-_None — CB-3 was the next-up entry from v7; now Currently in flight via brief approval. CB-4 + CB-5 remain Blocked._
+| [CB-3](../bets/CB-3/brief.md) | Strategy authoring + persistence (**PLUGGABLE**) | 2026-06-09 | 2026-06-29 | 3 wk | medium | **brief approved + pluggable pivot 2026-06-08**; bet-architecture at [`docs/bets/CB-3/architecture.md`](../bets/CB-3/architecture.md); next workflow is `/create-story CB-3` for CB-3.0 (strategy-core foundation). 5 stories forecast: CB-3.0 → CB-3.1 coinbase adapter → CB-3.2 DB schema → CB-3.3 form UI + Playwright → CB-3.4 activation. |
 
 ## Blocked
 
@@ -135,12 +137,12 @@ _v1–v5 entries (2026-05-31 to 2026-06-01) preserved in git history at versions
 
 ## Risks to plan
 
-- **Per-story velocity 3-days/story model still NOT retuned in v7 despite CB-1's data point** — unchanged from v6's DRI Decision (see [Decisions](#decisions) below: "Per-story velocity model NOT retuned in v6"). Watch through CB-2 + CB-3 actuals before considering an adjustment. If CB-2 also ships at <1 day/story (which is what scope-chop + foundation maturity suggests), v8 may justify retuning the model's per-story default downward. Expected outcome: another ~3-7 days compression on MVP target.
-- **CB-3/CB-4/CB-5 stub estimates dominate the remaining cascade** — three bets at stub `low` confidence (2 wk + 3 wk + 3 wk = 8 wk total). Each brief-approval will potentially compress further. The highest-leverage next move (after CB-2.1 ships) becomes **`/create-brief CB-3`** to refine CB-3's stub.
-- **CB-4 (bot runtime) carries the single-bet extension risk** (unchanged from v1+) — most surface area; may bump to 4 weeks at brief promotion. The most likely individual-bet expansion in the remaining cascade.
-- ~~**CDP key provisioning is now an IMMEDIATE blocker for CB-2.1**~~ — **PARTIALLY RESOLVED 2026-06-06.** CB-2.1 shipped via [PR #26](https://github.com/vivekschaudhary/crypto-bot/pull/26) using a public endpoint for the integration test (`/api/v3/brokerage/market/products/BTC-USD` — no auth required), sidestepping the CDP credentials requirement entirely. The gated integration test now smoke-checks the wrapper end-to-end against real Coinbase without needing CDP keys provisioned. **Still required for CB-2.3 (auth'd reads) and CB-2.4 (auth'd writes / place order)** — those stories WILL need CDP credentials in `.env.local` for their integration tests. Tracked as still-open Issue below.
+- **Per-story velocity 3-days/story model STILL NOT retuned in v8 despite TWO bets of strong evidence** — both CB-1 (7 stories / 5 days = 0.7 days/story) and CB-2 (5 stories / 3 days = 0.6 days/story) have shipped at ~5× the modeled velocity. The model's 3-days/story default is now demonstrably wrong for this operator + this foundation maturity. Holding through CB-3 actuals before retuning to avoid n=1 → n=3 over-correction; if CB-3 also ships at <1 day/story, v9 will retune (likely to 1-day/story default). Expected outcome of the retune: another ~10-14 days compression across remaining cascade, pulling MVP target meaningfully forward.
+- **CB-4/CB-5 stub estimates dominate the remaining cascade** (was CB-3/4/5 in v7) — two bets at stub `low` confidence (3 wk + 3 wk = 6 wk). Each brief-approval will likely compress further per the CB-1 + CB-2 + (in-progress) CB-3 brief-approval pattern. Highest-leverage next move after CB-3 ships: **`/create-brief CB-4`** to refine CB-4's stub.
+- **CB-4 (bot runtime) carries the single-bet extension risk** (unchanged from v1+) — most surface area of the remaining bets; may bump to 4 weeks at brief promotion. The most likely individual-bet expansion in the remaining cascade. Mitigated partially by CB-4 inheriting CB-2's typed Coinbase wrapper (no API research) + CB-3's typed strategy contract (no schema design); core CB-4 work is signal evaluation + cron + `LIVE_MODE` gate.
+- **CB-3 pluggable-pivot scope cost (+7 days)** — operator-accepted at brief-approval 2026-06-08 per [CB-3 brief PM DRI Decision #6](../bets/CB-3/brief.md#decisions). Trade: +7 days MVP slip in exchange for `@vc1023/strategy-core` extraction-readiness when the equity app consumes (per `@vc1023/passkey-2fa` precedent). Mitigation if equity app stalls: collapse to single-purpose with 1-2 day refactor (re-evaluation gate before `/build CB-3.0`).
+- **CB-3 first UI re-engagement after 5 stories of pure library code** — context loss + Playwright e2e ramp-up at CB-3.3 form UI story. Mitigated by CB-1.6's onboarding-UX precedent + the forward-reference e2e expectation notes added to CB-3 stub during CB-2.5 (now amended into the full brief).
 - **All v6 forward-watch risks unchanged** — operator-cadence assumption (now genuinely sequential since portfolio has no remaining parallel pairs); post-MVP rails scheduling. (Live entries in [Risks](#risks) below.)
-- ~~**Migration 0003 (RLS) still not yet applied to production Supabase**~~ — **CLOSED 2026-06-06** during this same-day session: operator applied via `pnpm db:migrate` (after baseline-seeding the `_migrations` tracking table for 0001+0002 in Supabase SQL Editor). All four `auth_*` tables now show `rowsecurity = true`. (See [Issues](#issues) below — v6 issue marked closed.)
 
 ## DRI Log
 

@@ -98,8 +98,10 @@ When the equity app is ready, a parallel `lib/strategy-alpaca/` (or `lib/strateg
 
 ```sql
 -- 0004-strategies.sql (CB-3.2)
+-- ULIDs stored as text per foundation architecture.md § Identity strategy
+-- (Crockford base32; 26 chars; debuggable; matches external-tool expectations).
 CREATE TABLE strategies (
-  id                          ulid PRIMARY KEY,
+  id                          text PRIMARY KEY,
   name                        text NOT NULL,
   asset_class                 text NOT NULL,  -- discriminator: 'crypto-coinbase' | 'equity-broker' | ...
   selected_assets             jsonb NOT NULL, -- array of {assetClass, identifier}; validated app-layer
@@ -109,14 +111,16 @@ CREATE TABLE strategies (
   per_session_buy_count_cap   integer NOT NULL CHECK (per_session_buy_count_cap > 0),
   per_session_dollar_cap      numeric NOT NULL CHECK (per_session_dollar_cap > 0),
   created_at                  timestamptz NOT NULL DEFAULT now(),
-  created_by_user_id          ulid NOT NULL REFERENCES auth_users(id),
-  superseded_by_strategy_id   ulid REFERENCES strategies(id)
+  created_by_user_id          text NOT NULL REFERENCES auth_users(id),
+  superseded_by_strategy_id   text REFERENCES strategies(id)
 );
 
--- bot_sessions: append-only FK reference
+-- bot_sessions: append-only FK reference. ULID stored as text per foundation.
 ALTER TABLE bot_sessions
-  ADD COLUMN active_strategy_id ulid REFERENCES strategies(id);
+  ADD COLUMN active_strategy_id text REFERENCES strategies(id);
 ```
+
+**Note on ULID column type:** Per [foundation architecture § Identity strategy](../../foundation/architecture.md#identity-strategy), ULIDs are stored as Postgres `text` (NOT a hypothetical `ulid` column type). The 26-char Crockford base32 representation goes in plain `text` columns; FK constraints work the same way. The CB-3.2 migration MUST use `text` to stay consistent with prior migrations (e.g., `auth_users.id` is `text` for the same reason).
 
 **Append-only at app layer:**
 - No `UPDATE strategies` paths from app code.
