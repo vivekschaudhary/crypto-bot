@@ -123,7 +123,7 @@ CB-3.3 is **the first UI surface in CB-3** — 5 of 6 categories load-bearing (n
 - [ ] **Feedback** — `covered by AC 9 — error toast discriminates network/validation/server/unknown; inline per-field errors mapped from VALIDATION_ERROR_CODES; destructive supersession confirms via modal; success acknowledgment on /dashboard.`
 - [ ] **Accessibility** — `covered by AC 10 — focus on mount lands on Name field; focus on submit-error moves to first invalid field; tab order top-to-bottom; Enter key submits; SR labels on selector + rule inputs; aria-invalid + aria-describedby for inline errors.`
 - [ ] **Edge cases** — `covered by AC 11 — slow-network/timeout on top-5 fetch (10s) → form unavailable + retry; offline at save → toast + no DB write; concurrent supersession → last-write-wins (acceptable for single-operator MVP); top-5 churn between page load and save → no special handling (selected_assets persisted to strategy row).`
-- [ ] **Cross-surface consistency** — `n/a — single-target web only per compass/config.yaml canary_artifacts.kind: web. No mobile/native; the only multi-target dimension that applies in CB-3 is asset-class portability (covered by CB-3.0 invariant tests + CB-3.1 real adapter + AC 3's AssetAdapter-prop pattern), not UI surface multi-target.`
+- [ ] **Cross-surface consistency** — `n/a — single-target web only per compass/config.yaml canary_artifacts.kind: web. No mobile/native; the only multi-target dimension that applies in CB-3 is asset-class portability (covered by CB-3.0 invariant tests + CB-3.1 real adapter + AC 3's asset-class-primitives boundary pattern — see AC 3 PR #50 amendment), not UI surface multi-target.`
 
 ## Tech notes
 
