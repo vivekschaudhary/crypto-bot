@@ -331,6 +331,29 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
     return inlineErrors.get(path);
   }
 
+  // ───── Numeric input helpers (PR #52 post-merge UX fix) ──────────────
+  // HTML number inputs send an empty string when the operator clears the
+  // field. `Number("")` returns 0 — which made the field re-render showing
+  // "0" with no way to clear visually without typing a non-zero digit
+  // first. Operators hit this in production within minutes of CB-3.3
+  // shipping.
+  //
+  // Fix: use NaN as the "empty" sentinel. The displayed input value is
+  // empty when state is NaN; on user input the empty string maps to NaN
+  // rather than 0. Submit is disabled while any field is NaN (the form
+  // requires fully-specified numbers before save).
+
+  function numericDisplay(n: number): number | string {
+    return Number.isFinite(n) ? n : "";
+  }
+
+  function makeNumericChangeHandler(setter: (n: number) => void) {
+    return (e: React.ChangeEvent<HTMLInputElement>): void => {
+      const v = e.target.value;
+      setter(v === "" ? NaN : Number(v));
+    };
+  }
+
   // ───── Submit handling ────────────────────────────────────────────────
 
   function handleSubmit(e: FormEvent<HTMLFormElement>): void {
@@ -498,8 +521,24 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
   });
   const isFormInvalid = !liveValidation.ok;
   const hasActiveInlineErrors = inlineErrors.size > 0;
+  // PR #52 fix: NaN sentinel means "operator cleared the field." Zod's
+  // z.number() accepts NaN by default and rule-branch comparisons against
+  // NaN always evaluate false, so validateStrategyPayload would NOT flag a
+  // NaN field as invalid. Gate submit explicitly on Number.isFinite for
+  // every numeric input so the operator cannot submit a half-filled form.
+  const allNumericFieldsFilled =
+    Number.isFinite(entryRsi) &&
+    Number.isFinite(exitRsi) &&
+    Number.isFinite(minProfitPct) &&
+    Number.isFinite(sellFraction) &&
+    Number.isFinite(positionSizeUsd) &&
+    Number.isFinite(perSessionBuyCountCap) &&
+    Number.isFinite(perSessionDollarCap);
   const isSubmitDisabled =
-    submitInFlight || isFormInvalid || hasActiveInlineErrors;
+    submitInFlight ||
+    isFormInvalid ||
+    hasActiveInlineErrors ||
+    !allNumericFieldsFilled;
 
   const candidatesByIdentifier = new Map(
     candidates.map((c) => [c.identifier, c]),
@@ -635,8 +674,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             max={100}
-            value={entryRsi}
-            onChange={(e) => setEntryRsi(Number(e.target.value))}
+            value={numericDisplay(entryRsi)}
+            onChange={makeNumericChangeHandler(setEntryRsi)}
             aria-invalid={Boolean(getInlineError("entry_rules.rsiThreshold"))}
             aria-describedby={
               getInlineError("entry_rules.rsiThreshold")
@@ -725,8 +764,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             max={100}
-            value={exitRsi}
-            onChange={(e) => setExitRsi(Number(e.target.value))}
+            value={numericDisplay(exitRsi)}
+            onChange={makeNumericChangeHandler(setExitRsi)}
             aria-invalid={Boolean(getInlineError("exit_rules.rsiThreshold"))}
             aria-describedby={
               getInlineError("exit_rules.rsiThreshold")
@@ -751,8 +790,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             id="min-profit"
             type="number"
             step="0.1"
-            value={minProfitPct}
-            onChange={(e) => setMinProfitPct(Number(e.target.value))}
+            value={numericDisplay(minProfitPct)}
+            onChange={makeNumericChangeHandler(setMinProfitPct)}
             style={inputStyle}
           />
           <p style={helperStyle}>
@@ -768,8 +807,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             min={0}
             max={1}
             step="0.05"
-            value={sellFraction}
-            onChange={(e) => setSellFraction(Number(e.target.value))}
+            value={numericDisplay(sellFraction)}
+            onChange={makeNumericChangeHandler(setSellFraction)}
             style={inputStyle}
           />
           <p style={helperStyle}>
@@ -791,8 +830,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             step="1"
-            value={positionSizeUsd}
-            onChange={(e) => setPositionSizeUsd(Number(e.target.value))}
+            value={numericDisplay(positionSizeUsd)}
+            onChange={makeNumericChangeHandler(setPositionSizeUsd)}
             aria-invalid={Boolean(getInlineError("position_size_usd"))}
             aria-describedby={
               getInlineError("position_size_usd")
@@ -817,8 +856,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={1}
             step="1"
-            value={perSessionBuyCountCap}
-            onChange={(e) => setPerSessionBuyCountCap(Number(e.target.value))}
+            value={numericDisplay(perSessionBuyCountCap)}
+            onChange={makeNumericChangeHandler(setPerSessionBuyCountCap)}
             aria-invalid={Boolean(
               getInlineError("per_session_buy_count_cap"),
             )}
@@ -847,8 +886,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             step="1"
-            value={perSessionDollarCap}
-            onChange={(e) => setPerSessionDollarCap(Number(e.target.value))}
+            value={numericDisplay(perSessionDollarCap)}
+            onChange={makeNumericChangeHandler(setPerSessionDollarCap)}
             aria-invalid={Boolean(getInlineError("per_session_dollar_cap"))}
             aria-describedby={
               getInlineError("per_session_dollar_cap")
