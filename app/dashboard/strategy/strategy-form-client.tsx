@@ -28,7 +28,6 @@ import type {
   ExitRules,
   MaPeriod,
 } from "@/lib/strategy-core/types";
-import type { AssetAdapter } from "@/lib/strategy-core/adapter";
 import {
   saveStrategy,
   type SaveStrategyResult,
@@ -59,8 +58,25 @@ interface InitialPayload {
   supersedes_strategy_id: string | null;
 }
 
+/**
+ * Production hardening (PR #49 post-merge fix): the adapter cannot be
+ * passed across the RSC boundary because AssetAdapter has regular
+ * function methods (not Server Actions) and React Server Components can
+ * only serialize Server Actions across the boundary — regular functions
+ * become broken `E{digest:...}` references that crash the page render in
+ * production. The form was only using `adapter.assetClass` inside a
+ * hidden span (a placeholder to satisfy the AC 3 generic-over-adapter
+ * contract); replaced with the primitive `assetClass: AssetClass`. The
+ * AC 3 contract is preserved at the architectural level: the form
+ * receives asset-class-agnostic data (assetClass discriminator +
+ * candidates list + selected_assets); the Server Component
+ * (`page.tsx`) is responsible for materializing those primitives via
+ * the adapter. This is the cleaner shape — Client Components shouldn't
+ * have direct access to adapters since they run in the browser where
+ * Coinbase credentials aren't available.
+ */
 export interface StrategyFormClientProps {
-  adapter: AssetAdapter;
+  assetClass: AssetClass;
   initialPayload: InitialPayload;
   candidates: Asset[];
   topFiveAsOf: Date;
@@ -216,7 +232,7 @@ const modalStyle: React.CSSProperties = {
 // ──────────────────────────────────────────────────────────────────────────
 
 export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element {
-  const { adapter, initialPayload, candidates, topFiveAsOf, isRevise } = props;
+  const { assetClass, initialPayload, candidates, topFiveAsOf, isRevise } = props;
 
   const [name, setName] = useState(initialPayload.name);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>(
@@ -922,7 +938,7 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
 
       {/* Suppress unused-prop warning while keeping the contract */}
       <span style={{ display: "none" }} aria-hidden="true">
-        {adapter.assetClass}
+        {assetClass}
         {candidatesByIdentifier.size}
       </span>
     </main>
