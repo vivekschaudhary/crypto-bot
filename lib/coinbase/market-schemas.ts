@@ -80,6 +80,15 @@ export const ProductSchema = z
     post_only: z.boolean().optional(),
     auction_mode: z.boolean().optional(),
     product_type: z.string().optional(),
+    // Coinbase's pre-computed approximate DOLLAR volume (base × price for
+    // the trailing 24h). Returned as a string per Coinbase convention.
+    // load-bearing for CB-3.1's top-N ranking: `volume_24h` alone is base-
+    // currency token count, which biases ranking toward cheap-token meme
+    // coins (PEPE-USD has ~10^11 tokens traded but ~$80M USD; BTC-USD has
+    // ~10^4 tokens traded but ~$685M USD). Empirically discovered during
+    // CB-3.1 `/build` 2026-06-08 — see CB-3 architecture Decision #3
+    // amendment in the build commit.
+    approximate_quote_24h_volume: z.string().optional(),
   })
   .passthrough();
 
