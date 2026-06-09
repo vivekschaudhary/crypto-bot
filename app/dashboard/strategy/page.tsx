@@ -232,7 +232,7 @@ export default async function StrategyPage(): Promise<JSX.Element> {
         </div>
       )}
       <StrategyFormClient
-        adapter={adapter}
+        assetClass={COINBASE_ASSET_CLASS}
         initialPayload={initialPayload}
         candidates={topFive}
         topFiveAsOf={topFiveAsOf}
