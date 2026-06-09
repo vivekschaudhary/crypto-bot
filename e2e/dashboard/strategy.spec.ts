@@ -207,6 +207,9 @@ test("CB-3.3 AC 13 Spec 1 — happy path: author strategy, persist, revisit show
       .click();
     await expect(page).toHaveURL(/\/dashboard\/strategy$/);
 
+    // Browser title (per copy.md § Page-level) discriminates create mode.
+    await expect(page).toHaveTitle("Create your strategy · DCA bot");
+
     // H1 is "Create your strategy" for first-time authoring.
     await expect(
       page.getByRole("heading", { name: "Create your strategy" }),
@@ -249,6 +252,8 @@ test("CB-3.3 AC 13 Spec 1 — happy path: author strategy, persist, revisit show
 
     // Revisit /dashboard/strategy — should now be in revise mode.
     await page.goto("/dashboard/strategy");
+    // Browser title (per copy.md § Page-level) flips to revise mode.
+    await expect(page).toHaveTitle("Revise your strategy · DCA bot");
     await expect(
       page.getByRole("heading", { name: "Revise your strategy" }),
     ).toBeVisible();

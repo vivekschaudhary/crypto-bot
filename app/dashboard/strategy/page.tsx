@@ -20,6 +20,7 @@
 // initial active-strategy fetch context (the actual created_by_user_id is
 // assigned server-side in saveStrategy from the same header).
 
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { JSX } from "react";
@@ -31,6 +32,34 @@ import { topN } from "@/lib/strategy-core/top-n";
 import type { Asset, Strategy } from "@/lib/strategy-core/types";
 
 import { StrategyFormClient } from "./strategy-form-client";
+
+/**
+ * Per copy.md § Page-level — the browser title discriminates create vs
+ * revise mode. Both strings are verbatim from copy.md (AC 14).
+ *
+ * Round-2 closure (Codex PR #49): metadata implementation was missing in
+ * round-0 + round-1. generateMetadata fetches active strategy to drive
+ * the same isRevise discriminator the page uses. The duplicate Postgres
+ * call is acceptable cost for single-operator MVP (the query is a single
+ * indexed row read); React's `cache()` could dedupe later if perf surfaces
+ * as a concern.
+ *
+ * Failure-tolerance: any DB error here falls back to create-mode title so
+ * metadata can never block page render.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  let isRevise = false;
+  try {
+    isRevise = (await getActiveStrategy()) !== null;
+  } catch {
+    isRevise = false;
+  }
+  return {
+    title: isRevise
+      ? "Revise your strategy · DCA bot"
+      : "Create your strategy · DCA bot",
+  };
+}
 
 const TOP_FIVE_FETCH_TIMEOUT_MS = 10_000;
 const COINBASE_ASSET_CLASS = "crypto-coinbase";
