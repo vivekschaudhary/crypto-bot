@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS bot_sessions (
     started_at timestamptz NOT NULL DEFAULT now(),
     ended_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    -- FK to currently-active strategy revision. Nullable: a session can
+    -- exist before any strategy is activated. Added by migration
+    -- 0004-strategies.sql (CB-3.2). REFERENCES strategies(id) below.
+    active_strategy_id text
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -122,6 +126,47 @@ CREATE TABLE IF NOT EXISTS auth_recovery_codes (
     used_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ─── Strategies (CB-3.2) ──────────────────────────────────────────────
+-- Placed AFTER auth_users so the FK to created_by_user_id resolves on
+-- a fresh schema apply. The table IS a product entity per architecture;
+-- placement here is a structural concession to FK declaration order, not
+-- a semantic re-classification.
+--
+-- Top-level columns snake_case; inner jsonb (selected_assets, entry_rules,
+-- exit_rules) carries camelCase keys per lib/strategy-core/types.ts
+-- convention split. Append-only at app layer via
+-- lib/strategy-core/supersession.ts (DB-level enforcement deferred per
+-- CB-3.2 Engineer DRI Decision #4).
+CREATE TABLE IF NOT EXISTS strategies (
+    id                          text PRIMARY KEY,
+    name                        text NOT NULL,
+    asset_class                 text NOT NULL,
+    selected_assets             jsonb NOT NULL,
+    entry_rules                 jsonb NOT NULL,
+    exit_rules                  jsonb NOT NULL,
+    position_size_usd           numeric NOT NULL CHECK (position_size_usd > 0),
+    per_session_buy_count_cap   integer NOT NULL CHECK (per_session_buy_count_cap > 0),
+    per_session_dollar_cap      numeric NOT NULL CHECK (per_session_dollar_cap > 0),
+    created_at                  timestamptz NOT NULL DEFAULT now(),
+    created_by_user_id          text NOT NULL REFERENCES auth_users(id),
+    superseded_by_strategy_id   text REFERENCES strategies(id)
+);
+
+-- bot_sessions.active_strategy_id FK constraint. The column is declared
+-- in the bot_sessions CREATE TABLE block above; the FK constraint is
+-- declared here so strategies(id) exists at constraint-creation time.
+-- Idempotent via DO block (Postgres has no `ADD CONSTRAINT IF NOT EXISTS`).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'bot_sessions_active_strategy_id_fkey'
+  ) THEN
+    ALTER TABLE bot_sessions
+      ADD CONSTRAINT bot_sessions_active_strategy_id_fkey
+      FOREIGN KEY (active_strategy_id) REFERENCES strategies(id);
+  END IF;
+END $$;
 
 -- ─── Indices ──────────────────────────────────────────────────────────
 
