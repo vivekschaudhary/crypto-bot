@@ -151,12 +151,14 @@ When the equity app is ready to consume:
 
 `/dashboard/strategy/` route:
 
-- `page.tsx` (Server Component) — fetches the adapter from a static module-load registry (e.g., `getAdapter(env.ASSET_CLASS)`), wraps `_form.tsx`
-- `_form.tsx` (Client Component) — takes `adapter: AssetAdapter` as a prop; renders the asset multi-select + rule sections. Asset-class-agnostic.
-- `_selector.tsx` (Client Component) — wraps the multi-select dropdown; calls `adapter.getCandidateAssets()` via a server action; renders options.
-- `_actions.ts` — server actions: `saveStrategy(formData, adapterKey)`. Validates via `lib/strategy-core/validate`; inserts via supersession; updates `bot_sessions.active_strategy_id`.
+- `page.tsx` (Server Component) — invokes the concrete adapter (`makeCoinbaseAdapter()`); resolves the top-5 + active-strategy data SERVER-SIDE; passes only PRIMITIVES (`assetClass: AssetClass`, `candidates: Asset[]`, `initialPayload: StrategyFormPayload`, `topFiveAsOf: Date`, `isRevise: boolean`) to the Client Component
+- `strategy-form-client.tsx` (Client Component; was `_form.tsx` in original sketch) — takes asset-class primitives as props (NOT the adapter object itself); renders the asset multi-select + rule sections. Asset-class-agnostic at the data-shape level.
+- Asset selector — inline within the form Client Component; consumes the resolved `candidates: Asset[]` prop. Does NOT call adapter methods directly (the server-rendered initial state is sufficient).
+- `strategy-actions.ts` (was `_actions.ts`) — server actions: `saveStrategy(formData)`. Validates via `lib/strategy-core/validate`; inserts via supersession; updates `bot_sessions.active_strategy_id`.
 
-The form is generic; the asset selector is generic; the save action is generic. Only the adapter choice is asset-class-specific, and that choice happens at module-boundary (env-var-driven for now; could become a tab-switch UI later).
+The form is generic over asset-class data; the save action is generic. Only the adapter choice is asset-class-specific, and that choice happens at the Server Component (`page.tsx`) boundary — env-var-driven for now; could become a tab-switch UI later.
+
+**Decision #6 amended 2026-06-09 during PR #50** (post-merge defect fix on CB-3.3): the originally approved sketch named `_form.tsx` taking `adapter: AssetAdapter` as a prop + `_selector.tsx` calling `adapter.getCandidateAssets()` via a server action. Production deploy of CB-3.3 (PR #49 merged 2026-06-08) revealed that React Server Components cannot serialize regular function methods across the RSC boundary — only Server Actions can cross. Passing the adapter object to a Client Component caused three broken `E{digest:...}` reference errors at runtime (one per AssetAdapter method), crashing every GET /dashboard/strategy with a 500. The fix moves all adapter invocation to the Server Component layer + passes resolved primitives across the RSC boundary. **Architectural intent preserved**: the form is still generic over asset-class portability (the data shape is asset-class-agnostic); the adapter is still the seam where asset-class-specific logic lives (CB-3.1's `makeCoinbaseAdapter` / future `lib/strategy-alpaca/` / etc.). Future asset-class-specific UI behavior that needs runtime adapter calls in the browser must be exposed as discrete Server Actions, not passed as adapter prop members. **Lesson encoded for future Server/Client Component prop design**: RSC props must be JSON-serializable OR Server Actions; never pass structural types with function members across the RSC boundary. Local `pnpm dev` + `pnpm build` are too lenient to catch this — only Vercel runtime surfaces it. Worth a Compass-original anti-pattern name in a future `/retro` (`[rsc-prop-serialization]`).
 
 ### 7. Observability shape
 
