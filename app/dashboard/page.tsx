@@ -7,6 +7,10 @@
 // page is read-only — it does not mutate state, so re-verification at the
 // handler layer is not required for this surface specifically. The Sign Out
 // button POSTs to /api/auth/sign-out which DOES re-verify (per CB-1.5).
+//
+// CB-3.3 amendment: render a success banner when ?strategy=saved is present
+// (the strategy authoring save action redirects here) + a link to
+// /dashboard/strategy so the operator has an entry point.
 
 import { headers } from "next/headers";
 import type { JSX } from "react";
@@ -52,9 +56,33 @@ const deviceStyle: React.CSSProperties = {
   fontSize: "0.875rem",
 };
 
+const successBannerStyle: React.CSSProperties = {
+  background: "#e8f5e9",
+  border: "1px solid #4caf50",
+  color: "#1b5e20",
+  padding: "0.75rem 1rem",
+  borderRadius: 4,
+  marginBottom: "1.25rem",
+  fontSize: "0.9375rem",
+};
+
+const linkStyle: React.CSSProperties = {
+  color: "#446",
+  textDecoration: "underline",
+};
+
 type CredRow = { device_label: string | null };
 
-export default async function DashboardPage(): Promise<JSX.Element> {
+interface DashboardPageProps {
+  searchParams?: Promise<{ strategy?: string }>;
+}
+
+export default async function DashboardPage(
+  { searchParams }: DashboardPageProps = {},
+): Promise<JSX.Element> {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const showStrategySavedBanner = resolvedSearchParams.strategy === "saved";
+
   const h = await headers();
   // Convenience read — proxy.ts forwards the verified session ids via the
   // cloned-request-headers mechanism (CB-1.4 AC 1). NOT trusted as an auth
@@ -87,7 +115,17 @@ export default async function DashboardPage(): Promise<JSX.Element> {
         <div style={titleStyle}>crypto-bot</div>
         <SignOutClient />
       </div>
+      {showStrategySavedBanner && (
+        <div role="status" style={successBannerStyle}>
+          Strategy saved. Bot will pick it up on the next tick.
+        </div>
+      )}
       <p style={bodyStyle}>Signed in.</p>
+      <p style={{ marginBottom: "1.25rem" }}>
+        <a href="/dashboard/strategy" style={linkStyle}>
+          Create or revise your DCA strategy
+        </a>
+      </p>
       <p style={placeholderStyle}>
         Bot controls and decision trace will arrive in the next bet (CB-2).
       </p>
