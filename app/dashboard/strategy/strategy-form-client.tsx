@@ -498,8 +498,24 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
   });
   const isFormInvalid = !liveValidation.ok;
   const hasActiveInlineErrors = inlineErrors.size > 0;
+  // PR #52: NaN sentinel means "operator cleared the field." The
+  // allNumericFieldsFilled pure function (exported below) is the
+  // testable derivation that gates submit on every numeric field being
+  // finite.
+  const numericFieldsFilled = allNumericFieldsFilled({
+    entryRsi,
+    exitRsi,
+    minProfitPct,
+    sellFraction,
+    positionSizeUsd,
+    perSessionBuyCountCap,
+    perSessionDollarCap,
+  });
   const isSubmitDisabled =
-    submitInFlight || isFormInvalid || hasActiveInlineErrors;
+    submitInFlight ||
+    isFormInvalid ||
+    hasActiveInlineErrors ||
+    !numericFieldsFilled;
 
   const candidatesByIdentifier = new Map(
     candidates.map((c) => [c.identifier, c]),
@@ -635,8 +651,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             max={100}
-            value={entryRsi}
-            onChange={(e) => setEntryRsi(Number(e.target.value))}
+            value={numericDisplay(entryRsi)}
+            onChange={makeNumericChangeHandler(setEntryRsi)}
             aria-invalid={Boolean(getInlineError("entry_rules.rsiThreshold"))}
             aria-describedby={
               getInlineError("entry_rules.rsiThreshold")
@@ -725,8 +741,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             max={100}
-            value={exitRsi}
-            onChange={(e) => setExitRsi(Number(e.target.value))}
+            value={numericDisplay(exitRsi)}
+            onChange={makeNumericChangeHandler(setExitRsi)}
             aria-invalid={Boolean(getInlineError("exit_rules.rsiThreshold"))}
             aria-describedby={
               getInlineError("exit_rules.rsiThreshold")
@@ -751,8 +767,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             id="min-profit"
             type="number"
             step="0.1"
-            value={minProfitPct}
-            onChange={(e) => setMinProfitPct(Number(e.target.value))}
+            value={numericDisplay(minProfitPct)}
+            onChange={makeNumericChangeHandler(setMinProfitPct)}
             style={inputStyle}
           />
           <p style={helperStyle}>
@@ -768,8 +784,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             min={0}
             max={1}
             step="0.05"
-            value={sellFraction}
-            onChange={(e) => setSellFraction(Number(e.target.value))}
+            value={numericDisplay(sellFraction)}
+            onChange={makeNumericChangeHandler(setSellFraction)}
             style={inputStyle}
           />
           <p style={helperStyle}>
@@ -791,8 +807,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             step="1"
-            value={positionSizeUsd}
-            onChange={(e) => setPositionSizeUsd(Number(e.target.value))}
+            value={numericDisplay(positionSizeUsd)}
+            onChange={makeNumericChangeHandler(setPositionSizeUsd)}
             aria-invalid={Boolean(getInlineError("position_size_usd"))}
             aria-describedby={
               getInlineError("position_size_usd")
@@ -817,8 +833,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={1}
             step="1"
-            value={perSessionBuyCountCap}
-            onChange={(e) => setPerSessionBuyCountCap(Number(e.target.value))}
+            value={numericDisplay(perSessionBuyCountCap)}
+            onChange={makeNumericChangeHandler(setPerSessionBuyCountCap)}
             aria-invalid={Boolean(
               getInlineError("per_session_buy_count_cap"),
             )}
@@ -847,8 +863,8 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
             type="number"
             min={0}
             step="1"
-            value={perSessionDollarCap}
-            onChange={(e) => setPerSessionDollarCap(Number(e.target.value))}
+            value={numericDisplay(perSessionDollarCap)}
+            onChange={makeNumericChangeHandler(setPerSessionDollarCap)}
             aria-invalid={Boolean(getInlineError("per_session_dollar_cap"))}
             aria-describedby={
               getInlineError("per_session_dollar_cap")
@@ -948,6 +964,66 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
 // ──────────────────────────────────────────────────────────────────────────
 // Helpers (exported for tests; pure logic, no React)
 // ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Numeric input display helper (PR #52 post-merge UX fix).
+ *
+ * HTML number inputs render `value={NaN}` and `value={0}` very differently
+ * — `0` displays the digit "0"; `NaN` displays empty. We use `NaN` as the
+ * "operator cleared the field" sentinel: this helper maps NaN → "" (empty
+ * string) so the input renders empty when state is non-finite, and returns
+ * the number unchanged otherwise.
+ *
+ * Pre-PR-#52 the field used `value={n}` directly; clearing the input sent
+ * `e.target.value === ""` which `Number("")` mapped to `0`, re-rendering
+ * the field with "0" stuck. Operators couldn't visually clear without
+ * typing a non-zero digit first.
+ */
+export function numericDisplay(n: number): number | string {
+  return Number.isFinite(n) ? n : "";
+}
+
+/**
+ * Numeric input onChange handler factory (PR #52). Maps the empty-string
+ * HTML input event to `NaN` rather than `0`, so the field state correctly
+ * represents "operator cleared this." Anything else is parsed via
+ * `Number(...)`.
+ */
+export function makeNumericChangeHandler(
+  setter: (n: number) => void,
+): (e: React.ChangeEvent<HTMLInputElement>) => void {
+  return (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const v = e.target.value;
+    setter(v === "" ? NaN : Number(v));
+  };
+}
+
+/**
+ * All 7 form numeric fields filled? (PR #52). Submit is gated on this
+ * predicate so a NaN-cleared field cannot reach the server action. Zod's
+ * `z.number()` accepts NaN by default and rule-branch comparisons against
+ * NaN always evaluate false, so `validateStrategyPayload` alone would NOT
+ * reject a half-filled form.
+ */
+export function allNumericFieldsFilled(values: {
+  entryRsi: number;
+  exitRsi: number;
+  minProfitPct: number;
+  sellFraction: number;
+  positionSizeUsd: number;
+  perSessionBuyCountCap: number;
+  perSessionDollarCap: number;
+}): boolean {
+  return (
+    Number.isFinite(values.entryRsi) &&
+    Number.isFinite(values.exitRsi) &&
+    Number.isFinite(values.minProfitPct) &&
+    Number.isFinite(values.sellFraction) &&
+    Number.isFinite(values.positionSizeUsd) &&
+    Number.isFinite(values.perSessionBuyCountCap) &&
+    Number.isFinite(values.perSessionDollarCap)
+  );
+}
 
 /**
  * Compare two form payloads for dirty-state detection (AC 7 unsaved-changes
