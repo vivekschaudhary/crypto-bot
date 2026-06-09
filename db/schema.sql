@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS bot_sessions (
     started_at timestamptz NOT NULL DEFAULT now(),
     ended_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    -- FK to currently-active strategy revision. Nullable: a session can
+    -- exist before any strategy is activated. Added by migration
+    -- 0004-strategies.sql (CB-3.2). REFERENCES strategies(id) below.
+    active_strategy_id text
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -86,6 +90,31 @@ CREATE TABLE IF NOT EXISTS account_snapshots (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Strategies — product entity (CB-3.2). Top-level columns snake_case;
+-- inner jsonb (selected_assets, entry_rules, exit_rules) carries
+-- camelCase keys per lib/strategy-core/types.ts convention split.
+-- Append-only at app layer via lib/strategy-core/supersession.ts
+-- (DB-level enforcement deferred per CB-3.2 Engineer DRI Decision #4).
+--
+-- The FK on created_by_user_id → auth_users(id) is declared as a separate
+-- ALTER TABLE further down the file (Cross-section FK constraints section),
+-- so this product-entities-first ordering is preserved on a fresh schema
+-- apply (auth_users doesn't exist yet at this point in the file).
+CREATE TABLE IF NOT EXISTS strategies (
+    id                          text PRIMARY KEY,
+    name                        text NOT NULL,
+    asset_class                 text NOT NULL,
+    selected_assets             jsonb NOT NULL,
+    entry_rules                 jsonb NOT NULL,
+    exit_rules                  jsonb NOT NULL,
+    position_size_usd           numeric NOT NULL CHECK (position_size_usd > 0),
+    per_session_buy_count_cap   integer NOT NULL CHECK (per_session_buy_count_cap > 0),
+    per_session_dollar_cap      numeric NOT NULL CHECK (per_session_dollar_cap > 0),
+    created_at                  timestamptz NOT NULL DEFAULT now(),
+    created_by_user_id          text NOT NULL,
+    superseded_by_strategy_id   text REFERENCES strategies(id)
+);
+
 -- ─── Infrastructure (auth) tables ─────────────────────────────────────
 -- Implement the Foundational Identity & Access Posture. Not product entities.
 
@@ -122,6 +151,41 @@ CREATE TABLE IF NOT EXISTS auth_recovery_codes (
     used_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ─── Cross-section FK constraints ────────────────────────────────────
+-- FKs that cross the product / auth section boundary. Declared here so
+-- the canonical reference preserves the existing product-then-auth section
+-- ordering while still resolving forward references on a fresh schema
+-- apply. Both ALTERs are idempotent via DO blocks (Postgres has no
+-- `ADD CONSTRAINT IF NOT EXISTS`).
+
+-- strategies.created_by_user_id → auth_users(id) — declared after both
+-- tables exist (CB-3.2).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'strategies_created_by_user_id_fkey'
+  ) THEN
+    ALTER TABLE strategies
+      ADD CONSTRAINT strategies_created_by_user_id_fkey
+      FOREIGN KEY (created_by_user_id) REFERENCES auth_users(id);
+  END IF;
+END $$;
+
+-- bot_sessions.active_strategy_id → strategies(id) — the column was added
+-- to the existing bot_sessions block above without an inline FK; the
+-- constraint lands here so strategies(id) exists at constraint-creation
+-- time (CB-3.2).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'bot_sessions_active_strategy_id_fkey'
+  ) THEN
+    ALTER TABLE bot_sessions
+      ADD CONSTRAINT bot_sessions_active_strategy_id_fkey
+      FOREIGN KEY (active_strategy_id) REFERENCES strategies(id);
+  END IF;
+END $$;
 
 -- ─── Indices ──────────────────────────────────────────────────────────
 

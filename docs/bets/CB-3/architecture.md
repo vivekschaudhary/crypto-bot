@@ -187,7 +187,7 @@ Same retention caveat as CB-2.5: Vercel Pro 1-day; aspirational 30-day requires 
 
 - [2026-06-08] [Architect] **Determine bot_sessions migration ownership** — does CB-3.2 ship the `bot_sessions` table or just the FK column?
   - **Severity (required, mandatory):** P3 (resolvable at `/create-story CB-3.2` time)
-  - **Owner (required, mandatory):** Engineer at CB-3.2 build time
-  - **Status:** open
+  - **Owner (required, mandatory):** Engineer at CB-3.2 build time → **resolved at PM `/create-story CB-3.2` time 2026-06-08** (earlier than expected; PM verified migration history)
+  - **Status:** **CLOSED 2026-06-08**
   - **Area (required, tag):** data-model / migration-ownership
-  - **Resolution (filled when closed):** [to be filled at CB-3.2 story creation — check whether `bot_sessions` table exists in any prior migration; if not, CB-3.2 ships both tables; if so, CB-3.2 only adds the FK column]
+  - **Resolution:** **FK column ONLY** — `bot_sessions` table already exists in [`db/migrations/0001-init.sql:23-30`](../../../db/migrations/0001-init.sql) (created at v1 foundation scaffold per architecture intent). CB-3.2 ships ONLY `ALTER TABLE bot_sessions ADD COLUMN active_strategy_id text REFERENCES strategies(id)` — NOT a second creation. Codified in [CB-3.2 story.md AC 2](stories/CB-3.2/story.md) + [PM DRI Decision in story DRI Log](stories/CB-3.2/story.md). Closed at story drafting time, not at build time, because the resolution check (`grep bot_sessions db/migrations/*.sql`) is mechanical and the answer is unambiguous.
