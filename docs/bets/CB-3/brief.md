@@ -29,7 +29,7 @@ guardrails:
   - name: Single active strategy per bot session (MVP simplicity)
     threshold: UNIQUE constraint on `(session_id)` for active strategy reference; enforced at DB layer
   - name: Top-5 ranking based on Coinbase's global 24h volume (NOT operator's personal trading volume)
-    threshold: ranking algorithm calls `lib/coinbase/getProducts()` + `getProduct(id)` only; no `lib/coinbase/getAccountTradeHistory()` reads; CI test asserts no auth'd-account reads in the top-5 path
+    threshold: ranking algorithm calls `lib/coinbase/getProducts()` only (the response already attaches `volume_24h` to each product per CB-2.2's schema; no per-asset `getProduct(id)` loop needed — see architecture Decision #3 amendment 2026-06-08); no `lib/coinbase/getAccountTradeHistory()` reads; CI test asserts no auth'd-account reads in the top-5 path
 measurement_window_days: 7
 check_in_cadence: weekly
 area_tags: [strategy, ui, validation, dependency-management, data-model]
@@ -72,7 +72,7 @@ Getting CB-3's data model right once means CB-4 inherits a stable typed contract
 
 ## Hypothesis (the bet)
 
-If we ship a strategy-authoring form UI at `/dashboard/strategy` (Server Component shell + Client Component form for editor controls) backed by a `strategies` DB table (append-only revisions; one active per `bot_session`) with deterministic validation rules (RSI thresholds in [0, 100]; MA periods in {5, 10, 20, 50}; position sizes > 0; per-session caps > 0; entry / exit rules don't contradict), driven by a top-5-by-global-24h-volume algorithm that picks the candidate cryptos via CB-2's `getProducts()` + `getProduct(id)`, then **the operator can author + persist a valid strategy within 5 minutes on first attempt; CB-4 can read it as a typed Zod-validated row on every tick; and the "create a strategy" clause of the MVP loop ([product.md](../../foundation/product.md))** is delivered.
+If we ship a strategy-authoring form UI at `/dashboard/strategy` (Server Component shell + Client Component form for editor controls) backed by a `strategies` DB table (append-only revisions; one active per `bot_session`) with deterministic validation rules (RSI thresholds in [0, 100]; MA periods in {5, 10, 20, 50}; position sizes > 0; per-session caps > 0; entry / exit rules don't contradict), driven by a top-5-by-global-24h-volume algorithm that picks the candidate cryptos via a single CB-2 `getProducts()` call (the response already attaches `volume_24h` to each product), then **the operator can author + persist a valid strategy within 5 minutes on first attempt; CB-4 can read it as a typed Zod-validated row on every tick; and the "create a strategy" clause of the MVP loop ([product.md](../../foundation/product.md))** is delivered.
 
 ## Defensibility
 
@@ -94,7 +94,7 @@ If we ship a strategy-authoring form UI at `/dashboard/strategy` (Server Compone
   - `top-n.ts` — generic top-N-by-volume ranking; takes an `AssetAdapter` + returns top-N assets
   - `form-schema.ts` — Zod schema for form payload; consumes `Asset` types from `types.ts`
 - **`lib/strategy-coinbase/`** — crypto-coinbase adapter:
-  - `adapter.ts` — implements `AssetAdapter`: `getCandidateAssets()` calls `lib/coinbase/getProducts()`; `rankByVolume()` calls `lib/coinbase/getProduct(id)` for each; `getAssetIdentifier()` returns the Coinbase `product_id` (e.g., `"BTC-USD"`). The ONLY file in this story that imports from `lib/coinbase/`; `lib/strategy-core/` stays Coinbase-free.
+  - `adapter.ts` — implements `AssetAdapter`: `getCandidateAssets()` calls `lib/coinbase/getProducts()`; `rankByVolume()` ALSO calls `lib/coinbase/getProducts()` to build a `product_id → volume_24h` lookup map (the CB-2.2 schema already attaches `volume_24h` to every product in the `getProducts()` response — no per-asset `getProduct(id)` loop needed; see [architecture Decision #3 amendment 2026-06-08](architecture.md#3-libstrategy-coinbase-is-the-crypto-coinbase-adapter)); `getAssetIdentifier()` returns the Coinbase `product_id` (e.g., `"BTC-USD"`). The ONLY file in this story that imports from `lib/coinbase/`; `lib/strategy-core/` stays Coinbase-free.
 - **`strategies` DB schema** via a new migration (e.g., `0004-strategies.sql`):
   - Primary key: ULID (per [architecture.md § Identity strategy](../../foundation/architecture.md#identity-strategy))
   - Columns: `id`, `name`, `asset_class` (text — discriminator: `"crypto-coinbase" | "equity-broker" | ...`), `selected_assets` (jsonb — array of `{assetClass, identifier}`), `entry_rules` (jsonb), `exit_rules` (jsonb), `position_size_usd` (numeric), `per_session_buy_count_cap` (int), `per_session_dollar_cap` (numeric), `created_at`, `created_by_user_id`, `superseded_by_strategy_id` (self-FK for versioning)
@@ -177,7 +177,7 @@ Per [CB-2's actual velocity ≈ 0.6 days/story](../../foundation/plan.md), this 
 ### Decisions
 
 - [2026-06-08] [PM] **Top-5 ranking basis = global 24h volume from Coinbase** — NOT operator's personal trading volume
-  - **Rationale (required):** Coinbase's product surface provides 24h volume via `getProduct(id).volume_24h`; that's the canonical signal for "currently liquid trading pairs." Personal trading volume would bias toward what the operator already holds — defeating the purpose (the operator wants the discipline to consider all liquid options, not just their existing holdings). Matches the stub's framing ("review coinbase data to highlight the top 5") explicitly.
+  - **Rationale (required):** Coinbase's product surface provides 24h volume via the `volume_24h` field on every product in the `getProducts()` response (per CB-2.2's schema at `market-schemas.ts:68`); that's the canonical signal for "currently liquid trading pairs," and a single list call suffices for both candidate-discovery AND ranking. Personal trading volume would bias toward what the operator already holds — defeating the purpose (the operator wants the discipline to consider all liquid options, not just their existing holdings). Matches the stub's framing ("review coinbase data to highlight the top 5") explicitly.
   - **Area (required, tag):** product / algorithm
   - **Alternatives considered (required):** rank by operator's personal 24h volume (rejected — bias confirmation); rank by 7-day volume average (rejected — smooths out the signal CB-3 is meant to surface; the operator wants timely "currently liquid" not "stable liquid"); rank by market cap (rejected — proxy for size, not liquidity; less useful for tactical DCA entry decisions); use a pre-curated allowlist (rejected — too operator-opinionated; defeats the discovery purpose)
   - **Reversibility:** trivial (change one line in `lib/strategy/top5.ts`; ranking logic is centralized)
