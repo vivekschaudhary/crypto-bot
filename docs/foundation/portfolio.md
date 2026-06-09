@@ -83,6 +83,8 @@ _Populated as each stub gets promoted to a full brief via `/create-brief <bet-id
 | ------ | ----------- | ---------------------- |
 | [CB-1](../bets/CB-1/brief.md) | 2026-05-31 | approved |
 | [CB-2](../bets/CB-2/brief.md) | 2026-06-06 | approved |
+| [CB-3](../bets/CB-3/brief.md) | 2026-06-08 | approved (BACKFILL — promotion log row missing at original promotion event; added during CB-4 promotion 2026-06-09 cross-artifact sweep) |
+| [CB-4](../bets/CB-4/brief.md) | 2026-06-09 | proposed (awaiting HITL approval) |
 
 ## DRI Log
 
