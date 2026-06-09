@@ -331,29 +331,6 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
     return inlineErrors.get(path);
   }
 
-  // ───── Numeric input helpers (PR #52 post-merge UX fix) ──────────────
-  // HTML number inputs send an empty string when the operator clears the
-  // field. `Number("")` returns 0 — which made the field re-render showing
-  // "0" with no way to clear visually without typing a non-zero digit
-  // first. Operators hit this in production within minutes of CB-3.3
-  // shipping.
-  //
-  // Fix: use NaN as the "empty" sentinel. The displayed input value is
-  // empty when state is NaN; on user input the empty string maps to NaN
-  // rather than 0. Submit is disabled while any field is NaN (the form
-  // requires fully-specified numbers before save).
-
-  function numericDisplay(n: number): number | string {
-    return Number.isFinite(n) ? n : "";
-  }
-
-  function makeNumericChangeHandler(setter: (n: number) => void) {
-    return (e: React.ChangeEvent<HTMLInputElement>): void => {
-      const v = e.target.value;
-      setter(v === "" ? NaN : Number(v));
-    };
-  }
-
   // ───── Submit handling ────────────────────────────────────────────────
 
   function handleSubmit(e: FormEvent<HTMLFormElement>): void {
@@ -521,24 +498,24 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
   });
   const isFormInvalid = !liveValidation.ok;
   const hasActiveInlineErrors = inlineErrors.size > 0;
-  // PR #52 fix: NaN sentinel means "operator cleared the field." Zod's
-  // z.number() accepts NaN by default and rule-branch comparisons against
-  // NaN always evaluate false, so validateStrategyPayload would NOT flag a
-  // NaN field as invalid. Gate submit explicitly on Number.isFinite for
-  // every numeric input so the operator cannot submit a half-filled form.
-  const allNumericFieldsFilled =
-    Number.isFinite(entryRsi) &&
-    Number.isFinite(exitRsi) &&
-    Number.isFinite(minProfitPct) &&
-    Number.isFinite(sellFraction) &&
-    Number.isFinite(positionSizeUsd) &&
-    Number.isFinite(perSessionBuyCountCap) &&
-    Number.isFinite(perSessionDollarCap);
+  // PR #52: NaN sentinel means "operator cleared the field." The
+  // allNumericFieldsFilled pure function (exported below) is the
+  // testable derivation that gates submit on every numeric field being
+  // finite.
+  const numericFieldsFilled = allNumericFieldsFilled({
+    entryRsi,
+    exitRsi,
+    minProfitPct,
+    sellFraction,
+    positionSizeUsd,
+    perSessionBuyCountCap,
+    perSessionDollarCap,
+  });
   const isSubmitDisabled =
     submitInFlight ||
     isFormInvalid ||
     hasActiveInlineErrors ||
-    !allNumericFieldsFilled;
+    !numericFieldsFilled;
 
   const candidatesByIdentifier = new Map(
     candidates.map((c) => [c.identifier, c]),
@@ -987,6 +964,66 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
 // ──────────────────────────────────────────────────────────────────────────
 // Helpers (exported for tests; pure logic, no React)
 // ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Numeric input display helper (PR #52 post-merge UX fix).
+ *
+ * HTML number inputs render `value={NaN}` and `value={0}` very differently
+ * — `0` displays the digit "0"; `NaN` displays empty. We use `NaN` as the
+ * "operator cleared the field" sentinel: this helper maps NaN → "" (empty
+ * string) so the input renders empty when state is non-finite, and returns
+ * the number unchanged otherwise.
+ *
+ * Pre-PR-#52 the field used `value={n}` directly; clearing the input sent
+ * `e.target.value === ""` which `Number("")` mapped to `0`, re-rendering
+ * the field with "0" stuck. Operators couldn't visually clear without
+ * typing a non-zero digit first.
+ */
+export function numericDisplay(n: number): number | string {
+  return Number.isFinite(n) ? n : "";
+}
+
+/**
+ * Numeric input onChange handler factory (PR #52). Maps the empty-string
+ * HTML input event to `NaN` rather than `0`, so the field state correctly
+ * represents "operator cleared this." Anything else is parsed via
+ * `Number(...)`.
+ */
+export function makeNumericChangeHandler(
+  setter: (n: number) => void,
+): (e: React.ChangeEvent<HTMLInputElement>) => void {
+  return (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const v = e.target.value;
+    setter(v === "" ? NaN : Number(v));
+  };
+}
+
+/**
+ * All 7 form numeric fields filled? (PR #52). Submit is gated on this
+ * predicate so a NaN-cleared field cannot reach the server action. Zod's
+ * `z.number()` accepts NaN by default and rule-branch comparisons against
+ * NaN always evaluate false, so `validateStrategyPayload` alone would NOT
+ * reject a half-filled form.
+ */
+export function allNumericFieldsFilled(values: {
+  entryRsi: number;
+  exitRsi: number;
+  minProfitPct: number;
+  sellFraction: number;
+  positionSizeUsd: number;
+  perSessionBuyCountCap: number;
+  perSessionDollarCap: number;
+}): boolean {
+  return (
+    Number.isFinite(values.entryRsi) &&
+    Number.isFinite(values.exitRsi) &&
+    Number.isFinite(values.minProfitPct) &&
+    Number.isFinite(values.sellFraction) &&
+    Number.isFinite(values.positionSizeUsd) &&
+    Number.isFinite(values.perSessionBuyCountCap) &&
+    Number.isFinite(values.perSessionDollarCap)
+  );
+}
 
 /**
  * Compare two form payloads for dirty-state detection (AC 7 unsaved-changes
