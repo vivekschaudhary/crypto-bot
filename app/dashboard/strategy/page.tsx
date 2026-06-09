@@ -27,11 +27,35 @@ import type { JSX } from "react";
 
 import { makeCoinbaseAdapter } from "@/lib/strategy-coinbase/adapter";
 import { getActiveStrategy } from "@/lib/strategies/db";
-import { buildEmptyStateDefaults, topFiveFallbackCopy } from "@/lib/strategies/defaults";
+import {
+  buildEmptyStateDefaults,
+  topFiveAsOfText,
+  topFiveFallbackCopy,
+} from "@/lib/strategies/defaults";
 import { topN } from "@/lib/strategy-core/top-n";
 import type { Asset, Strategy } from "@/lib/strategy-core/types";
 
-import { StrategyFormClient } from "./strategy-form-client";
+import {
+  StrategyFormClient,
+  type StrategyFormLabels,
+} from "./strategy-form-client";
+
+/**
+ * Crypto-coinbase-specific labels passed to the otherwise-agnostic
+ * StrategyFormClient (PR #53 portability refactor). The form Client
+ * Component receives these as a labels prop; equity-app's future page.tsx
+ * will construct its own StrategyFormLabels (e.g., "1-5 stocks", "Selected
+ * from your screener", "Pick between 1 and 5 stocks") and reuse the same
+ * form unchanged. Per copy.md § Page-level + Assets selector header +
+ * Inline field errors.
+ */
+const COINBASE_LABELS: StrategyFormLabels = {
+  assetsHelperText: "1-5 cryptos. The bot considers ONLY these.",
+  assetSelectorHeader: topFiveAsOfText,
+  errorOverrides: {
+    SELECTED_ASSETS_COUNT_OUT_OF_RANGE: "Pick between 1 and 5 cryptos.",
+  },
+};
 
 /**
  * Per copy.md § Page-level — the browser title discriminates create vs
@@ -237,6 +261,7 @@ export default async function StrategyPage(): Promise<JSX.Element> {
         candidates={topFive}
         topFiveAsOf={topFiveAsOf}
         isRevise={isRevise}
+        labels={COINBASE_LABELS}
       />
     </div>
   );
