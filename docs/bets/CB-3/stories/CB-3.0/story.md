@@ -2,7 +2,8 @@
 id: CB-3.0
 bet: CB-3
 type: story
-status: ready
+status: shipped
+shipped: 2026-06-08
 priority: P0
 created: 2026-06-08
 author: PM
@@ -118,8 +119,8 @@ _No integration tests in this story — no live Coinbase, no DB._
 
 ## PRs
 
-_Auto-populated as PRs open._
+- [PR #45](https://github.com/vivekschaudhary/crypto-bot/pull/45) — `feat(CB-3.0): lib/strategy-core/ foundation — types + AssetAdapter + validation + supersession + top-N (FIRST CB-3 STORY)`. Squash-merged 2026-06-08 (commit `4a31bb7`). **3 review rounds** — round-1: 2 BLOCKERs (camelCase vs snake_case shape; supersession contract `superseed → supersede` + `newRow → newPayload` + snake_case output) + 1 ISSUE (no-coupling regex-only → strengthened to transitive walk per AC 7); round-2: 2 BLOCKERs (convention split refined — top-level snake_case + inner jsonb camelCase; `validateStrategyPayload` permissive input schema so named error codes actually fire per AC 3); round-3: 1 BLOCKER (`created_at: z.date()` → `z.coerce.date()` for clean JSON roundtrip per AC 1). Codex security review clean. 53 unit tests + bundle 40K. Squash-race streak: 1 PR clean post-restoration.
 
 ---
 
-_Story closed: <pending>, brief link: docs/bets/CB-3/brief.md, architecture link: docs/bets/CB-3/architecture.md_
+_Story closed: 2026-06-08 (via PR #45 squash merge commit `4a31bb7`), brief link: docs/bets/CB-3/brief.md, architecture link: docs/bets/CB-3/architecture.md_
