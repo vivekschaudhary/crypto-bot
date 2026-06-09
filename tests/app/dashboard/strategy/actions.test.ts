@@ -31,9 +31,20 @@ vi.mock("@/lib/strategies/db", () => ({
   upsertSingletonBotSession: (id: unknown) => upsertSingletonBotSession(id),
 }));
 
-const headersMock = vi.fn();
+// Round-1 BLOCKER 2 closure: action now re-verifies the session via
+// verifySession(cookieValue) rather than trusting the proxy-forwarded
+// x-session-user-id header. Tests mock cookies() + lib/auth/sessions
+// verifySession to drive the action through the new auth path.
+const cookieStoreMock = vi.fn();
 vi.mock("next/headers", () => ({
-  headers: () => Promise.resolve(headersMock()),
+  cookies: () => Promise.resolve(cookieStoreMock()),
+}));
+
+const verifySessionMock = vi.fn<
+  (cookie: string) => Promise<{ userId: string; sessionId: string } | null>
+>();
+vi.mock("@/lib/auth/sessions", () => ({
+  verifySession: (cookie: unknown) => verifySessionMock(cookie as string),
 }));
 
 const redirectMock = vi.fn((path: string) => {
@@ -107,11 +118,20 @@ beforeEach(() => {
   insertStrategy.mockClear();
   markSuperseded.mockClear();
   upsertSingletonBotSession.mockClear();
-  headersMock.mockReset();
+  cookieStoreMock.mockReset();
+  verifySessionMock.mockReset();
   redirectMock.mockClear();
   ulidMock.mockReset();
   ulidMock.mockReturnValue("01HSTRATEGYNEWXY567890123T");
-  headersMock.mockReturnValue({ get: (k: string) => (k === "x-session-user-id" ? USER_ID : null) });
+  // Default: a valid session cookie present + verifySession succeeds.
+  cookieStoreMock.mockReturnValue({
+    get: (key: string) =>
+      key === "__compass_session" ? { value: "signed.cookie.value" } : undefined,
+  });
+  verifySessionMock.mockResolvedValue({
+    userId: USER_ID,
+    sessionId: "01HSESSION00000000000000",
+  });
 });
 
 afterEach(() => {
@@ -241,15 +261,40 @@ describe("saveStrategy — validation failures (returns SaveStrategyResult; no r
   });
 });
 
-describe("saveStrategy — auth posture", () => {
-  it("returns server-error result + no DB writes when session header is missing", async () => {
-    headersMock.mockReturnValue({ get: () => null });
+describe("saveStrategy — auth posture (defense-in-depth via verifySession)", () => {
+  it("returns server-error result + no DB writes when the session cookie is missing", async () => {
+    cookieStoreMock.mockReturnValue({ get: () => undefined });
     const formData = makeFormData();
     const result = await saveStrategy(formData);
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error_type).toBe("server");
+    expect(verifySessionMock).not.toHaveBeenCalled();
     expect(insertStrategy).not.toHaveBeenCalled();
+  });
+
+  it("returns server-error result + no DB writes when verifySession rejects (forged/expired cookie)", async () => {
+    verifySessionMock.mockResolvedValueOnce(null);
+    const formData = makeFormData();
+    const result = await saveStrategy(formData);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error_type).toBe("server");
+    expect(verifySessionMock).toHaveBeenCalledOnce();
+    expect(insertStrategy).not.toHaveBeenCalled();
+  });
+
+  it("uses the verifySession userId as the canonical auth claim (not a header)", async () => {
+    const formData = makeFormData();
+    try {
+      await saveStrategy(formData);
+    } catch {
+      // expected NEXT_REDIRECT on success
+    }
+    // The cookie was read AND verifySession was invoked — the action does
+    // NOT trust headers as auth claims.
+    expect(cookieStoreMock).toHaveBeenCalled();
+    expect(verifySessionMock).toHaveBeenCalledOnce();
   });
 });
 

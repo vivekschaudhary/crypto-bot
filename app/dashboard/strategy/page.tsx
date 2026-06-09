@@ -162,6 +162,34 @@ export default async function StrategyPage(): Promise<JSX.Element> {
         assetClass: COINBASE_ASSET_CLASS,
       });
 
+  // Codex BLOCKER 4 closure: when top-5 fails AND there's no active strategy
+  // (first-time authoring), render a degraded page — fallback notice + retry
+  // link back to /dashboard — NOT the form with empty candidates. The story
+  // (story.md AC 11) + design.md explicitly require "form unavailable + retry
+  // link." For revise mode (active strategy exists), the form is still
+  // operable because the operator's selected_assets are persisted on the
+  // active row; the top-5 candidate list is only needed for first-time
+  // authoring's pre-fill.
+  if (topFiveFallback && !isRevise) {
+    return (
+      <div style={pageStyle}>
+        <div style={headerStyle}>
+          <a href="/dashboard" style={linkStyle}>
+            ← Back to dashboard
+          </a>
+        </div>
+        <div role="alert" style={fallbackBannerStyle}>
+          {topFiveFallbackCopy(topFiveFallback)}
+        </div>
+        <p style={{ fontSize: "0.9375rem" }}>
+          <a href="/dashboard" style={linkStyle}>
+            Return to dashboard and try again
+          </a>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div style={pageStyle}>
       <div style={headerStyle}>

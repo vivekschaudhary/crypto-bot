@@ -26,26 +26,38 @@
 //       keys on `error_type` for top-of-form banner + `errors[].code +
 //       errors[].path` for inline-per-field rendering
 //
-// SECURITY: the action reads `x-session-user-id` from `headers()`. Per
-// proxy.ts, this header is forwarded only on valid sessions (the proxy
-// already gated `/dashboard/strategy`). The action treats it as the
-// authoritative `created_by_user_id`. CSRF protection is provided by
-// Next.js Server Actions (cookie origin check + opaque action id).
+// SECURITY: the action re-verifies the session via `verifySession()` against
+// the `__compass_session` signed cookie — defense-in-depth per the
+// architecture's "DB row is the source of truth" invariant + CB-1.4 Engineer
+// DRI Decision #5 (handlers that perform mutating actions MUST re-verify;
+// the proxy's `x-session-*` headers are NOT trusted as auth claims). The
+// proxy still gates the route (auth fast-path); the action re-verify is the
+// authoritative check for the userId attached to `created_by_user_id`. CSRF
+// protection comes from Next.js Server Actions (cookie origin check +
+// opaque action id) on top of the cookie signature.
+//
+// Round-1 BLOCKER 2 + Security MEDIUM fix (Codex PR #49 review): the
+// original implementation trusted the proxy-forwarded `x-session-user-id`
+// header inside the mutating action. Replaced with `verifySession` so the
+// write path matches the defense-in-depth posture established by
+// `/api/auth/sign-out` (CB-1.5) and the foundation architecture.
 //
 // No app-code path to UPDATE strategy content. The only allowed UPDATE is
 // `markSuperseded` (supersession-only).
 
 "use server";
 
-import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ulid } from "ulidx";
 
+import { verifySession } from "@/lib/auth/sessions";
 import {
   insertStrategy,
   markSuperseded,
   upsertSingletonBotSession,
 } from "@/lib/strategies/db";
+import { StrategyFormPayloadSchema } from "@/lib/strategy-core/form-schema";
 import { supersede } from "@/lib/strategy-core/supersession";
 import {
   StrategyIdSchema,
@@ -67,6 +79,7 @@ import {
 } from "@/lib/strategies/defaults";
 
 const COINBASE_ASSET_CLASS = "crypto-coinbase";
+const SESSION_COOKIE_NAME = "__compass_session";
 
 /**
  * Discriminated-union return shape per Engineer DRI Decision #6. The form
@@ -140,13 +153,16 @@ function logStrategySaveEvent(payload: {
 export async function saveStrategy(
   formData: FormData,
 ): Promise<SaveStrategyResult> {
-  // ─── Session check (defense in depth; proxy already gated) ──────────
-  const h = await headers();
-  const sessionUserId = h.get("x-session-user-id");
-  if (!sessionUserId) {
-    // Should be impossible — proxy.ts gates /dashboard/* and forwards the
-    // session header. Treat as server error rather than auth error;
-    // operator will see "Save failed on the server. Try again."
+  // ─── Session re-verify (defense in depth — Codex BLOCKER 2 closure) ─
+  // The proxy gates the route, but mutating actions MUST re-verify the
+  // session against the DB row (the authoritative source per architecture
+  // invariant). We read the signed cookie via cookies() and call
+  // verifySession (which performs signature check + auth_sessions row
+  // lookup + sliding expiry bump). The proxy-forwarded x-session-* headers
+  // are NOT trusted as auth claims for write paths.
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionCookie) {
     logStrategySaveEvent({
       success: false,
       asset_class: COINBASE_ASSET_CLASS,
@@ -154,6 +170,16 @@ export async function saveStrategy(
     });
     return failure("server");
   }
+  const session = await verifySession(sessionCookie);
+  if (!session) {
+    logStrategySaveEvent({
+      success: false,
+      asset_class: COINBASE_ASSET_CLASS,
+      validation_errors: ["SHAPE_INVALID"],
+    });
+    return failure("server");
+  }
+  const sessionUserId = session.userId;
 
   // ─── Parse form payload from FormData ──────────────────────────────
   // FormData arrives with string values for all fields; the form client
@@ -205,11 +231,15 @@ export async function saveStrategy(
     ]);
   }
 
-  // ─── Rule validation via CB-3.0's validateStrategyPayload ──────────
+  // ─── Stage 1 — Rule validation via CB-3.0's validateStrategyPayload ──
   // validate.ts uses a PERMISSIVE input schema internally (only catches truly
   // malformed shapes — wrong type / missing field) and emits NAMED codes for
   // every rule violation (range checks, MA period strict-set, cross-field
-  // contradictions, cardinality, positivity). AC 5 requires those named codes.
+  // contradictions, cardinality, positivity). AC 5 requires those named codes
+  // so the form can render inline-per-field errors. Run this BEFORE the
+  // strict StrategyFormPayloadSchema so named codes fire (the strict schema
+  // would otherwise collapse the same violations into SHAPE_INVALID — same
+  // lesson CB-3.0 round-2 BLOCKER taught for validate.ts itself).
   const ruleValidation = validateStrategyPayload(rawPayload);
   if (!ruleValidation.ok) {
     logStrategySaveEvent({
@@ -221,7 +251,35 @@ export async function saveStrategy(
     });
     return failure("validation", ruleValidation.errors);
   }
-  const payload = ruleValidation.value;
+
+  // ─── Stage 2 — Strict form-schema parse (defense-in-depth contract) ─
+  // Codex BLOCKER 3 closure: AC 6 step 1 + form-schema.ts (line 4) define
+  // StrategyFormPayloadSchema as the form-boundary contract. After validate.ts
+  // approves the named-code rules, run the strict schema as a defense-in-
+  // depth final shape check. validate.ts's rule set is a superset of
+  // form-schema's refinements, so this stage should ALWAYS succeed when
+  // validate.ts succeeds — if it doesn't, the two schemas have drifted (a
+  // programming error). On a drift, emit SHAPE_INVALID and fail loud rather
+  // than silently shipping a payload one layer would reject.
+  const formPayloadInput = {
+    ...rawPayload,
+    supersedes_strategy_id: supersedesStrategyId,
+  };
+  const formParse = StrategyFormPayloadSchema.safeParse(formPayloadInput);
+  if (!formParse.success) {
+    const errors: ValidationError[] = formParse.error.issues.map((issue) => ({
+      code: "SHAPE_INVALID",
+      path: issue.path.join("."),
+      message: issue.message,
+    }));
+    logStrategySaveEvent({
+      success: false,
+      asset_class: String(rawPayload.asset_class ?? COINBASE_ASSET_CLASS),
+      validation_errors: errors.map((e) => e.code),
+    });
+    return failure("validation", errors);
+  }
+  const payload = formParse.data;
 
   // ─── Build the new Strategy row (server-side id + created_at) ───────
   const newStrategyId = StrategyIdSchema.parse(ulid());

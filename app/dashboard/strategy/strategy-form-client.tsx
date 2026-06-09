@@ -41,6 +41,7 @@ import {
   topFiveAsOfText,
   type TopErrorBannerType,
 } from "@/lib/strategies/defaults";
+import { validateStrategyPayload } from "@/lib/strategy-core/validate";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Props
@@ -455,6 +456,35 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
       ? "Save revision"
       : "Save strategy";
 
+  // Codex round-1 ISSUE closure: submit must be disabled while the form is
+  // invalid AND while inline errors are active (AC 5 + AC 8). Run the
+  // CB-3.0 validateStrategyPayload locally against the current payload —
+  // submit disables the moment any rule violation surfaces. Inline errors
+  // displayed via inlineErrors map are separate signal (set on submit
+  // attempt or stale-from-prior-attempt); both gate submit.
+  const liveValidation = validateStrategyPayload({
+    name,
+    asset_class: initialPayload.asset_class,
+    selected_assets: selectedAssets,
+    entry_rules: {
+      rsiThreshold: entryRsi,
+      maPeriod,
+      maReinforcement,
+    },
+    exit_rules: {
+      rsiThreshold: exitRsi,
+      minProfitPct,
+      sellFraction,
+    },
+    position_size_usd: positionSizeUsd,
+    per_session_buy_count_cap: perSessionBuyCountCap,
+    per_session_dollar_cap: perSessionDollarCap,
+  });
+  const isFormInvalid = !liveValidation.ok;
+  const hasActiveInlineErrors = inlineErrors.size > 0;
+  const isSubmitDisabled =
+    submitInFlight || isFormInvalid || hasActiveInlineErrors;
+
   const candidatesByIdentifier = new Map(
     candidates.map((c) => [c.identifier, c]),
   );
@@ -831,11 +861,12 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
           </button>
           <button
             type="submit"
-            disabled={submitInFlight}
+            disabled={isSubmitDisabled}
             aria-busy={submitInFlight}
             style={{
               ...primaryButtonStyle,
-              opacity: submitInFlight ? 0.6 : 1,
+              opacity: isSubmitDisabled ? 0.6 : 1,
+              cursor: isSubmitDisabled ? "not-allowed" : "pointer",
             }}
           >
             {submitLabel}
