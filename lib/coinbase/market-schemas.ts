@@ -52,15 +52,24 @@ export const GRANULARITY_SECONDS: Record<Granularity, number> = {
  * A single product entry. Two strict-required fields per Coinbase's public
  * product contract:
  *   * `product_id` — downstream consumers key off it
- *   * `volume_24h` — load-bearing for CB-3's top-5-by-24h-volume ranking
+ *   * `volume_24h` — base-currency token count (NOT load-bearing for CB-3's
+ *     dollar-volume ranking; see `approximate_quote_24h_volume` below).
+ *     Kept required because Coinbase's docs guarantee it; surfaces an API
+ *     contract change loudly if Coinbase ever removes it.
+ *
+ * CB-3's top-5-by-DOLLAR-volume ranking uses `approximate_quote_24h_volume`,
+ * defined further down. Empirically discovered during CB-3.1 `/build`
+ * 2026-06-08: `volume_24h` is base-currency token count (PEPE has ~10^14
+ * tokens traded but ~$80M USD; BTC has ~10^4 tokens but ~$685M USD).
+ * Ranking by raw `volume_24h` biases toward meme coins; operator's
+ * "currently liquid" intent requires dollar volume. See CB-3 brief +
+ * architecture Decision #3 amendments 2026-06-08.
  *
  * Other fields are loose-optional with `.passthrough()` at the object
  * level for forward-compat (CB-2 brief PM Risk #2).
  *
  * Per [Coinbase Get Public Product docs](https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/public/get-public-product),
- * `volume_24h` is a string field consistently returned in the response —
- * making it required surfaces an API contract change loudly if Coinbase
- * ever removes it.
+ * `volume_24h` is a string field consistently returned in the response.
  */
 export const ProductSchema = z
   .object({
@@ -80,6 +89,15 @@ export const ProductSchema = z
     post_only: z.boolean().optional(),
     auction_mode: z.boolean().optional(),
     product_type: z.string().optional(),
+    // Coinbase's pre-computed approximate DOLLAR volume (base × price for
+    // the trailing 24h). Returned as a string per Coinbase convention.
+    // load-bearing for CB-3.1's top-N ranking: `volume_24h` alone is base-
+    // currency token count, which biases ranking toward cheap-token meme
+    // coins (PEPE-USD has ~10^11 tokens traded but ~$80M USD; BTC-USD has
+    // ~10^4 tokens traded but ~$685M USD). Empirically discovered during
+    // CB-3.1 `/build` 2026-06-08 — see CB-3 architecture Decision #3
+    // amendment in the build commit.
+    approximate_quote_24h_volume: z.string().optional(),
   })
   .passthrough();
 
