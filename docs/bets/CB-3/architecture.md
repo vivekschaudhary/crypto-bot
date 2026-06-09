@@ -151,14 +151,26 @@ When the equity app is ready to consume:
 
 `/dashboard/strategy/` route:
 
-- `page.tsx` (Server Component) — invokes the concrete adapter (`makeCoinbaseAdapter()`); resolves the top-5 + active-strategy data SERVER-SIDE; passes only PRIMITIVES (`assetClass: AssetClass`, `candidates: Asset[]`, `initialPayload: StrategyFormPayload`, `topFiveAsOf: Date`, `isRevise: boolean`) to the Client Component
-- `strategy-form-client.tsx` (Client Component; was `_form.tsx` in original sketch) — takes asset-class primitives as props (NOT the adapter object itself); renders the asset multi-select + rule sections. Asset-class-agnostic at the data-shape level.
+- `page.tsx` (Server Component) — invokes the concrete adapter (`makeCoinbaseAdapter()`); resolves the top-5 + active-strategy data SERVER-SIDE; constructs the asset-class-specific `labels: StrategyFormLabels` object (per-app verbatim copy.md strings); passes only PRIMITIVES + labels (`assetClass: AssetClass`, `candidates: Asset[]`, `initialPayload: StrategyFormPayload`, `topFiveAsOf: Date`, `isRevise: boolean`, `labels: StrategyFormLabels`) to the Client Component
+- `strategy-form-client.tsx` (Client Component; was `_form.tsx` in original sketch) — takes asset-class primitives + a labels prop (NOT the adapter object itself; NOT crypto-flavored copy strings hardcoded); renders the asset multi-select + rule sections. Asset-class-agnostic at the data-shape AND copy levels.
 - Asset selector — inline within the form Client Component; consumes the resolved `candidates: Asset[]` prop. Does NOT call adapter methods directly (the server-rendered initial state is sufficient).
 - `strategy-actions.ts` (was `_actions.ts`) — server actions: `saveStrategy(formData)`. Validates via `lib/strategy-core/validate`; inserts via supersession; updates `bot_sessions.active_strategy_id`.
 
 The form is generic over asset-class data; the save action is generic. Only the adapter choice is asset-class-specific, and that choice happens at the Server Component (`page.tsx`) boundary — env-var-driven for now; could become a tab-switch UI later.
 
 **Decision #6 amended 2026-06-09 during PR #50** (post-merge defect fix on CB-3.3): the originally approved sketch named `_form.tsx` taking `adapter: AssetAdapter` as a prop + `_selector.tsx` calling `adapter.getCandidateAssets()` via a server action. Production deploy of CB-3.3 (PR #49 merged 2026-06-08) revealed that React Server Components cannot serialize regular function methods across the RSC boundary — only Server Actions can cross. Passing the adapter object to a Client Component caused three broken `E{digest:...}` reference errors at runtime (one per AssetAdapter method), crashing every GET /dashboard/strategy with a 500. The fix moves all adapter invocation to the Server Component layer + passes resolved primitives across the RSC boundary. **Architectural intent preserved**: the form is still generic over asset-class portability (the data shape is asset-class-agnostic); the adapter is still the seam where asset-class-specific logic lives (CB-3.1's `makeCoinbaseAdapter` / future `lib/strategy-alpaca/` / etc.). Future asset-class-specific UI behavior that needs runtime adapter calls in the browser must be exposed as discrete Server Actions, not passed as adapter prop members. **Lesson encoded for future Server/Client Component prop design**: RSC props must be JSON-serializable OR Server Actions; never pass structural types with function members across the RSC boundary. Local `pnpm dev` + `pnpm build` are too lenient to catch this — only Vercel runtime surfaces it. Worth a Compass-original anti-pattern name in a future `/retro` (`[rsc-prop-serialization]`).
+
+**Decision #6 further amended 2026-06-09 during PR #53** (portability polish per [brief PM DRI Decision #6](brief.md#decisions)): added a `labels: StrategyFormLabels` prop on the Client Component to lift the 3 remaining crypto-flavored copy strings (assets helper text, asset-selector header, SELECTED_ASSETS_COUNT_OUT_OF_RANGE error override) out of the form-client.tsx + lib/strategies/defaults.ts to the route layer (page.tsx). The crypto-coinbase route now constructs a `COINBASE_LABELS` constant; the equity-app's future page.tsx will mirror with `EQUITY_LABELS` (e.g., "1-5 stocks" + "Selected from your screener" + "Pick between 1 and 5 stocks"). The form Client Component is now genuinely agnostic at the data-shape AND copy levels — the equity-app extraction estimate of "half-day find/replace" per brief PM Decision #6 is now truer than before. The `StrategyFormLabels` type:
+
+```ts
+interface StrategyFormLabels {
+  assetsHelperText: string;                              // crypto: "1-5 cryptos. The bot considers ONLY these."
+  assetSelectorHeader: (date: Date) => string;           // crypto: topFiveAsOfText (composes "Selected from top-5 by dollar volume (as of ...)")
+  errorOverrides?: Partial<Record<ValidationErrorCode, string>>; // crypto: { SELECTED_ASSETS_COUNT_OUT_OF_RANGE: "Pick between 1 and 5 cryptos." }
+}
+```
+
+`lib/strategies/defaults.ts` defaults are now asset-class-agnostic (`"Pick between 1 and 5 assets."`); the universal default is the fallback; per-app `errorOverrides` supplies copy.md verbatim strings. A new `formatAsOfStamp(date)` pure helper is extracted for cross-app reuse by future header-composition functions.
 
 ### 7. Observability shape
 

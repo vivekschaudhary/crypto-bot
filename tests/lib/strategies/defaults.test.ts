@@ -19,6 +19,7 @@ import {
   errorCodeToCopy,
   errorCodeToFieldPath,
   topErrorBannerCopy,
+  formatAsOfStamp,
   topFiveAsOfText,
   topFiveFallbackCopy,
 } from "@/lib/strategies/defaults";
@@ -142,7 +143,12 @@ describe("errorCodeToCopy — every VALIDATION_ERROR_CODES value has a verbatim 
 
   it("SELECTED_ASSETS_COUNT_OUT_OF_RANGE copy matches copy.md verbatim", () => {
     expect(errorCodeToCopy("SELECTED_ASSETS_COUNT_OUT_OF_RANGE")).toBe(
-      "Pick between 1 and 5 cryptos.",
+      // PR #53: defaults.ts default is now asset-class-agnostic ("assets");
+      // the crypto-coinbase form composes the verbatim "Pick between 1
+      // and 5 cryptos." copy.md string via labels.errorOverrides in
+      // page.tsx — see tests/app/dashboard/strategy/form-client.test.ts
+      // for the override-path coverage.
+      "Pick between 1 and 5 assets.",
     );
   });
 
@@ -179,15 +185,27 @@ describe("topErrorBannerCopy — verbatim copy.md strings per discriminated type
   });
 });
 
-describe("topFiveAsOfText — formatted UTC stamp matches copy.md prefix", () => {
+describe("formatAsOfStamp — pure date formatter (asset-class-agnostic; PR #53)", () => {
   it("formats YYYY-MM-DD HH:mm in UTC", () => {
+    const date = new Date("2026-06-08T12:34:56.000Z");
+    expect(formatAsOfStamp(date)).toBe("2026-06-08 12:34");
+  });
+
+  it("zero-pads month / day / hour / minute", () => {
+    const date = new Date("2026-01-05T03:09:00.000Z");
+    expect(formatAsOfStamp(date)).toBe("2026-01-05 03:09");
+  });
+});
+
+describe("topFiveAsOfText — crypto-coinbase selector header (composed via formatAsOfStamp)", () => {
+  it("formats the crypto-coinbase verbatim copy.md string with the as-of stamp", () => {
     const date = new Date("2026-06-08T12:34:56.000Z");
     expect(topFiveAsOfText(date)).toBe(
       "Selected from top-5 by dollar volume (as of 2026-06-08 12:34)",
     );
   });
 
-  it("zero-pads month / day / hour / minute", () => {
+  it("zero-pads month / day / hour / minute via formatAsOfStamp delegation", () => {
     const date = new Date("2026-01-05T03:09:00.000Z");
     expect(topFiveAsOfText(date)).toBe(
       "Selected from top-5 by dollar volume (as of 2026-01-05 03:09)",

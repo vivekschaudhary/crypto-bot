@@ -145,7 +145,12 @@ export function errorCodeToCopy(code: ValidationErrorCode): string {
     case "PER_SESSION_DOLLAR_CAP_NOT_POSITIVE":
       return "Must be greater than 0.";
     case "SELECTED_ASSETS_COUNT_OUT_OF_RANGE":
-      return "Pick between 1 and 5 cryptos.";
+      // PR #53 (portability refactor): default is generic ("assets") so this
+      // module is asset-class-agnostic. The crypto-coinbase form passes a
+      // labels.errorOverrides at the route layer to substitute "cryptos"
+      // verbatim per copy.md. Equity-app's future form passes its own
+      // override (e.g., "stocks"). Keeps lib/strategies/defaults.ts portable.
+      return "Pick between 1 and 5 assets.";
     case "SHAPE_INVALID":
       return "Something's wrong with this field. Check the value and try again.";
   }
@@ -180,25 +185,37 @@ export function topErrorBannerCopy(type: TopErrorBannerType): string {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Top-5 selector header copy ("Selected from top-5 by dollar volume…")
+// Selector header copy — the date-formatting helper + per-app header strings
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Per copy.md § Assets selector header. Renders the top-5-as-of fetch
- * timestamp so the operator knows when the candidate set was computed
- * (PM Risk #4 transparency — top-5 churn surprise mitigation).
- *
- * Format: `YYYY-MM-DD HH:mm` (24h, UTC). UTC chosen because the bot
- * operates in UTC tick boundaries; matches CB-2.5's structured-log
+ * Format a Date as `YYYY-MM-DD HH:mm` (24h, UTC). UTC chosen because the
+ * bot operates in UTC tick boundaries; matches CB-2.5's structured-log
  * timestamp convention.
+ *
+ * PR #53 (portability refactor): extracted as a pure date helper so each
+ * app can build its own header string with its own ranking-source label.
+ * The crypto-coinbase form composes "Selected from top-5 by dollar volume
+ * (as of ...)" via `coinbaseAssetSelectorHeader` in the page.tsx route
+ * layer. Equity app's future form composes its own header (e.g.,
+ * "Selected from your screener (as of ...)").
  */
-export function topFiveAsOfText(date: Date): string {
+export function formatAsOfStamp(date: Date): string {
   const yyyy = date.getUTCFullYear().toString().padStart(4, "0");
   const mm = (date.getUTCMonth() + 1).toString().padStart(2, "0");
   const dd = date.getUTCDate().toString().padStart(2, "0");
   const hh = date.getUTCHours().toString().padStart(2, "0");
   const min = date.getUTCMinutes().toString().padStart(2, "0");
-  return `Selected from top-5 by dollar volume (as of ${yyyy}-${mm}-${dd} ${hh}:${min})`;
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+
+/**
+ * Per copy.md § Assets selector header — the crypto-coinbase selector
+ * header copy. Composed at the route layer (page.tsx) via the labels prop
+ * so the form Client Component stays asset-class-agnostic.
+ */
+export function topFiveAsOfText(date: Date): string {
+  return `Selected from top-5 by dollar volume (as of ${formatAsOfStamp(date)})`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────

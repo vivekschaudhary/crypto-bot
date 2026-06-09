@@ -37,10 +37,12 @@ import {
   errorCodeToCopy,
   errorCodeToFieldPath,
   topErrorBannerCopy,
-  topFiveAsOfText,
   type TopErrorBannerType,
 } from "@/lib/strategies/defaults";
-import { validateStrategyPayload } from "@/lib/strategy-core/validate";
+import {
+  validateStrategyPayload,
+  type ValidationErrorCode,
+} from "@/lib/strategy-core/validate";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Props
@@ -81,6 +83,34 @@ export interface StrategyFormClientProps {
   candidates: Asset[];
   topFiveAsOf: Date;
   isRevise: boolean;
+  labels: StrategyFormLabels;
+}
+
+/**
+ * Asset-class-specific copy strings supplied by the route layer (PR #53
+ * portability refactor). The form Client Component is asset-class-agnostic;
+ * every crypto-flavored noun and ranking-source label lives in the labels
+ * object so the equity-app's future page.tsx can pass its own (e.g.,
+ * "stocks" + "from your screener") and reuse the same form.
+ *
+ * Discipline:
+ *   - assetsHelperText: the helper text below the asset selector. Crypto
+ *     passes "1-5 cryptos. The bot considers ONLY these." per copy.md;
+ *     equity passes "1-5 stocks. ..."
+ *   - assetSelectorHeader: a `(date) => string` so the route layer can
+ *     compose its own header copy with the as-of stamp. Crypto passes
+ *     `topFiveAsOfText` ("Selected from top-5 by dollar volume (as of ...)");
+ *     equity passes its own (e.g., "Selected from your screener (as of ...)").
+ *   - errorOverrides: per-app verbatim copy for inline errors where the
+ *     universal default is too generic. Crypto overrides
+ *     SELECTED_ASSETS_COUNT_OUT_OF_RANGE with "Pick between 1 and 5 cryptos."
+ *     so copy.md verbatim is preserved; the underlying defaults stay
+ *     asset-class-agnostic ("Pick between 1 and 5 assets.").
+ */
+export interface StrategyFormLabels {
+  assetsHelperText: string;
+  assetSelectorHeader: (date: Date) => string;
+  errorOverrides?: Partial<Record<ValidationErrorCode, string>>;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -232,7 +262,7 @@ const modalStyle: React.CSSProperties = {
 // ──────────────────────────────────────────────────────────────────────────
 
 export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element {
-  const { assetClass, initialPayload, candidates, topFiveAsOf, isRevise } = props;
+  const { assetClass, initialPayload, candidates, topFiveAsOf, isRevise, labels } = props;
 
   const [name, setName] = useState(initialPayload.name);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>(
@@ -411,7 +441,10 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
       const path = errorCodeToFieldPath(err.code);
       // Prefer the code-mapped verbatim copy.md string over the Zod-emitted
       // `message` (Zod messages are i18n-fluid and not from copy.md).
-      errMap.set(path, errorCodeToCopy(err.code));
+      // PR #53: prefer route-layer override (asset-class-specific copy)
+      // over the universal default from defaults.ts.
+      const override = labels.errorOverrides?.[err.code];
+      errMap.set(path, override ?? errorCodeToCopy(err.code));
     }
     setInlineErrors(errMap);
     setBanner({
@@ -569,7 +602,7 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
         {/* ─── Assets ─────────────────────────────────────────────── */}
         <fieldset style={sectionStyle}>
           <legend style={sectionTitleStyle}>Assets</legend>
-          <p style={helperStyle}>{topFiveAsOfText(topFiveAsOf)}</p>
+          <p style={helperStyle}>{labels.assetSelectorHeader(topFiveAsOf)}</p>
           <div
             data-field-path="selected_assets"
             aria-describedby="selected-assets-error"
@@ -625,7 +658,7 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
               Maximum 5 reached. Remove one to add another.
             </p>
           )}
-          <p style={helperStyle}>1-5 cryptos. The bot considers ONLY these.</p>
+          <p style={helperStyle}>{labels.assetsHelperText}</p>
           {getInlineError("selected_assets") && (
             <p
               id="selected-assets-error"
