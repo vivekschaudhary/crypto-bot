@@ -68,19 +68,30 @@ describe("CB-3.2 AC 5 — DB row → CB-3.0 StrategySchema roundtrip (no duplica
     expect(parsed.superseded_by_strategy_id).toBeNull();
   });
 
-  it("DB row with timestamptz as ISO string (driver-config / JSON.parse case) roundtrips via z.coerce.date()", () => {
-    // Simulates: row crosses JSON boundary (JSON.parse(JSON.stringify(row)))
-    // OR a driver config that returns timestamptz as a string. CB-3.0
-    // chose z.coerce.date() in types.ts specifically so this case works.
-    const row = {
-      ...makeDbRow(),
-      created_at: "2026-06-08T12:34:56.000Z" as unknown as Date,
-    };
-    const parsed = StrategySchema.parse(row);
-    expect(parsed.created_at).toBeInstanceOf(Date);
-    expect(parsed.created_at.getTime()).toBe(
-      new Date("2026-06-08T12:34:56.000Z").getTime(),
-    );
+  it("AC 5 full roundtrip: parse(DB row) → JSON.stringify → JSON.parse → re-parse → DEEP EQUAL", () => {
+    // The load-bearing roundtrip per AC 5: prove the row survives a full
+    // serialize/deserialize cycle without semantic loss. After parsing
+    // the Date-bearing row, stringify produces ISO strings for created_at;
+    // JSON.parse turns those back into strings; re-parsing through
+    // StrategySchema must coerce them back to Date instances AND yield a
+    // value deeply equal to the first parse (including Date instants).
+    // This is what z.coerce.date() on `created_at` exists to make safe.
+    const row = makeDbRow({ superseded_by_strategy_id: ULID_B });
+
+    // Step 1: first parse (Date in)
+    const parsed1 = StrategySchema.parse(row);
+
+    // Step 2: cross the JSON boundary (Date → ISO string)
+    const serialized = JSON.stringify(parsed1);
+    const fromJson = JSON.parse(serialized);
+    expect(typeof fromJson.created_at).toBe("string");
+
+    // Step 3: re-parse (ISO string coerced back to Date)
+    const parsed2 = StrategySchema.parse(fromJson);
+    expect(parsed2.created_at).toBeInstanceOf(Date);
+
+    // Step 4: DEEP EQUAL — every field, including the Date instant
+    expect(parsed2).toEqual(parsed1);
   });
 
   it("DB row with NON-NULL superseded_by_strategy_id (supersession case) roundtrips", () => {
