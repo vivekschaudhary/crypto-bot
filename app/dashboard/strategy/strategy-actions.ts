@@ -67,13 +67,11 @@ import {
   type StrategyId,
 } from "@/lib/strategy-core/types";
 import {
-  VALIDATION_ERROR_CODES,
   validateStrategyPayload,
   type ValidationError,
   type ValidationErrorCode,
 } from "@/lib/strategy-core/validate";
 import {
-  errorCodeToFieldPath,
   topErrorBannerCopy,
   type TopErrorBannerType,
 } from "@/lib/strategies/defaults";
@@ -367,6 +365,17 @@ export async function saveStrategy(
   };
 }
 
-// Re-export the canonical error codes list so call sites that need to map
-// codes can import from one module. Keeps the action surface terse.
-export { VALIDATION_ERROR_CODES, errorCodeToFieldPath };
+// Post-merge production fix (PR #51): the original re-export of
+// VALIDATION_ERROR_CODES + errorCodeToFieldPath violated Next.js's
+// "use server" file-level constraint that ALL exports must be async
+// functions (VALIDATION_ERROR_CODES is a const array; errorCodeToFieldPath
+// is sync). Production runtime error:
+//   "A 'use server' file can only export async functions, found object"
+// Local pnpm dev + pnpm build were lenient and didn't surface it. Removed
+// the dead re-export — both symbols are imported directly from their
+// origin modules at consumer sites (form-client.tsx already imports them
+// from @/lib/strategy-core/validate and @/lib/strategies/defaults).
+//
+// Lesson: a "use server" file's PUBLIC EXPORT SURFACE must be async
+// functions only. Type-only exports (export type) are erased and fine;
+// internal helpers (non-exported consts/sync functions) are fine.
