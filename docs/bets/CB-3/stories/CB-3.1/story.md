@@ -48,7 +48,7 @@ Server-only. No DB writes. No UI. No live order placement. `e2e: false`.
 - [ ] **AC 6** — Integration test at `tests/lib/strategy-coinbase/adapter.integration.test.ts` (~3 live tests) double-gated (`RUN_INTEGRATION_TESTS=1` + CDP creds via `COINBASE_API_KEY_NAME` + `COINBASE_API_PRIVATE_KEY` — though `getProducts` is the public path, gate still applies for consistency with CB-2.5's pattern). Tests:
   - `getCandidateAssets()` returns ≥ 1 USD-quoted spot product against live Coinbase
   - `rankByVolume()` returns assets in descending order; top-5 has 5 items
-  - **Top-5 anchor test**: assert `BTC-USD` is in the top-5 (the only stable run-to-run assertion possible; canonical anchor for the crypto market). Avoids brittle exact-order assertions.
+  - **Top-5 anchor test**: assert BOTH `BTC-USD` AND `ETH-USD` are in the top-5 (per PM Decision strengthened at `/build`; the two-anchor contract is more reliable than a single BTC anchor given the meme-coin trap discovery — see the BTC-USD + ETH-USD PM Decision below). The other 3 slots may rotate (live observation 2026-06-08: ZEC/XRP/SOL). Avoids brittle exact-order assertions.
   - Each test **logs the observation** (via `originalLog` pattern from CB-2.5's trace integration test). This is the load-bearing closure data feed for Researcher Open Question #1.
 - [ ] **AC 7** — Architectural invariant boundaries:
   - `lib/strategy-coinbase/` IS allowed to import from `@/lib/coinbase/*` (this IS the seam; the architectural decision)

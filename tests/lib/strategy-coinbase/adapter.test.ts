@@ -224,6 +224,55 @@ describe("rankByVolume — descending DOLLAR-volume (approximate_quote_24h_volum
     expect(ranked.map((a) => a.identifier)).toEqual(["WITH-VOL", "WITHOUT-VOL"]);
   });
 
+  it("ties (equal approximate_quote_24h_volume) preserve input order (stable sort per AC 5)", async () => {
+    // Two products with identical dollar volume. AC 5 requires "ties stable":
+    // the relative order of tied assets must match input order (V8's Array.sort
+    // is guaranteed stable per ECMAScript 2019; this test pins that contract
+    // for the adapter so any future implementation swap can't silently break
+    // it).
+    getProductsMock.mockResolvedValue([
+      product({
+        product_id: "TIED-A-USD",
+        approximate_quote_24h_volume: "1000000",
+      }),
+      product({
+        product_id: "TIED-B-USD",
+        approximate_quote_24h_volume: "1000000",
+      }),
+      product({
+        product_id: "HIGHER-USD",
+        approximate_quote_24h_volume: "9999999",
+      }),
+    ] as never[]);
+
+    // Input order: A before B
+    const inputAfirst = [
+      { assetClass: "crypto-coinbase", identifier: "TIED-A-USD" },
+      { assetClass: "crypto-coinbase", identifier: "TIED-B-USD" },
+      { assetClass: "crypto-coinbase", identifier: "HIGHER-USD" },
+    ];
+    const rankedAfirst = await makeCoinbaseAdapter().rankByVolume(inputAfirst);
+    // HIGHER first; then tied pair preserves input order (A before B)
+    expect(rankedAfirst.map((a) => a.identifier)).toEqual([
+      "HIGHER-USD",
+      "TIED-A-USD",
+      "TIED-B-USD",
+    ]);
+
+    // Input order: B before A — should now sort B before A in the tie
+    const inputBfirst = [
+      { assetClass: "crypto-coinbase", identifier: "TIED-B-USD" },
+      { assetClass: "crypto-coinbase", identifier: "TIED-A-USD" },
+      { assetClass: "crypto-coinbase", identifier: "HIGHER-USD" },
+    ];
+    const rankedBfirst = await makeCoinbaseAdapter().rankByVolume(inputBfirst);
+    expect(rankedBfirst.map((a) => a.identifier)).toEqual([
+      "HIGHER-USD",
+      "TIED-B-USD",
+      "TIED-A-USD",
+    ]);
+  });
+
   it("returns a NEW array; input not mutated", async () => {
     getProductsMock.mockResolvedValue([
       product({
