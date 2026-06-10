@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-09 (post-CB-4 brief promotion)_
+_Last updated: 2026-06-09 (post-CB-4 brief approval + CB-4.0 story ready)_
 
 ## In flight
 
