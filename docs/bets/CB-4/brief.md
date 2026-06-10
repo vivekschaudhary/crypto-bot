@@ -1,7 +1,7 @@
 ---
 id: CB-4
 type: feature
-status: proposed
+status: approved
 priority: P0
 parent: FOUNDATION-PRODUCT
 portfolio_stub: false
@@ -167,9 +167,9 @@ Per CB-3's actual velocity (1.5 calendar days end-to-end / 4 stories shipped + 4
 
 ## Check-in log
 
-| Date | Phase | Notes |
-|------|-------|-------|
-| 2026-05-31 | Portfolio stub | Created via `/create-bet-portfolio` (5-bet MVP wedge); stub estimate 3 wk / `low`; sketched scope (`lib/signals/`, `lib/decisions/`, cron handler, LIVE_MODE gate, append-only audit). |
+| Date       | Phase                                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-05-31 | Portfolio stub                          | Created via `/create-bet-portfolio` (5-bet MVP wedge); stub estimate 3 wk / `low`; sketched scope (`lib/signals/`, `lib/decisions/`, cron handler, LIVE_MODE gate, append-only audit).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 2026-06-09 | Brief promotion + HITL approval pending | Operator fires `/create-brief CB-4` immediately after CB-3 ship (PR #54 merged 2026-06-09). 6 PM DRI Decisions + 5 PM Risks logged; 3 Researcher Open Questions logged (closure forecast at /build CB-4.0 + .3); estimate refined 3 wk / `low` → 1 wk / `medium` (operator-confirmed at intake per CB-1/2/3's 5-15x-ahead velocity pattern); `architecture_required: false` (all needed architectural decisions already in foundation architecture — bot tick reliability function, append-only event log, LIVE_MODE gate posture, cron stateless-and-exit pattern). Override scope (pause/resume/force-buy/sell-N/reset) DEFERRED to CB-5 per operator confirmation. |
 
 ## DRI Log
