@@ -65,7 +65,7 @@ No DB writes; no live Coinbase calls; no UI; no env reads; no LIVE_MODE consulta
 
 ## Standard Experience Checklist
 
-CB-4.0 is pure library code (server-only; no UI surface; no rendered output). All 6 categories `n/a` per the CB-3.0 precedent.
+CB-4.0 is pure library code (server-only; no UI surface; no rendered output). **4 of 6 categories `n/a`** (Navigation / States / Feedback / Accessibility — no UI surface) + **2 of 6 covered by AC items** (Edge cases via AC 9; Cross-surface consistency via AC 4 + AC 7's architectural-invariant tests). Mirrors the [CB-3.0 precedent](../../../CB-3/stories/CB-3.0/story.md) shape — pure-library stories typically have non-trivial Edge cases (sentinel handling, NaN, insufficient bars) + Cross-surface (asset-class portability invariants) coverage that ISN'T `n/a` even though no UI ships.
 
 - [ ] **Navigation** — `n/a — no UI surface in this story; lib/signals/ exports number-in / number-out pure functions consumed by CB-4.1's decision engine + CB-4.2's cron handler in later stories.`
 - [ ] **States** — `n/a — pure functions return either a number (computed result) or null (insufficient-bars / NaN-in-input sentinel). No UI loading/empty/error states ship in this story; those are CB-5 dashboard concerns.`
