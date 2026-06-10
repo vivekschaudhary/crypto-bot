@@ -40,15 +40,18 @@ export function ma(period: number, closes: number[]): number | null {
   if (closes.length < period) return null;
 
   // Engineer DRI Decision #6: NaN-in-input → null (defense-in-depth).
-  // Check only the trailing-window slice — earlier bars don't affect the
-  // result, but defense-in-depth on the full input is the simpler
-  // contract. Cron handler shouldn't be passing NaN-bearing arrays
-  // either way.
-  const window = closes.slice(-period);
-  for (const c of window) {
+  // Check the FULL input array, not just the trailing window. AC 6's
+  // contract is "NaN in input array → null return", full stop. The
+  // earlier-prototype optimization (window-only scan) would have let
+  // `ma(3, [NaN, 1, 2, 3]) === 2` slip through — that's a contract
+  // violation against the AC even though the result is arithmetically
+  // valid. Codex BLOCKER closure (PR #58 round-1) + matches rsi.ts
+  // line 79's full-array check for consistency across both signals.
+  for (const c of closes) {
     if (!Number.isFinite(c)) return null;
   }
 
+  const window = closes.slice(-period);
   let sum = 0;
   for (const c of window) {
     sum += c;

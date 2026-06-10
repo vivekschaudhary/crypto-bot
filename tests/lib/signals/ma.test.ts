@@ -65,6 +65,22 @@ describe("ma — sentinel returns (insufficient bars / NaN / invalid period)", (
     expect(ma(3, [1, 2, 3, 4, NaN, 6])).toBeNull();
   });
 
+  it("returns null when NaN appears in earlier bars OUTSIDE the trailing window (PR #58 round-1 BLOCKER regression)", () => {
+    // Codex BLOCKER closure: AC 6 contract says "NaN in input array →
+    // null", FULL stop. The earlier prototype scanned only the trailing
+    // window (window-only optimization), letting `ma(3, [NaN, 1, 2, 3])
+    // === 2` slip through arithmetically-valid but contract-violating.
+    // This test pins the contract: any NaN anywhere in the input → null.
+    expect(ma(3, [NaN, 1, 2, 3])).toBeNull();
+    // And a longer series where NaN is far outside the window:
+    expect(ma(3, [NaN, 100, 200, 1, 2, 3])).toBeNull();
+  });
+
+  it("returns null when Infinity appears in earlier bars OUTSIDE the trailing window", () => {
+    expect(ma(3, [Infinity, 1, 2, 3])).toBeNull();
+    expect(ma(3, [-Infinity, 1, 2, 3])).toBeNull();
+  });
+
   it("returns null when input contains Infinity (defense-in-depth)", () => {
     expect(ma(3, [1, 2, Infinity])).toBeNull();
   });
