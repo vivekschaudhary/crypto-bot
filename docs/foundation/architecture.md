@@ -65,7 +65,7 @@ Each entity traces back to a line in `docs/foundation/product.md`. No invented e
 | `TradeFill`       | Executed-trade record returned by Coinbase                                                | "Full trade history" — [product.md § In scope](product.md#in-scope)                                                                                                                              |
 | `BotSession`      | A contiguous run of the bot, operator-resettable                                          | "Reset session..." + "session start" — [product.md § In scope](product.md#in-scope)                                                                                                              |
 | `BotTick`         | One 15-min decision evaluation by the bot                                                 | "Bot ticks every 15 minutes..." + "decision log (RSI, MA, signal source, intended action, reason)" — [product.md § Current quarter KR2](product.md#current-quarter-q2-2026--through-end-of-july) |
-| `Signal`          | RSI / 20MA value computed at a moment in time                                             | "current RSI / MA" — [product.md § In scope](product.md#in-scope)                                                                                                                                |
+| `Signal`          | Per-asset decision record for one tick: the asset's RSI / MA(period) values (nullable — insufficient-bars sentinel), the decision (`buy \| sell \| hold`), and the operator-readable reason. _Amended 2026-06-11 from "RSI / 20MA value computed at a moment in time" — the original kind/value shape predated multi-asset strategies (CB-3) and per-asset decisions (CB-4.1); see DRI Log 2026-06-11 entry._ | "current RSI / MA" + "decision log (RSI, MA, signal source, intended action, reason)" — [product.md § In scope](product.md#in-scope) + [§ Current quarter KR2](product.md#current-quarter-q2-2026--through-end-of-july)                                                                                                                                |
 | `OverrideEvent`   | Manual override the operator issued (pause, resume, force buy, sell 50%, sell all, reset) | "Manual override buttons" — [product.md § In scope](product.md#in-scope)                                                                                                                         |
 | `AccountSnapshot` | Periodic snapshot of balances (for historical position view)                              | "Real-time state: status, ETH held, average cost..." — [product.md § In scope](product.md#in-scope)                                                                                              |
 
@@ -183,9 +183,13 @@ erDiagram
     SIGNAL {
         text id PK "ULID"
         text tick_id FK
-        text asset_id FK
-        text kind "RSI | MA20"
-        numeric value
+        text asset_identifier "e.g. BTC-USD; matches strategy-core Asset.identifier (assets-dimension FK dropped 2026-06-11)"
+        text decision "buy | sell | hold"
+        text reason "operator-readable why (per-asset)"
+        numeric rsi "nullable - insufficient-bars sentinel"
+        numeric ma "nullable - insufficient-bars sentinel"
+        int ma_period "nullable; 5 | 10 | 20 | 50"
+        numeric last_close "nullable"
         timestamptz created_at
     }
     OVERRIDE_EVENT {
@@ -591,6 +595,12 @@ _Populated automatically by `/measure` cron._
 ## DRI Log
 
 ### Decisions
+
+- [2026-06-11] [Enterprise/Solution Architect] **Amend the `Signal` entity from kind/value rows to per-asset decision rows** (entity table + ER diagram updated in this amendment; physical migration `0005-multi-asset-tick-decisions.sql` ships with `/build CB-4.2`)
+  - **Rationale (required):** The original `Signal` shape (`asset_id` FK + `kind IN ('RSI','MA20')` + `value NOT NULL`) was derived 2026-05-29 under a single-asset, MA20-only assumption. Three downstream contracts have since invalidated it: CB-3.0's `MaPeriodSchema` allows `{5,10,20,50}` (the `MA20` CHECK is wrong); CB-4.0's null sentinel (insufficient bars) cannot persist in a `NOT NULL` value column; CB-4.1's `evaluate()` returns per-asset `{decision, reason}` which has no home (`bot_ticks` carries one decision per tick, and `signals` carried only numerics). The `assets(id)` FK is also dropped — nothing populates that dimension table; `asset_identifier text` matches the `strategy-core` `Asset.identifier` contract. **All event-log tables are empty in production** (heartbeat-only cron since 2026-05-31), so the reshape is zero-data-risk; this is the cheapest moment to fix the shape, before the first real rows land. Escalated from CB-4.2 story drafting per AGENTS.md Principle #16 (Codex review of PR #62 correctly flagged that a story may not redefine schema owned by this artifact — the amendment lands here FIRST, and the story executes it).
+  - **Area (required, tag):** architectural / data / schema-evolution
+  - **Alternatives considered (required):** keep kind/value + add a new `tick_decisions` table (rejected — two tables for one concern; kind/value rows would be dead weight 1:1 shadowing the decision rows); widen `bot_ticks` with per-asset JSON (rejected — breaks queryability for CB-5's dashboard + the append-only audit's row-level granularity); leave schema as-is and aggregate-only (rejected — loses the per-asset decision trace that product.md KR2 names explicitly)
+  - **Reversibility:** low-cost now (empty tables), expensive after first production rows — which is exactly why the amendment lands before `/build CB-4.2`
 
 - [2026-05-29] [Enterprise Architect] Choose **Vercel Pro ($20/mo) + Next.js 16 App Router + Supabase Postgres (DB only) + Vercel Cron (`*/15`) + SimpleWebAuthn passkey auth + Sentry free** as the foundational stack
   - **Rationale (required):** satisfies all 6 fitness functions with measurable headroom — Cost optimization fits at $20/mo of the $50/mo ceiling (Supabase free tier), Reliability via Pro-tier cron precision (Hobby tier rejects `*/15` at deploy time per [arch-research.md §2.3, §4.3](architecture-research.md#2-benchmarks)), Security via Vercel encrypted env + `CRON_SECRET` + Coinbase trade-only scoped keys + passkey-only operator-owned auth (Supabase Auth NOT used to preserve product bet's "no third-party IdP" posture), Operational excellence via git-push deploys + < 5 min rollback. All stack rows reverse at medium or better.
