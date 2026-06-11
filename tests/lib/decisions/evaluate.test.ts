@@ -353,13 +353,13 @@ describe("evaluate — insufficient signal data (CB-4.0 null sentinel propagatio
 // ──────────────────────────────────────────────────────────────────────────
 
 describe("evaluate — no-position handling (AC 8)", () => {
-  it("AC 8: rsi > exit_threshold but currentPosition === null → hold with specific 'sell signal but no open position' reason (PR #60 round-1 BLOCKER regression)", () => {
-    // AC 8 contract: when a SELL signal would fire (rsi > exit_threshold)
-    // at an asset with no open position, the reason MUST surface that
-    // the strategy would have sold IF a position existed — NOT silently
-    // emit the entry-rule-miss reason. The earlier implementation routed
-    // null-position assets straight to evaluateEntry, collapsing AC 8
-    // into the "no buy signal" reason. This test pins the AC 8 contract.
+  it("AC 8 (amended PR #60 round-2): rsi > exit_threshold + currentPosition === null → hold with 'exit rsi condition met' reason (NOT 'sell signal would fire'; only RSI half is checkable without a position)", () => {
+    // AC 8 amended contract: when ONLY the RSI half of the exit rule can
+    // be evaluated (no position → no avgCostUsd → no profit_pct), the
+    // reason must surface "exit rsi condition met" and NOT falsely claim
+    // "sell signal would fire" (which would imply the full exit rule
+    // was evaluated). PR #60 round-2 BLOCKER closure: the implementation
+    // and the story.md AC 8 spec must say the same thing.
     const strategy = makeStrategy();
     const signals = makeSignals([
       [
@@ -374,16 +374,19 @@ describe("evaluate — no-position handling (AC 8)", () => {
     ]);
     const [result] = evaluate(strategy, signals, ZERO_TOTALS);
     expect(result?.decision).toBe("hold");
-    expect(result?.reason).toContain("sell signal would fire");
+    // Spec-honest reason (round-2 amendment):
+    expect(result?.reason).toContain("exit rsi condition met");
     expect(result?.reason).toContain("rsi=72.10 > exit_threshold=70");
     expect(result?.reason).toContain("but no open position");
     expect(result?.reason).toContain("BTC-USD");
-    // CRITICAL: should NOT contain the entry-rule-miss reason.
+    // CRITICAL: should NOT falsely claim the full exit rule was evaluated.
+    expect(result?.reason).not.toContain("sell signal would fire");
+    // CRITICAL: should NOT route to the entry-rule-miss reason.
     expect(result?.reason).not.toContain("entry_threshold");
     expect(result?.reason).not.toContain("no buy signal");
   });
 
-  it("AC 8 also fires for quantity === 0 (treated as no position per bonus Engineer DRI)", () => {
+  it("AC 8 (amended) also fires for quantity === 0 (treated as no position per bonus Engineer DRI)", () => {
     const strategy = makeStrategy();
     const signals = makeSignals([
       [
@@ -398,8 +401,9 @@ describe("evaluate — no-position handling (AC 8)", () => {
     ]);
     const [result] = evaluate(strategy, signals, ZERO_TOTALS);
     expect(result?.decision).toBe("hold");
-    expect(result?.reason).toContain("sell signal would fire");
+    expect(result?.reason).toContain("exit rsi condition met");
     expect(result?.reason).toContain("but no open position");
+    expect(result?.reason).not.toContain("sell signal would fire");
   });
 
   it("currentPosition with quantity === 0 + entry signal → buy (still routes through entry branch when no exit signal fires)", () => {

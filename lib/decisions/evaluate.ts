@@ -18,7 +18,7 @@
 //        sell:   "sell: rsi=X.XX > exit_threshold=Y AND profit=P.PP% >= min_profit=Q.QQ%; sell F% of position at <asset>"
 //        cap:    "hold: <cap-name>_reached (...); buy signal suppressed at <asset>"
 //        insuf:  "hold: insufficient signal data (rsi=..., ma=...); insufficient bars at <asset>"
-//        nopos:  "hold: sell signal would fire (rsi=X > exit_threshold=Y) but no open position at <asset>"
+//        nopos:  "hold: exit rsi condition met (rsi=X > exit_threshold=Y) but no open position at <asset>" (amended PR #60 round-2; only the RSI half is checkable without a position)
 //        cb0:    "hold: cost basis is zero — position likely closed concurrently at <asset>"
 //        nan:    "hold: profit computation produced NaN at <asset>"
 //        miss:   "hold: rsi=X.XX >= entry_threshold=Y (no buy signal) at <asset>"
@@ -143,22 +143,29 @@ function evaluateAsset(
     return evaluateExit(asset, strategy, signal);
   }
 
-  // No position. AC 8: if a SELL signal would fire (rsi > exit_threshold)
-  // but there's no position to sell from, emit the specific
-  // "sell signal but no open position" reason BEFORE routing to the
-  // entry-rule branch. Operator-audit value: surfaces that the strategy
-  // would have sold IF there had been a position, instead of silently
-  // emitting the "no buy signal" reason from entry rule miss.
+  // No position. AC 8 (amended PR #60 round-2 to be spec-honest): if the
+  // RSI HALF of the exit rule fires (rsi > exit_threshold), emit a hold
+  // reason that surfaces what was checked + that no position exists to
+  // sell from. The FULL exit rule (rsi > threshold AND profit >= min_profit)
+  // can't be evaluated here because profit_pct requires currentPosition.
+  // avgCostUsd, which by definition isn't available. The reason must
+  // honestly state "exit rsi condition met" — NOT "sell signal would
+  // fire", which would falsely imply the full rule was evaluated.
   //
-  // PR #60 round-1 BLOCKER closure: the original implementation routed
-  // null-position assets straight to evaluateEntry, which collapsed AC 8
-  // into the entry-rule-miss reason. AC 8's reason is the specific
-  // surface that flows into bot_ticks.reason + CB-5's dashboard.
+  // Operator-audit value: surfaces that the strategy's RSI half of exit
+  // would have agreed sell-was-appropriate IF a position had existed,
+  // instead of silently routing to the entry-rule-miss "no buy signal"
+  // reason.
+  //
+  // PR #60 round-1 BLOCKER closure added this branch (was missing).
+  // PR #60 round-2 BLOCKER closure made the reason spec-honest (was
+  // claiming "sell signal would fire" without acknowledging only the
+  // RSI half was checked).
   const rsi = signal.rsi as number; // non-null per insufficient-data guard above
   if (rsi > strategy.exit_rules.rsiThreshold) {
     return holdResult(
       asset,
-      `hold: sell signal would fire (rsi=${rsi.toFixed(2)} > exit_threshold=${strategy.exit_rules.rsiThreshold}) but no open position at ${asset.identifier}`,
+      `hold: exit rsi condition met (rsi=${rsi.toFixed(2)} > exit_threshold=${strategy.exit_rules.rsiThreshold}) but no open position at ${asset.identifier}`,
     );
   }
 
