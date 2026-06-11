@@ -352,21 +352,60 @@ describe("evaluate — insufficient signal data (CB-4.0 null sentinel propagatio
 // 5. Sell signal with no position — 2 tests
 // ──────────────────────────────────────────────────────────────────────────
 
-describe("evaluate — no-position handling", () => {
-  it("rsi > exit_threshold but currentPosition === null → entry rule branch (no exit fires)", () => {
-    // With no position, the asset goes through the ENTRY-rule branch, not exit.
-    // High RSI fails the entry threshold check → hold.
+describe("evaluate — no-position handling (AC 8)", () => {
+  it("AC 8: rsi > exit_threshold but currentPosition === null → hold with specific 'sell signal but no open position' reason (PR #60 round-1 BLOCKER regression)", () => {
+    // AC 8 contract: when a SELL signal would fire (rsi > exit_threshold)
+    // at an asset with no open position, the reason MUST surface that
+    // the strategy would have sold IF a position existed — NOT silently
+    // emit the entry-rule-miss reason. The earlier implementation routed
+    // null-position assets straight to evaluateEntry, collapsing AC 8
+    // into the "no buy signal" reason. This test pins the AC 8 contract.
     const strategy = makeStrategy();
     const signals = makeSignals([
-      ["BTC-USD", makeSignal({ rsi: 72.1, ma: 42000, lastClose: 43000, currentPosition: null })],
+      [
+        "BTC-USD",
+        makeSignal({
+          rsi: 72.1,
+          ma: 42000,
+          lastClose: 43000,
+          currentPosition: null,
+        }),
+      ],
     ]);
     const [result] = evaluate(strategy, signals, ZERO_TOTALS);
     expect(result?.decision).toBe("hold");
-    expect(result?.reason).toContain("rsi=72.10 >= entry_threshold=30");
+    expect(result?.reason).toContain("sell signal would fire");
+    expect(result?.reason).toContain("rsi=72.10 > exit_threshold=70");
+    expect(result?.reason).toContain("but no open position");
+    expect(result?.reason).toContain("BTC-USD");
+    // CRITICAL: should NOT contain the entry-rule-miss reason.
+    expect(result?.reason).not.toContain("entry_threshold");
+    expect(result?.reason).not.toContain("no buy signal");
   });
 
-  it("currentPosition with quantity === 0 is treated as no position (bonus Engineer DRI)", () => {
+  it("AC 8 also fires for quantity === 0 (treated as no position per bonus Engineer DRI)", () => {
+    const strategy = makeStrategy();
+    const signals = makeSignals([
+      [
+        "BTC-USD",
+        makeSignal({
+          rsi: 72.1,
+          ma: 42000,
+          lastClose: 43000,
+          currentPosition: { avgCostUsd: 42000, quantity: 0 },
+        }),
+      ],
+    ]);
+    const [result] = evaluate(strategy, signals, ZERO_TOTALS);
+    expect(result?.decision).toBe("hold");
+    expect(result?.reason).toContain("sell signal would fire");
+    expect(result?.reason).toContain("but no open position");
+  });
+
+  it("currentPosition with quantity === 0 + entry signal → buy (still routes through entry branch when no exit signal fires)", () => {
     // Bonus Engineer DRI Decision: quantity=0 → no position (entry branch).
+    // With a LOW rsi (entry signal, NOT exit signal), the AC 8 branch
+    // doesn't fire and the entry rule evaluates → buy.
     const strategy = makeStrategy();
     const signals = makeSignals([
       [
@@ -380,8 +419,24 @@ describe("evaluate — no-position handling", () => {
       ],
     ]);
     const [result] = evaluate(strategy, signals, ZERO_TOTALS);
-    // Entry rule fires → buy
     expect(result?.decision).toBe("buy");
+  });
+
+  it("null position + neither entry nor exit signal → entry-rule-miss reason (sanity check on AC 8 precedence)", () => {
+    // RSI=50 is between entry (30) and exit (70) thresholds → neither
+    // fires. AC 8 specifically requires rsi > exit_threshold; here it's
+    // not, so we fall through to the entry-rule branch which emits the
+    // "rsi >= entry_threshold (no buy signal)" reason.
+    const strategy = makeStrategy();
+    const signals = makeSignals([
+      ["BTC-USD", makeSignal({ rsi: 50, ma: 42000, lastClose: 42000, currentPosition: null })],
+    ]);
+    const [result] = evaluate(strategy, signals, ZERO_TOTALS);
+    expect(result?.decision).toBe("hold");
+    expect(result?.reason).toContain("rsi=50.00 >= entry_threshold=30");
+    expect(result?.reason).toContain("no buy signal");
+    // Should NOT contain the AC 8 reason (rsi is not above exit_threshold).
+    expect(result?.reason).not.toContain("sell signal would fire");
   });
 });
 

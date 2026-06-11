@@ -141,10 +141,29 @@ function evaluateAsset(
   if (hasPosition) {
     // Position exists → evaluate exit rules.
     return evaluateExit(asset, strategy, signal);
-  } else {
-    // No position → evaluate entry rules + cap enforcement.
-    return evaluateEntry(asset, strategy, signal, sessionTotals);
   }
+
+  // No position. AC 8: if a SELL signal would fire (rsi > exit_threshold)
+  // but there's no position to sell from, emit the specific
+  // "sell signal but no open position" reason BEFORE routing to the
+  // entry-rule branch. Operator-audit value: surfaces that the strategy
+  // would have sold IF there had been a position, instead of silently
+  // emitting the "no buy signal" reason from entry rule miss.
+  //
+  // PR #60 round-1 BLOCKER closure: the original implementation routed
+  // null-position assets straight to evaluateEntry, which collapsed AC 8
+  // into the entry-rule-miss reason. AC 8's reason is the specific
+  // surface that flows into bot_ticks.reason + CB-5's dashboard.
+  const rsi = signal.rsi as number; // non-null per insufficient-data guard above
+  if (rsi > strategy.exit_rules.rsiThreshold) {
+    return holdResult(
+      asset,
+      `hold: sell signal would fire (rsi=${rsi.toFixed(2)} > exit_threshold=${strategy.exit_rules.rsiThreshold}) but no open position at ${asset.identifier}`,
+    );
+  }
+
+  // Otherwise → evaluate entry rules + cap enforcement.
+  return evaluateEntry(asset, strategy, signal, sessionTotals);
 }
 
 /**

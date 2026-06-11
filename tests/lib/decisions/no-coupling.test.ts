@@ -157,7 +157,32 @@ function findEscapingImports(): {
       const relPath = match[1];
       if (relPath === undefined) continue;
       const resolved = resolveRelativeImport(file, relPath);
-      if (resolved && resolved.startsWith(REPO_ROOT) && !visited.has(resolved)) {
+      if (!resolved) continue;
+
+      // PR #60 round-1 BLOCKER closure: enforce the architectural
+      // boundary on RELATIVE imports too. The earlier prototype only
+      // checked @/lib/... imports for boundary violations; relative
+      // imports were followed for transitive walking but never flagged.
+      // A `../signals/rsi` style import from lib/decisions/ would have
+      // silently slipped past. Matches the strictness of the @/-import
+      // boundary check above: an `@/lib/...` import that resolves
+      // outside decisions+strategy-core is a violation; a relative
+      // import that resolves outside decisions+strategy-core is the
+      // same violation.
+      const insideDecisions = resolved.startsWith(LIB_DECISIONS_DIR);
+      const insideStrategyCore = resolved.startsWith(LIB_STRATEGY_CORE_DIR);
+      if (!insideDecisions && !insideStrategyCore) {
+        escapes.push({
+          file: file.replace(REPO_ROOT + "/", ""),
+          importedPath: relPath,
+          resolvedPath: resolved.replace(REPO_ROOT + "/", ""),
+        });
+      }
+
+      if (
+        (insideDecisions || insideStrategyCore) &&
+        !visited.has(resolved)
+      ) {
         visited.add(resolved);
         queue.push(resolved);
       }
