@@ -88,6 +88,40 @@ export async function getActiveStrategy(): Promise<Strategy | null> {
 }
 
 /**
+ * Fetch ONE strategy row by id — the bot tick's read path. CB-4.2 (PR #63
+ * round-1 BLOCKER closure): the cron tick must follow
+ * `bot_sessions.active_strategy_id → strategies` per the CB-4 brief
+ * Hypothesis + CB-3 brief PM Decision #2 (single-active-per-session
+ * contract). `getActiveStrategy()` above is the UI-oriented
+ * latest-non-superseded read for form pre-fill; the two SHOULD agree
+ * (CB-3.3's save flow updates both), but the session pointer is the
+ * bot's contract — if they ever diverge, the bot must trade what the
+ * session says, not what the UI would display.
+ */
+export async function getStrategyById(id: string): Promise<Strategy | null> {
+  const sql = db();
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT id,
+           name,
+           asset_class,
+           selected_assets,
+           entry_rules,
+           exit_rules,
+           position_size_usd::float8 AS position_size_usd,
+           per_session_buy_count_cap,
+           per_session_dollar_cap::float8 AS per_session_dollar_cap,
+           created_at,
+           created_by_user_id,
+           superseded_by_strategy_id
+      FROM strategies
+     WHERE id = ${id}
+     LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  return StrategySchema.parse(rows[0]);
+}
+
+/**
  * INSERT a new strategy row. Caller is responsible for generating the ULID
  * (done in the server action so the id is server-side-trusted). The row
  * must already pass `StrategySchema.parse` before reaching here — this

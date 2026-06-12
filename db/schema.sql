@@ -67,12 +67,23 @@ CREATE TABLE IF NOT EXISTS bot_ticks (
     UNIQUE (session_id, tick_started_at)  -- prevents cron-overlap double-fires
 );
 
+-- Per-asset decision rows — one per asset evaluated per tick. Reshaped by
+-- migration 0005 (CB-4.2) per the amended Signal entity at
+-- docs/foundation/architecture.md DRI Log 2026-06-11: the original
+-- kind/value shape predated multi-asset strategies. rsi/ma are nullable
+-- (CB-4.0 insufficient-bars sentinel persists honestly); asset_identifier
+-- matches lib/strategy-core Asset.identifier (assets-dimension FK dropped —
+-- nothing populates that table).
 CREATE TABLE IF NOT EXISTS signals (
     id text PRIMARY KEY,
     tick_id text NOT NULL REFERENCES bot_ticks(id),
-    asset_id text NOT NULL REFERENCES assets(id),
-    kind text NOT NULL CHECK (kind IN ('RSI', 'MA20')),
-    value numeric NOT NULL,
+    asset_identifier text NOT NULL,
+    decision text NOT NULL CHECK (decision IN ('buy', 'sell', 'hold')),
+    reason text NOT NULL,
+    rsi numeric,
+    ma numeric,
+    ma_period int,
+    last_close numeric,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
