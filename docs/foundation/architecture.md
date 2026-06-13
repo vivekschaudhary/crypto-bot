@@ -61,7 +61,7 @@ Each entity traces back to a line in `docs/foundation/product.md`. No invented e
 | ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Asset`           | Cryptocurrency identifier (BTC, ETH, ...)                                                 | "Trades top 5 cryptos via Coinbase" — [product.md § Target users](product.md#target-users--personas)                                                                                             |
 | `Account`         | Operator's Coinbase account state snapshot                                                | "Account balances refreshed every 15 sec" — [product.md § In scope](product.md#in-scope)                                                                                                         |
-| `Order`           | Manual or bot-placed Coinbase order (separated by `source`)                               | "Order placement..." + "manual orders logged separately from bot orders" — [product.md § In scope](product.md#in-scope)                                                                          |
+| `Order`           | Manual or bot-placed Coinbase order (separated by `source`); the unified buy/sell ledger across dry-run + live modes. _Amended 2026-06-13: `accounts`/`assets` dimension FKs dropped (nothing populated them — same root cause as the 0005 `Signal` reshape); `asset_id` → `asset_identifier text`; `account_id` dropped (single-operator MVP). See DRI Log 2026-06-13._ | "Order placement..." + "manual orders logged separately from bot orders" + "try with paper money, then move to real money" — [product.md § In scope](product.md#in-scope)                                                                          |
 | `TradeFill`       | Executed-trade record returned by Coinbase                                                | "Full trade history" — [product.md § In scope](product.md#in-scope)                                                                                                                              |
 | `BotSession`      | A contiguous run of the bot, operator-resettable                                          | "Reset session..." + "session start" — [product.md § In scope](product.md#in-scope)                                                                                                              |
 | `BotTick`         | One 15-min decision evaluation by the bot                                                 | "Bot ticks every 15 minutes..." + "decision log (RSI, MA, signal source, intended action, reason)" — [product.md § Current quarter KR2](product.md#current-quarter-q2-2026--through-end-of-july) |
@@ -145,14 +145,13 @@ erDiagram
     }
     ORDER {
         text id PK "ULID"
-        text account_id FK
-        text asset_id FK
+        text asset_identifier "e.g. BTC-USD; matches strategy-core Asset.identifier (accounts + assets dimension FKs dropped 2026-06-13)"
         text session_id FK "nullable; null for manual"
         text source "manual | bot"
         text side "buy | sell"
-        numeric amount
-        text status
-        text coinbase_order_id "nullable until placed"
+        numeric amount "USD notional"
+        text status "dry_run | submitted | failed (bot); free-form"
+        text coinbase_order_id "nullable; null for dry_run + failed"
         timestamptz created_at
     }
     TRADE_FILL {
@@ -595,6 +594,12 @@ _Populated automatically by `/measure` cron._
 ## DRI Log
 
 ### Decisions
+
+- [2026-06-13] [Enterprise/Solution Architect] **Amend the `Order` entity — drop the `accounts`/`assets` dimension FKs (`account_id` removed; `asset_id` → `asset_identifier text`)** (entity table + ER diagram updated; physical migration `0006-orders-writable.sql` ships with `/build CB-4.3`)
+  - **Rationale (required):** Same root cause as the 2026-06-11 `Signal` amendment: the 2026-05-29 scaffold modeled `accounts` + `assets` dimension tables that the single-operator/5-asset MVP never populates (verified: zero INSERT paths in `lib/`+`app/`+`db/`). The `orders` table's two dimension FKs make it structurally unwritable — any INSERT fails — which blocks CB-4.3's `LIVE_MODE` order placement + the unified ledger writes (brief PM Decision #8). `asset_identifier text` matches the `strategy-core` `Asset.identifier` contract + the reshaped `Signal`; `account_id` is dead weight at single-operator. `orders` is EMPTY in production (no writes have ever happened — CB-4.2 is dry-run and writes only `bot_ticks`/`signals`), so the reshape is zero-data-risk. Surfaced during CB-4.3 story drafting and amended upstream-first per AGENTS.md Principle #16 (NOT deferred to a Codex escalation round — applying the CB-4.2 migration-0005 lesson proactively).
+  - **Area (required, tag):** architectural / data / schema-evolution
+  - **Alternatives considered (required):** populate the dimension tables so the FKs resolve (rejected — speculative dimension modeling for a single-operator MVP; the `Signal` reshape set the asset_identifier-text precedent); insert placeholder dimension rows (rejected — fabricated rows pollute schema meaning); a separate `bot_orders` table (rejected — splits the unified-ledger contract Decision #8 depends on; CB-5 would need two reads)
+  - **Reversibility:** low-cost now (empty table); the `account_id` drop is the one one-way door, mitigated by single-operator reality — reintroduce with a real `accounts` table if multi-operator ever lands
 
 - [2026-06-11] [Enterprise/Solution Architect] **Amend the `Signal` entity from kind/value rows to per-asset decision rows** (entity table + ER diagram updated in this amendment; physical migration `0005-multi-asset-tick-decisions.sql` ships with `/build CB-4.2`)
   - **Rationale (required):** The original `Signal` shape (`asset_id` FK + `kind IN ('RSI','MA20')` + `value NOT NULL`) was derived 2026-05-29 under a single-asset, MA20-only assumption. Three downstream contracts have since invalidated it: CB-3.0's `MaPeriodSchema` allows `{5,10,20,50}` (the `MA20` CHECK is wrong); CB-4.0's null sentinel (insufficient bars) cannot persist in a `NOT NULL` value column; CB-4.1's `evaluate()` returns per-asset `{decision, reason}` which has no home (`bot_ticks` carries one decision per tick, and `signals` carried only numerics). The `assets(id)` FK is also dropped — nothing populates that dimension table; `asset_identifier text` matches the `strategy-core` `Asset.identifier` contract. **All event-log tables are empty in production** (heartbeat-only cron since 2026-05-31), so the reshape is zero-data-risk; this is the cheapest moment to fix the shape, before the first real rows land. Escalated from CB-4.2 story drafting per AGENTS.md Principle #16 (Codex review of PR #62 correctly flagged that a story may not redefine schema owned by this artifact — the amendment lands here FIRST, and the story executes it).

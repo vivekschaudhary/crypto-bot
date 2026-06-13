@@ -2,9 +2,12 @@
 id: CB-4.2
 bet: CB-4
 type: story
-status: ready
+status: done
 priority: P0
 created: 2026-06-11
+shipped: 2026-06-13
+shipped_pr: 63
+verified_in_prod: "2026-06-13 — 84 ticks / 0 errors / 100% tick reliability over ~21h; first row 2026-06-12 21:45 UTC, dry-run, real top-5 portfolio. Production-only-defect class (CB-3 retro watch) did NOT recur."
 author: PM
 design_link: n/a — server-side cron handler; no UI surface (CB-4.0/4.1 precedent)
 area_tags: [bot-runtime, cron, tick-handler, schema-migration, cost-basis, structured-log, append-only-audit, dry-run]
@@ -21,6 +24,8 @@ e2e: false
 ---
 
 # CB-4.2 — Cron tick handler (compose signals + decisions → persist decision trace; dry-run only)
+
+> **SHIPPED + VERIFIED 2026-06-13 (PR #63).** Production verification (story PM Risk #1 — first live cron exercise) passed: **84 ticks, 0 errors, 100% tick reliability over ~21h** (first row 2026-06-12 21:45 UTC; 420 signal rows = exactly 5/tick; all `tick_started_at` on clean :00/:15/:30/:45 boundaries; `live_mode=false`; ~2.4s/tick vs the 60s ceiling; rate-limit headroom intact at 29/30). Decisions ran the real signal math against the operator's real top-5 portfolio (BTC/ETH/ZEC/XRP/SOL), including a live ETH `position open` via cost-basis aggregation and the CB-4.1 round-2 amended `exit rsi condition met … but no open position` reason on SOL. **The CB-3-retro production-only-defect class did NOT recur.**
 
 ## Description
 
