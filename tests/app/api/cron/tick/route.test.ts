@@ -31,8 +31,10 @@ vi.mock("@/lib/strategies/db", () => ({
 }));
 
 const getProductCandles = vi.fn();
+const getProduct = vi.fn();
 vi.mock("@/lib/coinbase/market", () => ({
   getProductCandles: (args: unknown) => getProductCandles(args),
+  getProduct: (id: unknown) => getProduct(id),
 }));
 
 const getAccountTradeHistory = vi.fn();
@@ -40,8 +42,15 @@ vi.mock("@/lib/coinbase/accounts", () => ({
   getAccountTradeHistory: (args: unknown) => getAccountTradeHistory(args),
 }));
 
+const placeOrder = vi.fn();
+vi.mock("@/lib/coinbase/orders", () => ({
+  placeOrder: (args: unknown) => placeOrder(args),
+}));
+
+// LIVE_MODE is per-test mutable (CB-4.3 gate tests both directions).
+let liveModeMock = false;
 vi.mock("@/lib/env", () => ({
-  env: () => ({ CRON_SECRET: "test-secret", LIVE_MODE: false }),
+  env: () => ({ CRON_SECRET: "test-secret", LIVE_MODE: liveModeMock }),
 }));
 
 import { GET } from "@/app/api/cron/tick/route";
@@ -115,6 +124,22 @@ beforeEach(() => {
   getStrategyById.mockResolvedValue(makeStrategy());
   getProductCandles.mockResolvedValue(makeCandles(FLAT_30));
   getAccountTradeHistory.mockResolvedValue({ fills: [] });
+  getProduct.mockResolvedValue({
+    product_id: "BTC-USD",
+    volume_24h: "1",
+    quote_increment: "0.01",
+    base_increment: "0.00000001",
+  });
+  placeOrder.mockResolvedValue({
+    success: true,
+    success_response: {
+      order_id: "cb-order-123",
+      product_id: "BTC-USD",
+      side: "BUY",
+      client_order_id: "det-123",
+    },
+  });
+  liveModeMock = false; // default dry-run; LIVE_MODE tests opt in
 });
 
 afterEach(() => {
@@ -376,5 +401,119 @@ describe("tick route — duplicate handling (AC 5: loud, narrow)", () => {
     };
     expect(errorRow.reason).toBe("tick_error");
     expect(errorRow.errorDetail).toContain("coinbase 502");
+  });
+});
+
+// ── CB-4.3: LIVE_MODE gate + unified ledger ──────────────────────────────
+
+describe("tick route — LIVE_MODE gate (CB-4.3 AC 3/4/7)", () => {
+  // A falling series → buy decision; gives us a buy/sell to gate on.
+  function buyStrategy() {
+    getProductCandles.mockResolvedValue(makeCandles(FALLING_30));
+  }
+
+  it("LIVE_MODE=false + buy decision → dry_run ledger row, placeOrder NEVER called", async () => {
+    liveModeMock = false;
+    buyStrategy();
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+    expect(placeOrder).not.toHaveBeenCalled();
+    const tick = insertTickWithDecisions.mock.calls[0]?.[0] as {
+      orders: { status: string; coinbaseOrderId: string | null; side: string; amount: number }[];
+    };
+    expect(tick.orders).toHaveLength(1);
+    expect(tick.orders[0]?.status).toBe("dry_run");
+    expect(tick.orders[0]?.coinbaseOrderId).toBeNull();
+    expect(tick.orders[0]?.side).toBe("buy");
+    expect(tick.orders[0]?.amount).toBe(50); // position_size_usd
+  });
+
+  it("LIVE_MODE=true + buy decision → placeOrder called + submitted row + coinbase_order_id", async () => {
+    liveModeMock = true;
+    buyStrategy();
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+    expect(placeOrder).toHaveBeenCalledTimes(1);
+    const placeArgs = placeOrder.mock.calls[0]?.[0] as {
+      side: string;
+      clientOrderId: string;
+      orderConfiguration: { limit_limit_gtc?: unknown };
+    };
+    expect(placeArgs.side).toBe("BUY");
+    expect(placeArgs.clientOrderId).toMatch(/^[a-z0-9]{32}$/); // deterministic
+    expect(placeArgs.orderConfiguration).toHaveProperty("limit_limit_gtc");
+    const tick = insertTickWithDecisions.mock.calls[0]?.[0] as {
+      orders: { status: string; coinbaseOrderId: string | null }[];
+    };
+    expect(tick.orders[0]?.status).toBe("submitted");
+    expect(tick.orders[0]?.coinbaseOrderId).toBe("cb-order-123");
+  });
+
+  it("LIVE_MODE=true + hold decision → NO placeOrder, NO orders row", async () => {
+    liveModeMock = true;
+    getProductCandles.mockResolvedValue(makeCandles(FLAT_30)); // RSI 50 → hold
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+    expect(placeOrder).not.toHaveBeenCalled();
+    const tick = insertTickWithDecisions.mock.calls[0]?.[0] as { orders: unknown[] };
+    expect(tick.orders).toHaveLength(0);
+  });
+
+  it("LIVE_MODE=true + Coinbase error_response → failed row, tick still 200", async () => {
+    liveModeMock = true;
+    buyStrategy();
+    placeOrder.mockResolvedValue({
+      success: false,
+      error_response: { error: "INSUFFICIENT_FUND", message: "not enough USD" },
+    });
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200); // tick survives
+    const tick = insertTickWithDecisions.mock.calls[0]?.[0] as {
+      orders: { status: string; errorDetail: string | null }[];
+    };
+    expect(tick.orders[0]?.status).toBe("failed");
+    expect(tick.orders[0]?.errorDetail).toContain("not enough USD");
+  });
+
+  it("LIVE_MODE=true + placeOrder throws → failed row, tick still 200 (per-asset isolation)", async () => {
+    liveModeMock = true;
+    buyStrategy();
+    placeOrder.mockRejectedValue(new Error("coinbase 503"));
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+    const tick = insertTickWithDecisions.mock.calls[0]?.[0] as {
+      orders: { status: string; errorDetail: string | null }[];
+    };
+    expect(tick.orders[0]?.status).toBe("failed");
+    expect(tick.orders[0]?.errorDetail).toContain("coinbase 503");
+  });
+
+  it("per-asset isolation: one asset's order failure does not block a sibling's success", async () => {
+    liveModeMock = true;
+    getStrategyById.mockResolvedValue(
+      makeStrategy({ selected_assets: [BTC, ETH] }),
+    );
+    getProductCandles.mockResolvedValue(makeCandles(FALLING_30)); // both buy
+    // BTC fails, ETH succeeds.
+    placeOrder.mockImplementation((args: { productId: string }) => {
+      if (args.productId === "BTC-USD") return Promise.reject(new Error("min size"));
+      return Promise.resolve({
+        success: true,
+        success_response: {
+          order_id: "cb-eth-9",
+          product_id: "ETH-USD",
+          side: "BUY",
+          client_order_id: "x",
+        },
+      });
+    });
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+    const tick = insertTickWithDecisions.mock.calls[0]?.[0] as {
+      orders: { assetIdentifier: string; status: string }[];
+    };
+    const byAsset = Object.fromEntries(tick.orders.map((o) => [o.assetIdentifier, o.status]));
+    expect(byAsset["BTC-USD"]).toBe("failed");
+    expect(byAsset["ETH-USD"]).toBe("submitted");
   });
 });

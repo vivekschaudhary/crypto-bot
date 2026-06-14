@@ -98,6 +98,14 @@ export const ProductSchema = z
     // CB-3.1 `/build` 2026-06-08 — see CB-3 architecture Decision #3
     // amendment in the build commit.
     approximate_quote_24h_volume: z.string().optional(),
+    // Tick-size increments for order placement. CB-4.3 rounds limit prices
+    // to `quote_increment` and base sizes to `base_increment` before
+    // placeOrder (Coinbase rejects over-precise values). Optional +
+    // .passthrough() because they aren't load-bearing for CB-3.1's top-N
+    // ranking and shouldn't fail that read if Coinbase omits them; CB-4.3
+    // falls back to a conservative fixed precision + warns if absent.
+    quote_increment: z.string().optional(),
+    base_increment: z.string().optional(),
   })
   .passthrough();
 

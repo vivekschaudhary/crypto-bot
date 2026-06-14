@@ -51,8 +51,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ulid } from "ulidx";
 
 import { getAccountTradeHistory } from "@/lib/coinbase/accounts";
-import { getProductCandles } from "@/lib/coinbase/market";
-import { evaluate, type PerAssetSignal } from "@/lib/decisions";
+import { getProduct, getProductCandles } from "@/lib/coinbase/market";
+import { placeOrder } from "@/lib/coinbase/orders";
+import { evaluate, type DecisionResult, type PerAssetSignal } from "@/lib/decisions";
 import { env } from "@/lib/env";
 import { ma, rsi } from "@/lib/signals";
 import { getStrategyById } from "@/lib/strategies/db";
@@ -62,8 +63,13 @@ import {
   aggregateSessionTotals,
   insertTickWithDecisions,
   loadSingletonSession,
+  type OrderRowInsert,
   type SignalRowInsert,
 } from "@/lib/ticks/db";
+import {
+  buildLimitOrder,
+  deterministicClientOrderId,
+} from "@/lib/ticks/orders";
 import {
   aggregateTickDecision,
   floorToQuarterHour,
@@ -125,6 +131,120 @@ async function buildPerAssetSignal(
     lastClose,
     currentPosition: aggregatePosition(history.fills),
   };
+}
+
+/**
+ * CB-4.3 — turn buy/sell decisions into unified-ledger rows, placing real
+ * Coinbase limit orders first when LIVE_MODE is on.
+ *
+ * Per-asset isolation (story AC 7 / PM Decision #2): a placement failure
+ * for one asset records a `status='failed'` row and does NOT abort the
+ * tick or skip siblings — contrast a signal/eval failure, which is
+ * tick-fatal (CB-4.2 AC 8). `hold` decisions produce no row.
+ *
+ * Placement BEFORE persistence (AC 9): the orders rows record the actual
+ * outcome; the deterministic clientOrderId (idempotency) + Coinbase-sourced
+ * cost basis cover the place-succeeded-but-write-failed window.
+ */
+async function buildOrderRows(args: {
+  decisions: DecisionResult[];
+  perAssetSignals: Map<string, PerAssetSignal>;
+  strategy: Strategy;
+  sessionId: string;
+  tickStartedAt: Date;
+  liveMode: boolean;
+}): Promise<OrderRowInsert[]> {
+  const rows: OrderRowInsert[] = [];
+
+  for (const d of args.decisions) {
+    if (d.decision === "hold" || !d.sizing) continue; // holds aren't transactions
+
+    const signal = args.perAssetSignals.get(d.asset.identifier);
+    const lastClose = signal?.lastClose ?? Number.NaN;
+    const side = d.decision === "buy" ? "BUY" : "SELL";
+
+    // Compute the limit order (price + size + USD amount). Increments are
+    // resolved LIVE-MODE-only (Decision #4) — dry-run needs no rounding.
+    const built = buildLimitOrder({
+      side,
+      lastClose,
+      dollars: d.sizing.kind === "buy_dollars" ? d.sizing.dollars : undefined,
+      fraction: d.sizing.kind === "sell_fraction" ? d.sizing.fraction : undefined,
+      heldQuantity: signal?.currentPosition?.quantity ?? 0,
+    });
+
+    const base: Omit<OrderRowInsert, "status" | "coinbaseOrderId" | "errorDetail"> = {
+      id: ulid(),
+      assetIdentifier: d.asset.identifier,
+      side: d.decision === "buy" ? "buy" : "sell",
+      amount: built.amountUsd,
+    };
+
+    if (!args.liveMode) {
+      rows.push({ ...base, status: "dry_run", coinbaseOrderId: null, errorDetail: null });
+      continue;
+    }
+
+    // LIVE_MODE — place the real order, per-asset isolated.
+    const clientOrderId = deterministicClientOrderId(
+      args.sessionId,
+      args.tickStartedAt,
+      d.asset.identifier,
+    );
+    try {
+      // Fetch product increments for correct price/size rounding (live-only).
+      const product = await getProduct(d.asset.identifier);
+      const live = buildLimitOrder({
+        side,
+        lastClose,
+        dollars: d.sizing.kind === "buy_dollars" ? d.sizing.dollars : undefined,
+        fraction: d.sizing.kind === "sell_fraction" ? d.sizing.fraction : undefined,
+        heldQuantity: signal?.currentPosition?.quantity ?? 0,
+        quoteIncrement: product.quote_increment,
+        baseIncrement: product.base_increment,
+      });
+      const resp = await placeOrder({
+        productId: d.asset.identifier,
+        side,
+        orderConfiguration: live.config,
+        clientOrderId,
+      });
+      if (resp.success && resp.success_response) {
+        rows.push({
+          ...base,
+          amount: live.amountUsd,
+          status: "submitted",
+          coinbaseOrderId: resp.success_response.order_id,
+          errorDetail: null,
+        });
+      } else {
+        const reason = sanitizeErrorDetail(
+          resp.error_response?.message ??
+            resp.error_response?.error ??
+            "order rejected (no error_response)",
+        );
+        rows.push({
+          ...base,
+          amount: live.amountUsd,
+          status: "failed",
+          coinbaseOrderId: null,
+          errorDetail: reason,
+        });
+      }
+    } catch (err) {
+      // Per-asset isolation: record the failure, keep the tick going.
+      rows.push({
+        ...base,
+        status: "failed",
+        coinbaseOrderId: null,
+        errorDetail: sanitizeErrorDetail(
+          err instanceof Error ? err.message : String(err),
+        ),
+      });
+    }
+  }
+
+  return rows;
 }
 
 export async function GET(request: NextRequest) {
@@ -202,6 +322,18 @@ export async function GET(request: NextRequest) {
     // Step 6 — the decision engine (CB-4.1).
     const decisions = evaluate(strategy, perAssetSignals, sessionTotals);
 
+    // Step 6b (CB-4.3) — LIVE_MODE gate + unified-ledger rows. buy/sell
+    // decisions each yield an orders row regardless of mode; in LIVE_MODE
+    // a real limit order is placed first (per-asset isolated). hold → no row.
+    const orderRows = await buildOrderRows({
+      decisions,
+      perAssetSignals,
+      strategy,
+      sessionId: session.id,
+      tickStartedAt,
+      liveMode,
+    });
+
     // Step 7 — transactional persistence.
     const tickId = ulid();
     const signalRows: SignalRowInsert[] = decisions.map((d) => {
@@ -226,6 +358,7 @@ export async function GET(request: NextRequest) {
         decision: aggregateTickDecision(decisions),
         reason: summarizeTickReason(decisions),
         signals: signalRows,
+        orders: orderRows,
       });
     } catch (err) {
       // Engineer DRI Decision #4: NARROW duplicate catch — 23505 only.

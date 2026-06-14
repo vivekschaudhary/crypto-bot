@@ -37,6 +37,24 @@ export interface SignalRowInsert {
   lastClose: number | null;
 }
 
+/**
+ * One unified-ledger row destined for the reshaped `orders` table (CB-4.3,
+ * migration 0006). Written in the SAME transaction as the tick. Dry-run:
+ * `status='dry_run'`, `coinbaseOrderId=null`. Live success:
+ * `status='submitted'` + the Coinbase order id. Live failure:
+ * `status='failed'` + a redacted `errorDetail`. Only buy/sell decisions
+ * produce a row (a hold is not a transaction).
+ */
+export interface OrderRowInsert {
+  id: string;
+  assetIdentifier: string;
+  side: "buy" | "sell";
+  amount: number;
+  status: "dry_run" | "submitted" | "failed";
+  coinbaseOrderId: string | null;
+  errorDetail: string | null;
+}
+
 export interface TickInsert {
   id: string;
   sessionId: string;
@@ -45,6 +63,7 @@ export interface TickInsert {
   reason: string;
   errorDetail?: string;
   signals: SignalRowInsert[];
+  orders?: OrderRowInsert[];
 }
 
 /**
@@ -135,6 +154,24 @@ export async function insertTickWithDecisions(tick: TickInsert): Promise<void> {
           ${s.ma},
           ${s.maPeriod},
           ${s.lastClose}
+        )
+      `;
+    }
+    // CB-4.3: unified ledger rows (buy/sell only) in the SAME transaction
+    // as the tick — bot_ticks + signals + orders are atomic per tick.
+    for (const o of tick.orders ?? []) {
+      await tx`
+        INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, status, coinbase_order_id, error_detail)
+        VALUES (
+          ${o.id},
+          ${o.assetIdentifier},
+          ${tick.sessionId},
+          'bot',
+          ${o.side},
+          ${o.amount},
+          ${o.status},
+          ${o.coinbaseOrderId},
+          ${o.errorDetail}
         )
       `;
     }

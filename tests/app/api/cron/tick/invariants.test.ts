@@ -1,14 +1,13 @@
-// Architectural-invariant tests for the CB-4.2 cron tick pipeline.
+// Architectural-invariant tests for the cron tick pipeline.
 //
-// CB-4.2 AC 10 (no order placement in the dry-run tick's module graph) +
-// AC 13 (append-only grep + AC 5's no-silent-swallow proof).
+// CB-4.2 AC 10/13 + CB-4.3 AC 11 (the order-wiring contract INVERTED).
 //
-//   1. NO-ORDERS-IMPORT WALK — transitive import walk starting at
-//      app/api/cron/tick/route.ts; fails if ANY file in the graph resolves
-//      to lib/coinbase/orders.ts. Order placement is CB-4.3's concern at
-//      the LIVE_MODE gate; the dry-run tick must be structurally incapable
-//      of placing an order. Same walker pattern as
-//      tests/lib/decisions/no-coupling.test.ts (CB-4.0/4.1 precedent).
+//   1. ORDER-PLACEMENT WIRING (CB-4.3, inverted from CB-4.2) — the route's
+//      transitive graph now DOES reach lib/coinbase/orders.ts (the LIVE_MODE
+//      gate). CB-4.2 asserted the opposite (dry-run only); the contract
+//      deliberately shifted, so the test shifted with it (a
+//      [cross-artifact-sweep-on-contract-shift] instance). The behavioral
+//      "never called in dry-run" guarantee lives in route.test.ts.
 //
 //   2. APPEND-ONLY GREP — no `UPDATE bot_ticks` / `UPDATE signals`
 //      anywhere in lib/ + app/ source (brief guardrail, load-bearing now
@@ -102,18 +101,19 @@ function walkTsFiles(dir: string): string[] {
   return out;
 }
 
-describe("cron tick — dry-run module graph (AC 10)", () => {
-  it("route's transitive imports NEVER reach lib/coinbase/orders.ts", () => {
+describe("cron tick — order-placement wiring (CB-4.3 AC 11; INVERTED from CB-4.2 AC 10)", () => {
+  // CB-4.2 asserted the route's module graph NEVER reached lib/coinbase/orders.ts
+  // (dry-run only). CB-4.3 DELIBERATELY inverts that contract — the route now
+  // imports placeOrder for the LIVE_MODE gate. This is a textbook
+  // [cross-artifact-sweep-on-contract-shift]: the pinned contract changed, so
+  // the test moves WITH it in the same PR (not left asserting the old truth).
+  // The BEHAVIORAL guarantee that placeOrder is never CALLED in dry-run lives
+  // in route.test.ts (LIVE_MODE=false → placeOrder not called); here we only
+  // prove the structural wiring exists.
+  it("route's transitive imports now DO reach lib/coinbase/orders.ts", () => {
     const graph = walkModuleGraph(ROUTE_FILE);
     expect(graph.size).toBeGreaterThan(5); // smoke: the walk actually walked
-    if (graph.has(ORDERS_FILE)) {
-      throw new Error(
-        `Dry-run invariant violated: app/api/cron/tick/route.ts transitively imports lib/coinbase/orders.ts.\n` +
-          `Order placement is CB-4.3's concern at the LIVE_MODE gate — the CB-4.2 tick must be\n` +
-          `structurally incapable of placing an order. If you're building CB-4.3, gate the import\n` +
-          `behind the LIVE_MODE module per the brief, and update this test per that story's ACs.`,
-      );
-    }
+    expect(graph.has(ORDERS_FILE)).toBe(true);
   });
 });
 
