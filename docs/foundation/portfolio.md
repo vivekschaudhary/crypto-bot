@@ -57,7 +57,7 @@ flowchart LR
 - **Stream 1 (Day 1, no deps):** CB-1 (passkey auth) + CB-2 (Coinbase data + top-5 discovery) — independent foundations. Either of these is a meaningful Day-1 ship by itself.
 - **Stream 2 (after Stream 1):** CB-3 (strategy authoring) — depends on CB-1 + CB-2; no parallel sibling at this stage.
 - **Stream 3 (after CB-3):** CB-4 (bot runtime) — sequential; needs strategy config to read.
-- **Stream 4 (after CB-4):** CB-5 (ledger + dashboard) — sequential; needs `bot_ticks` rows to display.
+- **Stream 4 (overlaps CB-4 tail):** CB-5 (ledger + dashboard). Originally planned sequential — "needs `bot_ticks` rows to display." That dependency is **satisfied** as of 2026-06-14 (CB-4.2/4.3 shipped; `bot_ticks`/`signals`/`orders` live + verified in prod), so CB-5 was promoted in parallel with the CB-4 tail (dry_run verification + CB-4.4 drop call). See CB-5 brief PM Decision #5.
 
 Critical path: CB-2 → CB-3 → CB-4 → CB-5 (4 sequential bets). The MVP is **largely a single critical path** with CB-1 as the one parallel companion to CB-2.
 
@@ -84,7 +84,8 @@ _Populated as each stub gets promoted to a full brief via `/create-brief <bet-id
 | [CB-1](../bets/CB-1/brief.md) | 2026-05-31 | approved |
 | [CB-2](../bets/CB-2/brief.md) | 2026-06-06 | approved |
 | [CB-3](../bets/CB-3/brief.md) | 2026-06-08 | approved (BACKFILL — promotion log row missing at original promotion event; added during CB-4 promotion 2026-06-09 cross-artifact sweep) |
-| [CB-4](../bets/CB-4/brief.md) | 2026-06-09 | proposed (awaiting HITL approval) |
+| [CB-4](../bets/CB-4/brief.md) | 2026-06-09 | approved (2026-06-09, PR #56); 3 of 4 stories shipped + verified in prod as of 2026-06-14 (CB-4.0/4.1/4.2/4.3) |
+| [CB-5](../bets/CB-5/brief.md) | 2026-06-14 | proposed (awaiting HITL approval) — promoted in parallel with the CB-4 tail; dependency satisfied (bot_ticks/signals/orders shipped + verified) |
 
 ## DRI Log
 
