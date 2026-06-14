@@ -93,14 +93,24 @@ export async function loadSingletonSession(): Promise<BotSession | null> {
  * Aggregate the active session's bot-buy totals for cap enforcement.
  *
  * PM DRI Decision #2 (story): source of truth is the `orders` ledger —
- * `source='bot'`, `side='buy'`, non-failed, session-scoped. Returns ZEROS
- * during the CB-4.2 window (no `orders` writes exist until CB-4.3 ships
- * the ledger writes per brief PM Decision #8); the query is the permanent
- * seam — CB-4.3 changes nothing here, rows simply start existing.
+ * `source='bot'`, `side='buy'`, session-scoped, counting ONLY rows that
+ * deployed REAL capital.
+ *
+ * CAP SEMANTICS — count live deployments only (PR #65 round-1 BLOCKER):
+ * caps (`per_session_dollar_cap` / `per_session_buy_count_cap`) bound how
+ * much REAL operator capital the bot commits per session, so this excludes
+ * BOTH `failed` (no money) AND `dry_run` (paper, no money). The CB-4.2
+ * predicate was `status <> 'failed'` — correct THEN (the table was empty,
+ * so it returned zeros), but CB-4.3 introduced `dry_run` rows and counting
+ * them would let a long paper-trading session exhaust the caps, so that
+ * flipping `LIVE_MODE=true` alone would still suppress buys. Excluding
+ * `dry_run` at the query is the robust fix (no dependence on a session
+ * reset between paper and live): paper trades NEVER count against
+ * real-money caps, within or across sessions. Counts `submitted` now + any
+ * future live status (filled/pending/…) by exclusion.
  *
  * `amount` semantics: for bot BUY orders the column stores the USD
- * notional (CB-4.1 `BuySizing.dollars`); exact status taxonomy lands with
- * CB-4.3's Engineer DRI.
+ * notional (CB-4.1 `BuySizing.dollars` = `position_size_usd`).
  */
 export async function aggregateSessionTotals(
   sessionId: string,
@@ -113,7 +123,7 @@ export async function aggregateSessionTotals(
      WHERE session_id = ${sessionId}
        AND source = 'bot'
        AND side = 'buy'
-       AND status <> 'failed'
+       AND status NOT IN ('failed', 'dry_run')
   `;
   return {
     dollarSpent: rows[0]?.dollar_spent ?? 0,
