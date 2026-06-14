@@ -139,7 +139,7 @@ If the dashboard surfaces, as Server-Component-rendered views on each page load:
   - **Area (required, tag):** test-discipline / e2e
 
 - [2026-06-14] [PM] **Holdings/avg-cost display divergence from Coinbase reality**
-  - **Likelihood (required):** low-medium (the dashboard shows a fresh `aggregatePosition` read, but cost-basis aggregation has a 250-fill pagination window per CB-4.3's Engineer Decision — a very long trade history could under-count)
+  - **Likelihood (required):** low-medium (the dashboard shows a fresh `aggregatePosition` read, but cost-basis aggregation reads a single bounded page of fills — pagination is deferred per CB-4.3's Engineer Decision — so a very long trade history could under-count)
   - **Impact (required):** medium (operator sees a slightly-off avg cost → mild distrust; not a money bug in dry-run)
   - **Mitigation (required):** label the live-state numbers as derived-from-Coinbase-fills; surface `last_close` alongside so the operator can sanity-check; the pagination limit is a known CB-4.3 deferral (CB-4.3 PM Risk #3), inherited + labeled here.
   - **Area (required, tag):** data-accuracy / display
