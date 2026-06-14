@@ -516,4 +516,54 @@ describe("tick route — LIVE_MODE gate (CB-4.3 AC 3/4/7)", () => {
     expect(byAsset["BTC-USD"]).toBe("failed");
     expect(byAsset["ETH-USD"]).toBe("submitted");
   });
+
+  it("AC 9 leg (c): a live order's coinbase_order_id is logged BEFORE the DB write, so it survives a DB-write failure (PR #65 review finding)", async () => {
+    liveModeMock = true;
+    getProductCandles.mockResolvedValue(makeCandles(FALLING_30)); // buy
+    placeOrder.mockResolvedValue({
+      success: true,
+      success_response: {
+        order_id: "cb-survives-123",
+        product_id: "BTC-USD",
+        side: "BUY",
+        client_order_id: "x",
+      },
+    });
+    // The DB transaction fails AFTER the order was placed (the dual-write window).
+    insertTickWithDecisions.mockRejectedValueOnce(
+      Object.assign(new Error("connection lost"), { code: "08006" }),
+    );
+    insertTickWithDecisions.mockResolvedValueOnce(undefined); // the error row
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const res = await GET(makeRequest());
+      expect(res.status).toBe(500); // DB write failed → tick error
+      // The placement was logged independently of the (rolled-back) DB row,
+      // so the real order id is recoverable from the log drain.
+      const placementLog = logSpy.mock.calls
+        .map((c) => String(c[0]))
+        .find((line) => line.includes('"event":"bot_order_placed"'));
+      expect(placementLog).toBeDefined();
+      expect(placementLog).toContain('"coinbase_order_id":"cb-survives-123"');
+      expect(placementLog).toContain('"status":"submitted"');
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("dry-run placements emit NO bot_order_placed log (nothing real was placed)", async () => {
+    liveModeMock = false;
+    getProductCandles.mockResolvedValue(makeCandles(FALLING_30)); // buy
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      await GET(makeRequest());
+      const placementLog = logSpy.mock.calls
+        .map((c) => String(c[0]))
+        .find((line) => line.includes('"event":"bot_order_placed"'));
+      expect(placementLog).toBeUndefined();
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
 });

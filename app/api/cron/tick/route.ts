@@ -75,7 +75,11 @@ import {
   floorToQuarterHour,
   summarizeTickReason,
 } from "@/lib/ticks/tick-helpers";
-import { emitTickTrace, sanitizeErrorDetail } from "@/lib/ticks/trace";
+import {
+  emitOrderPlacementTrace,
+  emitTickTrace,
+  sanitizeErrorDetail,
+} from "@/lib/ticks/trace";
 
 export const dynamic = "force-dynamic";
 // AC 9 — fail-fast ceiling; layer 2 of the cron-overlap defense. A hung
@@ -210,6 +214,18 @@ async function buildOrderRows(args: {
         clientOrderId,
       });
       if (resp.success && resp.success_response) {
+        // AC 9 leg (c): log the placement outcome BEFORE the DB transaction,
+        // so a real coinbase_order_id survives a later DB-write failure
+        // (the orders row would roll back). PR #65 round-1 review finding.
+        emitOrderPlacementTrace({
+          sessionId: args.sessionId,
+          tickStartedAt: args.tickStartedAt.toISOString(),
+          assetIdentifier: d.asset.identifier,
+          side: base.side,
+          clientOrderId,
+          status: "submitted",
+          coinbaseOrderId: resp.success_response.order_id,
+        });
         rows.push({
           ...base,
           amount: live.amountUsd,
@@ -223,6 +239,15 @@ async function buildOrderRows(args: {
             resp.error_response?.error ??
             "order rejected (no error_response)",
         );
+        emitOrderPlacementTrace({
+          sessionId: args.sessionId,
+          tickStartedAt: args.tickStartedAt.toISOString(),
+          assetIdentifier: d.asset.identifier,
+          side: base.side,
+          clientOrderId,
+          status: "failed",
+          errorDetail: reason,
+        });
         rows.push({
           ...base,
           amount: live.amountUsd,
@@ -233,13 +258,23 @@ async function buildOrderRows(args: {
       }
     } catch (err) {
       // Per-asset isolation: record the failure, keep the tick going.
+      const reason = sanitizeErrorDetail(
+        err instanceof Error ? err.message : String(err),
+      );
+      emitOrderPlacementTrace({
+        sessionId: args.sessionId,
+        tickStartedAt: args.tickStartedAt.toISOString(),
+        assetIdentifier: d.asset.identifier,
+        side: base.side,
+        clientOrderId,
+        status: "failed",
+        errorDetail: reason,
+      });
       rows.push({
         ...base,
         status: "failed",
         coinbaseOrderId: null,
-        errorDetail: sanitizeErrorDetail(
-          err instanceof Error ? err.message : String(err),
-        ),
+        errorDetail: reason,
       });
     }
   }
