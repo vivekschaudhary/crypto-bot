@@ -1,7 +1,7 @@
 ---
 id: CB-5
 type: feature
-status: proposed
+status: approved
 priority: P0
 parent: FOUNDATION-PRODUCT
 portfolio_stub: false
@@ -169,7 +169,8 @@ The decision-trace + reason-string observability is the product's actual moat pe
 | Date | Event | Notes |
 |---|---|---|
 | 2026-05-31 | Portfolio stub created | CB-5 as the 5th MVP bet; sequential after CB-4; 3wk/low stub estimate. |
-| 2026-06-14 | Brief promoted via `/create-brief CB-5` | Promoted in parallel with the CB-4 tail (dependency satisfied — `bot_ticks`/`signals`/`orders` shipped + verified in prod). 6 PM DRI Decisions (safe-controls-first; SSR-per-load; reuse read model; inline styles; parallel_with CB-4; holdings from `aggregatePosition`). 3 PM Risks; 1 Researcher Open Question (PnL scope). 4 MVP stories forecast (CB-5.0–5.3) + a deferred CB-5.4. Estimate refined 3wk/low → 1wk/medium. `architecture_required: false` (foundation architecture + CB-4 data model cover it). Two grounding findings: `account_snapshots` + `override_events` both unpopulated (CB-5 is the first `override_events` writer; holdings come from Coinbase cost-basis). Awaiting HITL approval before `/create-story CB-5`. |
+| 2026-06-14 | Brief promoted via `/create-brief CB-5` | Promoted in parallel with the CB-4 tail (dependency satisfied — `bot_ticks`/`signals`/`orders` shipped + verified in prod). 6 PM DRI Decisions (safe-controls-first; SSR-per-load; reuse read model; inline styles; parallel_with CB-4; holdings from `aggregatePosition`). 3 PM Risks; 1 Researcher Open Question (PnL scope). 4 MVP stories forecast (CB-5.0–5.3) + a deferred CB-5.4. Estimate refined 3wk/low → 1wk/medium. `architecture_required: false` (foundation architecture + CB-4 data model cover it). Two grounding findings: `account_snapshots` + `override_events` both unpopulated (CB-5 is the first `override_events` writer; holdings come from Coinbase cost-basis). Promotion shipped via PR #66 (1 supplementary-review ISSUE closed — stale CB-4 status-row sweep; Codex was down, re-review retroactive). Awaiting HITL approval before `/create-story CB-5`. |
+| 2026-06-14 | **Brief APPROVED** (HITL milestone gate) | Operator authorized at the MVP-transition milestone ("ready to close and move to the next"). `status: proposed → approved`. Unblocks `/create-story CB-5` for CB-5.0 (live-state view + read model). No further HITL gate before `/create-story` per `hitl_level: milestones`. |
 
 ## DRI Log
 

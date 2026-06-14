@@ -84,8 +84,8 @@ _Populated as each stub gets promoted to a full brief via `/create-brief <bet-id
 | [CB-1](../bets/CB-1/brief.md) | 2026-05-31 | approved |
 | [CB-2](../bets/CB-2/brief.md) | 2026-06-06 | approved |
 | [CB-3](../bets/CB-3/brief.md) | 2026-06-08 | approved (BACKFILL — promotion log row missing at original promotion event; added during CB-4 promotion 2026-06-09 cross-artifact sweep) |
-| [CB-4](../bets/CB-4/brief.md) | 2026-06-09 | approved (2026-06-09, PR #56); 3 of 4 stories shipped + verified in prod as of 2026-06-14 (CB-4.0/4.1/4.2/4.3) |
-| [CB-5](../bets/CB-5/brief.md) | 2026-06-14 | proposed (awaiting HITL approval) — promoted in parallel with the CB-4 tail; dependency satisfied (bot_ticks/signals/orders shipped + verified) |
+| [CB-4](../bets/CB-4/brief.md) | 2026-06-09 | approved (2026-06-09, PR #56); **BET COMPLETE 2026-06-14 — all 4 stories shipped (CB-4.0/4.1/4.2/4.3), CB-4.4 dropped** |
+| [CB-5](../bets/CB-5/brief.md) | 2026-06-14 | approved (2026-06-14, HITL milestone gate; promoted PR #66) — last MVP bet, building next via `/create-story CB-5` |
 
 ## DRI Log
 
