@@ -15,8 +15,11 @@
 import { headers } from "next/headers";
 import type { JSX } from "react";
 
+import { loadLiveState } from "@/lib/dashboard/live-state";
 import { db } from "@/lib/db/client";
 
+import { LiveModeBanner } from "./live-mode-banner";
+import { LiveStatePanels } from "./live-state-panels";
 import { SignOutClient } from "./sign-out-client";
 
 const pageStyle: React.CSSProperties = {
@@ -42,11 +45,6 @@ const titleStyle: React.CSSProperties = {
 
 const bodyStyle: React.CSSProperties = {
   marginBottom: "1.5rem",
-};
-
-const placeholderStyle: React.CSSProperties = {
-  color: "#666",
-  marginBottom: "2rem",
 };
 
 const deviceStyle: React.CSSProperties = {
@@ -109,25 +107,28 @@ export default async function DashboardPage(
     ? deviceLabel
     : "this device";
 
+  // CB-5.0 — live-state read model (SSR per load; brief PM Decision #2).
+  const liveState = await loadLiveState();
+
   return (
     <main style={pageStyle}>
       <div style={chromeStyle}>
         <div style={titleStyle}>crypto-bot</div>
         <SignOutClient />
       </div>
+      <LiveModeBanner liveMode={liveState.liveMode} />
+      {/* CB-1.6 post-auth confirmation — preserved (onboarding e2e contract). */}
+      <p style={bodyStyle}>Signed in.</p>
       {showStrategySavedBanner && (
         <div role="status" style={successBannerStyle}>
           Strategy saved. Bot will pick it up on the next tick.
         </div>
       )}
-      <p style={bodyStyle}>Signed in.</p>
-      <p style={{ marginBottom: "1.25rem" }}>
+      <LiveStatePanels state={liveState} />
+      <p style={{ marginTop: "1.5rem", marginBottom: "1.25rem" }}>
         <a href="/dashboard/strategy" style={linkStyle}>
           Create or revise your DCA strategy
         </a>
-      </p>
-      <p style={placeholderStyle}>
-        Bot controls and decision trace will arrive in the next bet (CB-2).
       </p>
       <p style={deviceStyle}>Connected device: {connectedDevice}</p>
     </main>

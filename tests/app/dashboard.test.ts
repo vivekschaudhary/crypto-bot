@@ -23,6 +23,21 @@ vi.mock("@/app/dashboard/sign-out-client", () => ({
   SignOutClient: () => null,
 }));
 
+// CB-5.0: the page now composes the live-state read model. Mock it to a
+// benign no-session state so these CB-1.6 chrome/device-label tests stay
+// isolated to their concern (live-state has its own tests at
+// tests/lib/dashboard/live-state.test.ts). With this mocked, loadLiveState
+// makes no db()/Coinbase calls, so the device_label query is the only
+// sqlMock consumer.
+vi.mock("@/lib/dashboard/live-state", () => ({
+  loadLiveState: vi.fn(async () => ({
+    session: null,
+    holdings: [],
+    activity: { buyCount: 0, totalInvestedUsd: 0 },
+    liveMode: false,
+  })),
+}));
+
 hoisted.sqlMock.mockImplementation(async () => hoisted.state.deviceLabelRows);
 
 const { headersGetMock, sqlMock, state } = hoisted;
@@ -45,7 +60,12 @@ describe("DashboardPage /dashboard", () => {
     const json = JSON.stringify(el);
     expect(json).toContain("crypto-bot");
     expect(json).toContain("Signed in.");
-    expect(json).toContain("Bot controls and decision trace will arrive in the next bet (CB-2).");
+    expect(json).toContain("Create or revise your DCA strategy");
+    // CB-5.0: the CB-2 placeholder is gone — replaced by the live-state
+    // surface (LIVE_MODE banner + panels are child components, asserted in
+    // e2e + tests/lib/dashboard; JSON.stringify of the element tree only
+    // captures DashboardPage's own direct JSX, not nested-component output).
+    expect(json).not.toContain("will arrive in the next bet");
   });
 
   it("renders the device label from auth_credentials.device_label", async () => {
