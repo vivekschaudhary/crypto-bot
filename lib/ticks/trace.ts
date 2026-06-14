@@ -46,6 +46,49 @@ export interface TickTraceArgs {
 }
 
 /**
+ * Per-LIVE-PLACEMENT structured log line — emitted the MOMENT placeOrder
+ * resolves, BEFORE the tick's DB transaction (CB-4.3 PR #65 round-1 review
+ * finding; story AC 9 mitigation leg (c)).
+ *
+ * The dual-write window: a live order can be placed successfully but the
+ * subsequent insertTickWithDecisions transaction can then fail — rolling
+ * back the orders row, leaving NO local trace of the real coinbase_order_id.
+ * This log records the placement outcome independently of the DB so the id
+ * survives a DB-write failure (reconciliation / manual recovery). Only
+ * emitted for live placements (dry-run places nothing + is already in the
+ * tick-level decisions trace). errorDetail must already be sanitized by the
+ * caller; re-sanitized here as defense-in-depth.
+ */
+export function emitOrderPlacementTrace(args: {
+  sessionId: string;
+  tickStartedAt: string;
+  assetIdentifier: string;
+  side: "buy" | "sell";
+  clientOrderId: string;
+  status: "submitted" | "failed";
+  coinbaseOrderId?: string | null;
+  errorDetail?: string | null;
+}): void {
+  try {
+    const payload: Record<string, unknown> = {
+      event: "bot_order_placed",
+      live_mode: true,
+      session_id: args.sessionId,
+      tick_started_at: args.tickStartedAt,
+      asset: args.assetIdentifier,
+      side: args.side,
+      client_order_id: args.clientOrderId,
+      status: args.status,
+    };
+    if (args.coinbaseOrderId) payload.coinbase_order_id = args.coinbaseOrderId;
+    if (args.errorDetail) payload.error = sanitizeErrorDetail(args.errorDetail);
+    console.log(JSON.stringify(payload));
+  } catch {
+    // Logging must never take down a tick.
+  }
+}
+
+/**
  * Emit the per-tick structured log line. console.log → Vercel log drain;
  * never throws (a logging failure must not fail the tick).
  */

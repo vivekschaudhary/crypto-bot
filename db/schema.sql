@@ -34,16 +34,24 @@ CREATE TABLE IF NOT EXISTS bot_sessions (
     active_strategy_id text
 );
 
+-- Unified buy/sell ledger across dry-run + live modes. Reshaped by
+-- migration 0006 (CB-4.3) per the amended Order entity at
+-- docs/foundation/architecture.md DRI Log 2026-06-13: the original
+-- accounts/assets dimension FKs were dropped (nothing populated them —
+-- same root cause as the 0005 signals reshape); asset_id → asset_identifier
+-- text; account_id dropped (single-operator MVP). status free-form
+-- (dry_run | submitted | failed for bot rows); coinbase_order_id NULL for
+-- dry_run + failed; error_detail holds the redacted failure reason.
 CREATE TABLE IF NOT EXISTS orders (
     id text PRIMARY KEY,
-    account_id text NOT NULL REFERENCES accounts(id),
-    asset_id text NOT NULL REFERENCES assets(id),
+    asset_identifier text NOT NULL,
     session_id text REFERENCES bot_sessions(id),  -- NULL for manual orders
     source text NOT NULL CHECK (source IN ('manual', 'bot')),
     side text NOT NULL CHECK (side IN ('buy', 'sell')),
     amount numeric NOT NULL,
     status text NOT NULL,
     coinbase_order_id text,
+    error_detail text,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
