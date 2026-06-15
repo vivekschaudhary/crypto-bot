@@ -15,9 +15,44 @@
 
 import { defineConfig, devices } from "@playwright/test";
 
+import { requireTestDatabaseUrl } from "./e2e/test-db";
+
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const liveBaseURL = process.env.PLAYWRIGHT_LIVE_BASE_URL ?? "http://localhost:3100";
 const skipWebServer = !!process.env.PLAYWRIGHT_SKIP_WEB_SERVER;
+
+// FAIL-CLOSED against production — UNCONDITIONALLY (both modes). The specs
+// connect to TEST_DATABASE_URL via e2e/test-db.ts regardless of who starts the
+// server, so TEST_DATABASE_URL must always be present. requireTestDatabaseUrl()
+// throws if it is unset or equals DATABASE_URL → e2e refuses to run rather than
+// letting the specs' TRUNCATEs hit prod (the 2026-06-15 data-loss incident).
+const testDatabaseUrl = requireTestDatabaseUrl();
+
+// External-server mode: Playwright does NOT start the server, so it cannot
+// control that server's DATABASE_URL. If the already-running server points at
+// prod (this repo shares one DATABASE_URL across local/preview/prod — see
+// docs/ops/2026-06-06-db-migrate-env-and-build.md), the app-under-test would
+// WRITE to prod even though the specs' TRUNCATEs are safely confined to the
+// test DB. Playwright can't verify the external server's DB, so external mode
+// is fail-closed too: it requires an explicit acknowledgment that the server
+// was started against the test DB (DATABASE_URL=$TEST_DATABASE_URL).
+if (skipWebServer && process.env.PLAYWRIGHT_EXTERNAL_DB_OK !== "1") {
+  throw new Error(
+    "[e2e] PLAYWRIGHT_SKIP_WEB_SERVER is set, but Playwright cannot control the " +
+      "externally-started server's DATABASE_URL — if it points at production the " +
+      "app-under-test will write prod. Start that server with " +
+      "DATABASE_URL=$TEST_DATABASE_URL and set PLAYWRIGHT_EXTERNAL_DB_OK=1 to " +
+      "confirm. Refusing to run.",
+  );
+}
+
+// When Playwright boots the webServers, inject the test DB so the
+// app-under-test uses it too (this `env` wins over .env.local — Next does not
+// override an already-set process.env var). Empty in external mode (the
+// operator owns the external server's env, gated by the assert above).
+const webServerDbEnv: Record<string, string> = skipWebServer
+  ? {}
+  : { DATABASE_URL: testDatabaseUrl };
 
 export default defineConfig({
   testDir: "./e2e",
@@ -54,16 +89,18 @@ export default defineConfig({
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
+          // App-under-test uses the dedicated test DB, never prod (see above).
+          env: webServerDbEnv,
         },
         {
           // Second server with LIVE_MODE=true (overrides .env.local's
           // false; Next.js still loads the rest of .env.local). Different
-          // port so both run concurrently against the shared DB.
+          // port so both run concurrently against the test DB.
           command: "pnpm dev --port 3100",
           url: liveBaseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
-          env: { LIVE_MODE: "true" },
+          env: { ...webServerDbEnv, LIVE_MODE: "true" },
         },
       ],
 });

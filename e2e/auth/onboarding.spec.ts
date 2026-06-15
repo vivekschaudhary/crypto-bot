@@ -1,48 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import postgres from "postgres";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-function loadEnvValue(key: string): string | undefined {
-  if (process.env[key]) return process.env[key];
+import { getTestSql } from "../test-db";
 
-  for (const filename of [".env.local", ".env"]) {
-    const path = resolve(process.cwd(), filename);
-    if (!existsSync(path)) continue;
-
-    const line = readFileSync(path, "utf8")
-      .split(/\r?\n/)
-      .find((entry) => entry.startsWith(`${key}=`));
-
-    if (!line) continue;
-
-    const rawValue = line.slice(key.length + 1).trim();
-    if (!rawValue) continue;
-
-    if (
-      (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
-      (rawValue.startsWith("'") && rawValue.endsWith("'"))
-    ) {
-      return rawValue.slice(1, -1);
-    }
-
-    return rawValue;
-  }
-
-  return undefined;
-}
-
-const DATABASE_URL = loadEnvValue("DATABASE_URL");
-
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL is required for e2e/auth/onboarding.spec.ts");
-}
-
-const sql = postgres(DATABASE_URL, {
-  prepare: false,
-  idle_timeout: 20,
-  max: 1,
-});
+// Fail-closed against prod: getTestSql() uses TEST_DATABASE_URL and throws if
+// it is unset or equals DATABASE_URL (see e2e/test-db.ts; 2026-06-15 incident).
+const sql = getTestSql();
 
 test.describe.configure({ mode: "serial" });
 

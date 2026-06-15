@@ -1,36 +1,18 @@
-// Shared e2e helpers (CB-5.0). The CB-1.6 onboarding + CB-3.3 strategy
-// specs predate this and duplicate these locally; new specs use this
-// module (refactoring the old ones to it is a future cleanup, noted).
-
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+// Shared e2e helpers (CB-5.0). DB access is fail-closed against production —
+// it routes through `e2e/test-db.ts` (TEST_DATABASE_URL only; throws if unset
+// or equal to prod). See that module for the 2026-06-15 incident rationale.
 
 import { expect, type Page } from "@playwright/test";
-import postgres from "postgres";
+import type postgres from "postgres";
 
-export function loadEnvValue(key: string): string | undefined {
-  if (process.env[key]) return process.env[key];
-  for (const filename of [".env.local", ".env"]) {
-    const path = resolve(process.cwd(), filename);
-    if (!existsSync(path)) continue;
-    const line = readFileSync(path, "utf8")
-      .split(/\r?\n/)
-      .find((entry) => entry.startsWith(`${key}=`));
-    if (!line) continue;
-    const raw = line.slice(key.length + 1).trim();
-    if (!raw) continue;
-    if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
-      return raw.slice(1, -1);
-    }
-    return raw;
-  }
-  return undefined;
-}
+import { getTestSql, loadEnvValue } from "./test-db";
 
+// Re-exported so existing specs can keep importing these from "../helpers".
+export { loadEnvValue };
+
+/** A postgres.js client bound to the guarded, disposable test database. */
 export function getSql(): ReturnType<typeof postgres> {
-  const DATABASE_URL = loadEnvValue("DATABASE_URL");
-  if (!DATABASE_URL) throw new Error("DATABASE_URL is required for e2e");
-  return postgres(DATABASE_URL, { prepare: false, idle_timeout: 20, max: 1 });
+  return getTestSql();
 }
 
 /** Clear all operator data (FK cascade through auth_users). */
