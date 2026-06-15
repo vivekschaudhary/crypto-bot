@@ -36,9 +36,9 @@ The final MVP story and CB-5's **only write surface**: in-product controls to **
 
 - [ ] **AC 3 — resume**: `kind='resume'` → `status='active'` + `override_events(kind='resume')`, one transaction.
 
-- [ ] **AC 4 — reset** (PM Decision #1 — single-row semantics): `kind='reset'` → UPDATE the singleton `bot_sessions` row to `status='active'` + `started_at=now()` (a fresh session start) + INSERT `override_events(kind='reset')`, one transaction. **Historical `orders`/`bot_ticks`/`signals` are PRESERVED (never deleted)** — "reset clears the session, not the exchange or the audit history" (product.md). The same row id is kept (the `bot_sessions` singleton invariant + `loadSingletonSession`'s `LIMIT 1` stay intact — NO second row).
+- [ ] **AC 4 — reset** (PM Decision #1 — MULTI-ROW, per the architecture `BotSession` model): `kind='reset'` → in ONE transaction, END the current `bot_sessions` row (`status='reset'`, `ended_at=now()`) AND INSERT a NEW active row (`status='active'`, `started_at=now()`, `active_strategy_id` carried over from the ended session) + INSERT `override_events(kind='reset')`. **Historical `orders`/`bot_ticks`/`signals` are PRESERVED** (their `session_id` points at the now-ended session — audit intact); "reset clears the session, not the exchange or the audit history" (product.md). The new row becomes the current session. NO migration (`bot_sessions.ended_at` already exists in 0001-init).
 
-- [ ] **AC 5 — "this session" activity re-anchors to `started_at`**: so reset actually resets the live-state activity count, `loadSessionActivity` (CB-5.0) counts orders with `created_at >= bot_sessions.started_at` (not all session orders). After a reset, "this session" shows 0 buys until new ones occur; the **ledger view (CB-5.2) still shows full history** (audit preserved). This is the refinement that makes reset meaningful without multi-row sessions.
+- [ ] **AC 5 — current-session selection updated for multi-row** (the shipped-read change this requires): `loadSingletonSession` (CB-4.2) + the `bot_sessions` read inside `upsertSingletonBotSession` (CB-3.3) select the LATEST session by `started_at` (`ORDER BY started_at DESC LIMIT 1`, `FOR UPDATE` where it locks) — the current running session — instead of `LIMIT 1` over a presumed singleton. After a reset, the cron + dashboard naturally operate on the new active row; **"this session" activity resets to 0 automatically** because `loadSessionActivity` counts by the (new) current `session_id` — NO `started_at` filter needed (multi-row is cleaner than the single-row workaround would have been). The **ledger view (CB-5.2) still shows all orders across all sessions** (audit). NOTE: with multi-row, the current session is never `status='reset'` (reset immediately creates an active row), so CB-4.2's `status='reset'` cron early-out is unreachable for the current session — leave it as harmless defense-in-depth; the Engineer documents this.
 
 - [ ] **AC 6 — Override controls UI** (Client Component on `/dashboard` live-state): **Pause** (shown when status='active'), **Resume** (shown when 'paused'), **Reset** (always). Each POSTs to `/api/bot/override`; on success the page reflects the new state (refresh/`router.refresh()` — SSR re-render shows the updated status/activity). **Reset requires a confirm step** (it re-anchors the session) — confirmation copy from [copy.md](copy.md). Copy verbatim.
 
@@ -68,7 +68,7 @@ UI + write surface — load-bearing.
 
 ### Engineer DRI Decisions
 1. **Single route `/api/bot/override`** with a `kind` body (vs three routes) — extensible for CB-5.4's force_buy/sell on the same route; the safe-kind allow-list gates it now.
-2. **Reset = single-row UPDATE** (status + started_at), NOT a second bot_sessions row — preserves the singleton `LIMIT 1` contract that `loadSingletonSession`/`upsertSingletonBotSession` rely on (a second row would make `LIMIT 1` non-deterministic). Activity re-anchors via `started_at` (AC 5).
+2. **Reset = MULTI-ROW** (end current row + insert new active row, carry `active_strategy_id`) per the architecture model; update `loadSingletonSession` + `upsertSingletonBotSession`'s reads to latest-session (`ORDER BY started_at DESC`). Activity resets naturally by the new `session_id` (no `started_at` filter). No migration (`ended_at` exists). The cron `status='reset'` early-out becomes unreachable-for-current-session (document; leave as defense-in-depth).
 3. **Auth reuse** — `verifySession` + the CSRF/Origin + rate-limit + cookie helpers from the CB-1.5 sign-out route; do not reinvent.
 4. **Override DB ops in `lib/bot/overrides.ts`** (server-only; transactional status + override_events). The live-state activity query refinement (AC 5) lands in `lib/dashboard/live-state.ts`.
 
@@ -77,17 +77,17 @@ UI + write surface — load-bearing.
 
 ### What this story does NOT include
 - Real-money overrides force_buy/sell_50/sell_all (CB-5.4, post-flip — rejected with 400 here).
-- Multi-row session history (reset is single-row re-anchor).
+- A per-session HISTORY view (the multi-row data now exists — ended sessions with `started_at`/`ended_at` — but rendering a session-by-session breakdown is post-MVP; CB-5.0 live-state shows only the current session, the ledger shows all orders).
 - The LIVE_MODE flip itself (operator env ceremony).
 
 ## DRI Log
 
 ### Decisions
-- [2026-06-14] [PM] **Reset = single-row re-anchor (status='active' + started_at=now), history preserved; activity counts since started_at**
-  - **Rationale (required):** product.md says "reset clears the session, not the exchange." The honest local meaning: a fresh session (status active, new start time, activity counter reset) WITHOUT deleting historical orders/ticks (audit) or touching the real Coinbase account. A single-row UPDATE preserves the `bot_sessions` singleton invariant that `loadSingletonSession`'s `LIMIT 1` (CB-4.2) + `upsertSingletonBotSession` (CB-3.3) depend on — a second "new session" row would make `LIMIT 1` non-deterministic (a shipped-code hazard). Activity re-anchors to `started_at` (AC 5) so "this session" resets; the ledger keeps full history.
-  - **Area (required, tag):** session-model / reset-semantics
-  - **Alternatives considered (required):** multi-row sessions (current row → status='reset' + ended_at, INSERT a new active row) (rejected — breaks `loadSingletonSession` `LIMIT 1`; would require changing shipped CB-3/CB-4 reads to "latest" selection — scope + risk); delete session orders on reset (rejected — destroys the audit ledger; product.md says preserve the ledger)
-  - **Reversibility:** moderate — moving to multi-row sessions later is a migration + read-path change if historical-session views are ever wanted
+- [2026-06-14] [PM] **Reset = MULTI-ROW (end current session + start a new one), per the foundational architecture `BotSession` model** — operator decision at the PR #74 round-1 BLOCKER (Codex flagged the story diverging from the architecture; Principle #16)
+  - **Rationale (required):** the [foundation architecture](../../../../foundation/architecture.md) defines `BotSession` as "a contiguous run of the bot, operator-resettable" with reset ending one session + starting a new one (multi-row). The shipped CB-3/CB-4 code was single-row singleton — a **pre-existing doc-vs-code drift** (the architecture's multi-row intent was never implemented). The BLOCKER is resolved by ALIGNING the story to the architecture (conform the downstream to the owning artifact — NOT amending the architecture down to the shipped shortcut, which would have been soft-spec rationalization). The operator chose multi-row for true per-session history. **No architecture amendment** (the story now matches it); **no migration** (`bot_sessions.ended_at` already exists). Activity resets naturally by the new `session_id` (cleaner than the single-row `started_at`-filter would have been). Cost: the shipped `loadSingletonSession` + `upsertSingletonBotSession` reads change to latest-session selection (PM Risk below).
+  - **Area (required, tag):** session-model / reset-semantics / upstream-first
+  - **Alternatives considered (required):** single-row re-anchor (the story's original draft — rejected by the operator; it diverged from the architecture + foreclosed per-session history); amend the architecture DOWN to single-row to match the shipped code (rejected — that's conforming the spec to a shortcut, soft-spec rationalization; the architecture's model is the richer/correct one); delete session orders on reset (rejected — destroys the audit ledger)
+  - **Reversibility:** moderate — the read-path change is localized to an `ORDER BY started_at DESC`; reverting to singleton would re-drift from the architecture
 - [2026-06-14] [PM] **Safe controls only; force_buy/sell_* rejected (400) — deferred to CB-5.4** (executes brief PM Decision #1) — the route + UI ship pause/resume/reset; the real-money kinds are gated until the LIVE_MODE path is proven post-flip.
   - **Area:** scope / real-money-safety
   - **Reversibility:** trivial — CB-5.4 adds the kinds to the same route + buttons
@@ -95,13 +95,14 @@ UI + write surface — load-bearing.
 ### Risks
 - [2026-06-14] [PM] **Override races the in-flight tick** — **Likelihood:** medium · **Impact:** low (one more tick may run before pause; dry-run = harmless; auditable via override_events + next-tick early-out) · **Mitigation:** AC 7 next-tick semantics + UI copy; the cron reads status at tick top · **Area:** concurrency
 - [2026-06-14] [PM] **Write-path auth** (a state-mutating route) — **Likelihood:** low · **Impact:** high if wrong (unauth'd pause/reset) · **Mitigation:** AC 1 reuses the CB-1.5 sign-out auth exactly (verifySession re-verify + CSRF + rate-limit); never trusts proxy headers; unit-tested (AC 10) · **Area:** security
-- [2026-06-14] [PM] **reset re-anchor correctness** (activity must reset, history must survive) — **Likelihood:** low-medium · **Impact:** medium (wrong reset confuses the operator) · **Mitigation:** AC 5 explicit started_at filter; unit + e2e assert post-reset activity=0 + ledger history intact · **Area:** correctness
+- [2026-06-14] [PM] **Changing the SHIPPED cron session lookup** (`loadSingletonSession` + `upsertSingletonBotSession` → latest-session selection) — **Likelihood:** medium · **Impact:** high if wrong (the LIVE cron resolves the wrong session → ticks against a stale/ended session) · **Mitigation:** the change is localized to the read query's `ORDER BY started_at DESC` (no logic change in the cron route, which mocks these in tests); NEW unit tests assert latest-session selection + that the post-reset active row is the one picked + that an ended (`reset`) row is never returned as current; the existing CB-4.2 route tests (mocked) stay green · **Area:** regression / shipped-code
+- [2026-06-14] [PM] **reset multi-row correctness** (new session active, old session ended + preserved, activity resets) — **Likelihood:** low-medium · **Impact:** medium · **Mitigation:** transactional end+insert; unit + e2e assert post-reset: a new active row exists, the old row is `status='reset'` + `ended_at` set, historical orders survive (ledger), and "this session" activity = 0 · **Area:** correctness
 
 ### Issues
 _None at story creation._
 
 ## Tests
-_Unit: route auth/method/kind + per-action writes (`tests/app/api/bot/override.test.ts`); activity re-anchor (`tests/lib/dashboard/live-state.test.ts` extension); override DB ops. Invariant: `/api/bot/**` no-orders-import. e2e: `e2e/dashboard/override.spec.ts`._
+_Unit: route auth/method/kind + per-action writes (`tests/app/api/bot/override.test.ts`); reset multi-row (end+insert, history preserved) + latest-session selection in `loadSingletonSession`/`upsertSingletonBotSession` (regression tests); override DB ops. Invariant: `/api/bot/**` no-orders-import. e2e: `e2e/dashboard/override.spec.ts` (pause→resume→reset; post-reset new active session)._
 
 ## PRs
 _Auto-populated._
