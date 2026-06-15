@@ -15,9 +15,23 @@
 
 import { defineConfig, devices } from "@playwright/test";
 
+import { requireTestDatabaseUrl } from "./e2e/test-db";
+
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const liveBaseURL = process.env.PLAYWRIGHT_LIVE_BASE_URL ?? "http://localhost:3100";
 const skipWebServer = !!process.env.PLAYWRIGHT_SKIP_WEB_SERVER;
+
+// FAIL-CLOSED against production. When Playwright boots the app webServers,
+// the app-under-test must use the dedicated TEST_DATABASE_URL — NEVER prod.
+// requireTestDatabaseUrl() throws if TEST_DATABASE_URL is unset or equals
+// DATABASE_URL, so a misconfigured local run refuses to start the servers
+// rather than letting the app (and the specs' TRUNCATEs) hit prod — the
+// 2026-06-15 data-loss incident. Passing DATABASE_URL in the webServer `env`
+// wins over .env.local (Next does not override an already-set process.env var).
+// Skipped when PLAYWRIGHT_SKIP_WEB_SERVER is set (servers managed externally).
+const webServerDbEnv: Record<string, string> = skipWebServer
+  ? {}
+  : { DATABASE_URL: requireTestDatabaseUrl() };
 
 export default defineConfig({
   testDir: "./e2e",
@@ -54,16 +68,18 @@ export default defineConfig({
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
+          // App-under-test uses the dedicated test DB, never prod (see above).
+          env: webServerDbEnv,
         },
         {
           // Second server with LIVE_MODE=true (overrides .env.local's
           // false; Next.js still loads the rest of .env.local). Different
-          // port so both run concurrently against the shared DB.
+          // port so both run concurrently against the test DB.
           command: "pnpm dev --port 3100",
           url: liveBaseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
-          env: { LIVE_MODE: "true" },
+          env: { ...webServerDbEnv, LIVE_MODE: "true" },
         },
       ],
 });
