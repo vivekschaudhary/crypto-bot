@@ -3,11 +3,16 @@
 // e2e MUST run against a dedicated, disposable database — NEVER production.
 // On 2026-06-15 a local `pnpm e2e` resolved its DB from the prod
 // `DATABASE_URL` (`.env.local`) and every spec's `TRUNCATE … CASCADE` wiped
-// production (operator passkey + DCA strategy + all bot history). This module
-// makes that structurally impossible: e2e reads `TEST_DATABASE_URL`, and if
+// production (operator passkey + DCA strategy + all bot history). Every e2e DB
+// connection routes through this module: it reads `TEST_DATABASE_URL`, and if
 // it is unset OR equal to `DATABASE_URL`, every connection THROWS — the suite
-// fails closed (runs nothing) rather than touching prod. Same fail-closed
-// posture as the `MIGRATE_DESTINATION` gate in `lib/db/migrate.ts`.
+// fails closed (runs nothing) rather than touching prod. So the destructive
+// `TRUNCATE`s can never reach production. (The app-under-test is a separate
+// concern: managed Playwright webServers are booted on the test DB; external
+// servers — `PLAYWRIGHT_SKIP_WEB_SERVER` — are honor-system, gated by an
+// explicit `PLAYWRIGHT_EXTERNAL_DB_OK` ack since Playwright can't read their
+// DB.) Same fail-closed posture as the `MIGRATE_DESTINATION` gate in
+// `lib/db/migrate.ts`.
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";

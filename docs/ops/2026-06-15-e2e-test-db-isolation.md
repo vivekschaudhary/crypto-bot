@@ -24,9 +24,18 @@ all bot history, then registered a throwaway Playwright credential → operator
 locked out + total operational-data loss. (CI was NOT the cause — `ci.yml` runs
 only lint/typecheck/test; no e2e. The destructive path is local-only.)
 
-This change makes it **structurally impossible for e2e to touch production**:
-e2e reads a dedicated `TEST_DATABASE_URL` and **fails closed** (throws, runs
-nothing) if that var is unset or equals `DATABASE_URL`.
+This change makes the **destructive `TRUNCATE`s structurally unable to reach
+production**: every e2e DB connection routes through one guarded connector that
+reads a dedicated `TEST_DATABASE_URL` and **fails closed** (throws, runs
+nothing) if that var is unset or equals `DATABASE_URL`. The **app-under-test**
+is handled separately: managed Playwright webServers are booted on the test DB;
+external servers (`PLAYWRIGHT_SKIP_WEB_SERVER`) are honor-system — Playwright
+can't read their DB — so that mode is gated behind an explicit
+`PLAYWRIGHT_EXTERNAL_DB_OK=1` acknowledgment that the operator pointed the
+server at the test DB. (Net: the suite can never *truncate* prod; the only
+residual path to prod is an operator who sets the external-mode ack while
+pointing at a prod-backed server — a conscious, documented opt-in, not a silent
+default.)
 
 ## Affected systems
 
