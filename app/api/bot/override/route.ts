@@ -28,8 +28,7 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/cookie";
 import { OriginMismatchError, verifyOriginOrThrow } from "@/lib/auth/origin-check";
 import { RateLimitedError, consumeOrThrow } from "@/lib/auth/rate-limit";
 import { verifySession } from "@/lib/auth/sessions";
-import { pauseSession, resetSession, resumeSession, type OverrideKind } from "@/lib/bot/overrides";
-import { loadSingletonSession } from "@/lib/ticks/db";
+import { pauseSession, resetSession, resumeSession, type OverrideKind, type OverrideOutcome } from "@/lib/bot/overrides";
 
 const SAFE_KINDS = new Set<OverrideKind>(["pause", "resume", "reset"]);
 // Real-money kinds the schema's CHECK permits but CB-5.3 does NOT ship.
@@ -108,22 +107,33 @@ export async function POST(request: Request): Promise<Response> {
     return jsonResponse(400, { error: "invalid-kind" });
   }
 
-  // 5. Load the current session to act on.
-  const session = await loadSingletonSession();
-  if (!session) {
-    // No session has been bootstrapped (no strategy saved yet) — nothing to
-    // pause/resume/reset. 409 rather than 500: the request is well-formed,
-    // the state just doesn't permit it.
-    return jsonResponse(409, { error: "no-session" });
+  // 5. Dispatch the safe override. The helper resolves + LOCKS the current
+  //    session in-transaction (it is NOT handed a session id from this
+  //    handler), so the mutation acts on a row proven-current at commit time
+  //    — closing the stale/concurrent fork-or-reopen window (round-1 BLOCKER).
+  let outcome: OverrideOutcome;
+  try {
+    outcome =
+      kind === "pause"
+        ? await pauseSession()
+        : kind === "resume"
+          ? await resumeSession()
+          : await resetSession();
+  } catch (err) {
+    // The `bot_sessions_single_current` partial unique index rejects a forked
+    // (second concurrent current) session with 23505 — surface as a conflict,
+    // not a 500. postgres.js exposes the SQLSTATE on `err.code`.
+    if (err instanceof Error && (err as Error & { code?: string }).code === "23505") {
+      return jsonResponse(409, { error: "conflict" });
+    }
+    throw err;
   }
 
-  // 6. Dispatch the safe override (transactional status + override_events).
-  const outcome =
-    kind === "pause"
-      ? await pauseSession(session.id)
-      : kind === "resume"
-        ? await resumeSession(session.id)
-        : await resetSession({ sessionId: session.id, activeStrategyId: session.activeStrategyId });
+  if (!outcome.ok) {
+    // No current session (no strategy saved yet, or it was ended out from
+    // under this request). Well-formed but not permitted → 409, not 500.
+    return jsonResponse(409, { error: "no-session" });
+  }
 
   return jsonResponse(200, { ok: true, status: outcome.status });
 }

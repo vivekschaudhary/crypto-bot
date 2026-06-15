@@ -189,10 +189,11 @@ describe("upsertSingletonBotSession", () => {
     expect(capturedCalls).toHaveLength(2);
     expect(capturedCalls[0]?.text).toContain("SELECT id FROM bot_sessions");
     expect(capturedCalls[0]?.text).toContain("FOR UPDATE");
-    // CB-5.3 (MULTI-ROW): the upsert must target the CURRENT session (latest
-    // by started_at), not an arbitrary row — else a save after a reset could
-    // re-point the ended ('reset') session's active_strategy_id. Regression
-    // guard against reverting to the bare `LIMIT 1` singleton read.
+    // CB-5.3 (MULTI-ROW): the upsert must target the CURRENT session — the
+    // not-yet-ended run (`ended_at IS NULL`) — not an arbitrary row, else a
+    // save after a reset could re-point the ended ('reset') session's
+    // active_strategy_id. Regression guard against the bare `LIMIT 1` read.
+    expect(capturedCalls[0]?.text).toContain("ended_at IS NULL");
     expect(capturedCalls[0]?.text).toContain("ORDER BY started_at DESC");
     expect(capturedCalls[1]?.text).toContain("INSERT INTO bot_sessions");
     // status='active' is inline in the INSERT SQL (not a parameterized value)

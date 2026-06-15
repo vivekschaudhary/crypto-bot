@@ -53,8 +53,8 @@ export interface LiveState {
  * here avoids widening that contract.
  *
  * CB-5.3 (MULTI-ROW): `bot_sessions` is multi-row now (reset ends one + starts
- * a new one). `ORDER BY started_at DESC LIMIT 1` selects the newest session so
- * the dashboard reflects the post-reset active row — and "this session"
+ * a new one). The CURRENT session is the not-yet-ended run (`ended_at IS NULL`)
+ * so the dashboard reflects the post-reset active row — and "this session"
  * activity (counted by the new session_id below) naturally reads 0 after a
  * reset. Mirrors loadSingletonSession's current-session selection.
  */
@@ -66,6 +66,7 @@ async function loadSessionState(): Promise<{
   const rows = await sql<{ id: string; status: string; started_at: Date }[]>`
     SELECT id, status, started_at
       FROM bot_sessions
+     WHERE ended_at IS NULL
      ORDER BY started_at DESC
      LIMIT 1
   `;

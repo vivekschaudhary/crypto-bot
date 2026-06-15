@@ -18,8 +18,6 @@ vi.mock("@/lib/env", () => ({
 
 vi.mock("@/lib/auth/sessions", () => ({ verifySession: vi.fn() }));
 
-vi.mock("@/lib/ticks/db", () => ({ loadSingletonSession: vi.fn() }));
-
 vi.mock("@/lib/bot/overrides", () => ({
   pauseSession: vi.fn(),
   resumeSession: vi.fn(),
@@ -28,19 +26,16 @@ vi.mock("@/lib/bot/overrides", () => ({
 
 import { verifySession } from "@/lib/auth/sessions";
 import { pauseSession, resetSession, resumeSession } from "@/lib/bot/overrides";
-import { loadSingletonSession } from "@/lib/ticks/db";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/cookie";
 import { __resetRateLimits } from "@/lib/auth/rate-limit";
 import { DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT } from "@/app/api/bot/override/route";
 
 const verifySessionMock = vi.mocked(verifySession);
-const loadSessionMock = vi.mocked(loadSingletonSession);
 const pauseMock = vi.mocked(pauseSession);
 const resumeMock = vi.mocked(resumeSession);
 const resetMock = vi.mocked(resetSession);
 
 const VALID_CLAIMS = { userId: "01ARZ3NDEKTSV4RRFFQ69G5USER", sessionId: "01ARZ3NDEKTSV4RRFFQ69G5SES1" };
-const SESSION = { id: "session-1", status: "active" as const, activeStrategyId: "strat-1" };
 
 function makeRequest(opts: {
   method?: string;
@@ -62,34 +57,57 @@ beforeEach(() => {
   vi.clearAllMocks();
   __resetRateLimits();
   verifySessionMock.mockResolvedValue(VALID_CLAIMS);
-  loadSessionMock.mockResolvedValue(SESSION);
-  pauseMock.mockResolvedValue({ status: "paused", sessionId: "session-1" });
-  resumeMock.mockResolvedValue({ status: "active", sessionId: "session-1" });
-  resetMock.mockResolvedValue({ status: "active", sessionId: "session-2" });
+  pauseMock.mockResolvedValue({ ok: true, status: "paused", sessionId: "session-1" });
+  resumeMock.mockResolvedValue({ ok: true, status: "active", sessionId: "session-1" });
+  resetMock.mockResolvedValue({ ok: true, status: "active", sessionId: "session-2" });
 });
 
 describe("POST /api/bot/override — happy paths per kind", () => {
-  it("pause → 200 { ok, status: 'paused' } + pauseSession(currentSessionId)", async () => {
+  it("pause → 200 { ok, status: 'paused' } + pauseSession() (no route-supplied id)", async () => {
     const res = await POST(makeRequest({ body: { kind: "pause" } }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, status: "paused" });
-    expect(pauseMock).toHaveBeenCalledWith("session-1");
+    // The helper resolves the current session itself (round-1 BLOCKER fix) —
+    // the route passes NO session id.
+    expect(pauseMock).toHaveBeenCalledWith();
     expect(resumeMock).not.toHaveBeenCalled();
     expect(resetMock).not.toHaveBeenCalled();
   });
 
-  it("resume → 200 { ok, status: 'active' } + resumeSession", async () => {
+  it("resume → 200 { ok, status: 'active' } + resumeSession()", async () => {
     const res = await POST(makeRequest({ body: { kind: "resume" } }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, status: "active" });
-    expect(resumeMock).toHaveBeenCalledWith("session-1");
+    expect(resumeMock).toHaveBeenCalledWith();
   });
 
-  it("reset → 200 + resetSession(sessionId + activeStrategyId carried forward)", async () => {
+  it("reset → 200 + resetSession() (resolves + carries strategy in-tx)", async () => {
     const res = await POST(makeRequest({ body: { kind: "reset" } }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, status: "active" });
-    expect(resetMock).toHaveBeenCalledWith({ sessionId: "session-1", activeStrategyId: "strat-1" });
+    expect(resetMock).toHaveBeenCalledWith();
+  });
+});
+
+describe("POST /api/bot/override — session-integrity outcomes", () => {
+  it("helper returns no-session (none current) → 409 no-session", async () => {
+    pauseMock.mockResolvedValueOnce({ ok: false, reason: "no-session" });
+    const res = await POST(makeRequest({ body: { kind: "pause" } }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "no-session" });
+  });
+
+  it("concurrent fork (unique-index 23505) → 409 conflict, not 500", async () => {
+    const err = Object.assign(new Error("duplicate key"), { code: "23505" });
+    resetMock.mockRejectedValueOnce(err);
+    const res = await POST(makeRequest({ body: { kind: "reset" } }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "conflict" });
+  });
+
+  it("a non-23505 helper error propagates (not swallowed as a conflict)", async () => {
+    resetMock.mockRejectedValueOnce(new Error("db down"));
+    await expect(POST(makeRequest({ body: { kind: "reset" } }))).rejects.toThrow("db down");
   });
 });
 
@@ -145,16 +163,6 @@ describe("POST /api/bot/override — kind validation", () => {
       expect(resetMock).not.toHaveBeenCalled();
     },
   );
-});
-
-describe("POST /api/bot/override — no session", () => {
-  it("no current session → 409 no-session, no DB op", async () => {
-    loadSessionMock.mockResolvedValueOnce(null);
-    const res = await POST(makeRequest({ body: { kind: "pause" } }));
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "no-session" });
-    expect(pauseMock).not.toHaveBeenCalled();
-  });
 });
 
 describe("/api/bot/override — method discipline (typed 405)", () => {

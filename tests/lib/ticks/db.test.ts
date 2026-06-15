@@ -44,13 +44,13 @@ describe("loadSingletonSession — CURRENT session = latest by started_at (CB-5.
     const session = await loadSingletonSession();
     const q = capturedCalls[0]?.text ?? "";
     expect(q).toContain("FROM bot_sessions");
-    // Load-bearing: an ENDED ('reset') row must never be picked as current.
-    // After a reset, the new active row has the latest started_at, so the
-    // DESC ordering returns it — NOT the just-ended session.
+    // Load-bearing: the CURRENT session is the not-yet-ended run. An ENDED
+    // ('reset') row must NEVER be returned as current — the predicate, not
+    // just started_at ordering, guarantees it (round-1 BLOCKER).
+    expect(q).toContain("ended_at IS NULL");
     expect(q).toContain("ORDER BY started_at DESC");
     expect(q).toContain("LIMIT 1");
-    // Regression guard against the pre-multi-row bare `LIMIT 1` singleton read
-    // (which, post-reset, could return an arbitrary row including the ended one).
+    // Regression guard against the pre-multi-row bare `LIMIT 1` singleton read.
     expect(q).not.toMatch(/FROM bot_sessions\s+LIMIT 1/);
     expect(session).toEqual({ id: "session-new", status: "active", activeStrategyId: "strat-1" });
   });

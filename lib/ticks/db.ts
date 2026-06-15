@@ -75,10 +75,13 @@ export interface TickInsert {
  * CB-5.3 (MULTI-ROW): `bot_sessions` is no longer a singleton. A reset ENDS
  * the current row (`status='reset'`, `ended_at` set) and INSERTs a new active
  * row (per the foundation architecture `BotSession` model + story PM Decision
- * #1). `ORDER BY started_at DESC LIMIT 1` selects the newest session — the one
- * the cron must tick against — so an ended (`reset`) row is never returned as
- * current. (The fn name is retained for caller stability; "singleton" is now a
- * historical label.) Regression-guarded in tests/lib/ticks/db.test.ts.
+ * #1). The CURRENT session is the not-yet-ended run: `WHERE ended_at IS NULL`
+ * (the `bot_sessions_single_current` partial unique index guarantees at most
+ * one). `ORDER BY started_at DESC LIMIT 1` is belt-and-suspenders ordering.
+ * This selects the row the cron must tick against — an ended (`reset`) row is
+ * never returned as current, even transiently. (The fn name is retained for
+ * caller stability; "singleton" is now a historical label.) Regression-guarded
+ * in tests/lib/ticks/db.test.ts.
  */
 export async function loadSingletonSession(): Promise<BotSession | null> {
   const sql = db();
@@ -87,6 +90,7 @@ export async function loadSingletonSession(): Promise<BotSession | null> {
   >`
     SELECT id, status, active_strategy_id
       FROM bot_sessions
+     WHERE ended_at IS NULL
      ORDER BY started_at DESC
      LIMIT 1
   `;

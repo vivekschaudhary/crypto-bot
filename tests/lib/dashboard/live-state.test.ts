@@ -134,7 +134,9 @@ describe("loadLiveState — session + mode", () => {
     await loadLiveState();
     const sessionQ = capturedQueries.find((q) => /FROM bot_sessions/.test(q)) ?? "";
     // After a reset the dashboard must show the NEW active session, not the
-    // just-ended ('reset') row — same current-session selection as the cron.
+    // just-ended ('reset') row — same current-session selection as the cron
+    // (the not-yet-ended run).
+    expect(sessionQ).toContain("ended_at IS NULL");
     expect(sessionQ).toContain("ORDER BY started_at DESC");
     expect(sessionQ).toContain("LIMIT 1");
   });
