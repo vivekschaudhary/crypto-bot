@@ -130,6 +130,11 @@ export default async function DashboardPage(
           View decision trace →
         </a>
       </p>
+      <p style={{ marginBottom: "0.5rem" }}>
+        <a href="/dashboard/ledger" style={linkStyle}>
+          View transaction ledger →
+        </a>
+      </p>
       <p style={{ marginBottom: "1.25rem" }}>
         <a href="/dashboard/strategy" style={linkStyle}>
           Create or revise your DCA strategy
