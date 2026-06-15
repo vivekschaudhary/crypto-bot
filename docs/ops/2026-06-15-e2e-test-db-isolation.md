@@ -56,14 +56,25 @@ today's total data loss); low *risk* to prod.
      test DB). Refusing to run against production."*;
    - throws if `TEST_DATABASE_URL === DATABASE_URL` (misconfig guard);
    - exports `getTestSql()` + the existing `resetAllTables()` semantics.
-2. Route **all 5** destructive points through `getTestSql()` — `e2e/helpers.ts`
-   and the 4 auth specs (swap each spec's local `postgres(DATABASE_URL, …)` for
-   the guarded connector; spec test-logic unchanged).
-3. Wire `playwright.config.ts` webServers so the **app-under-test** also uses
-   the test DB: each `pnpm dev` command gets `env: { DATABASE_URL:
-   process.env.TEST_DATABASE_URL }` (Next does not override an already-set
-   process.env var with `.env.local`, so this wins). Add a top-of-config assert
-   that refuses to boot the webServers if `TEST_DATABASE_URL` is unset/equals prod.
+2. Route **every destructive DB path** through `getTestSql()` — `e2e/helpers.ts`
+   plus the **6 specs** that predate the helper and open their own
+   `postgres(DATABASE_URL, …)`: `auth/{register,authenticate,sign-out,
+   proxy-gating,onboarding}.spec.ts` + `dashboard/strategy.spec.ts`. (The other
+   dashboard specs — override/ledger/decision-trace/live-state — already use
+   `getSql` from helpers, so they're covered transitively.) Spec test-logic
+   unchanged. **Round-1 review correction:** the first draft missed
+   `onboarding` + `strategy` (an inventory `head -30` truncation); the
+   "5 points" figure was wrong — it is 7 paths (helpers + 6 specs).
+3. Wire `playwright.config.ts` so e2e is fail-closed in BOTH modes:
+   - `requireTestDatabaseUrl()` runs **unconditionally** at config load (the
+     specs use the test DB regardless of who starts the server).
+   - Managed webServers: each `pnpm dev` gets `env: { DATABASE_URL:
+     $TEST_DATABASE_URL }` (Next does not override an already-set process.env
+     var, so this wins).
+   - External-server mode (`PLAYWRIGHT_SKIP_WEB_SERVER`): Playwright can't
+     control the running server's DB, so it **requires explicit
+     `PLAYWRIGHT_EXTERNAL_DB_OK=1`** (operator confirms the server was started
+     against the test DB) — else it throws. Closes the skip-mode bypass.
 4. Document the `TEST_DATABASE_URL` contract in `.env.example` + a short
    `e2e/README.md` note ("e2e is fail-closed against prod; set TEST_DATABASE_URL").
 
@@ -119,7 +130,17 @@ touched, so `git revert <merge>` is clean and prod-inert.
     DATABASE_URL (production)".
   - Distinct test URL → config loads, 19 tests listed (would connect to the
     test DB only).
-- Completed (Part A): 2026-06-15T12:45 — pending Codex review + merge.
+- **Round-1 review (Codex) — 2 BLOCKERs, both closed:**
+  - B1: two destructive specs (`auth/onboarding`, `dashboard/strategy`) still
+    opened `postgres(DATABASE_URL, …)` — missed in the first pass (inventory
+    `head -30` truncation; the "5 points" claim was wrong → it is 7). Both now
+    routed through `getTestSql()`. Re-verified: `grep` shows ONLY `test-db.ts`
+    opens a connection.
+  - B2: `PLAYWRIGHT_SKIP_WEB_SERVER` bypassed the guard for the app-under-test.
+    Now: `requireTestDatabaseUrl()` runs unconditionally, and skip-mode requires
+    explicit `PLAYWRIGHT_EXTERNAL_DB_OK=1`. Verified all three branches (unset →
+    throw; skip w/o ack → throw; skip w/ ack → 19 tests list).
+- Completed (Part A): 2026-06-15 — pending Codex re-review + merge.
 - Outcome: Part A code done; **Part B (operator: provision local Docker test
   DB + set `TEST_DATABASE_URL`) outstanding** before e2e can run again.
 

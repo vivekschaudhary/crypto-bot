@@ -41,7 +41,13 @@ pnpm e2e:ui       # interactive runner
 ```
 
 Set `PLAYWRIGHT_BASE_URL=https://...` to run against a deployed preview/canary.
-Set `PLAYWRIGHT_SKIP_WEB_SERVER=1` if the server is already running.
+
+`PLAYWRIGHT_SKIP_WEB_SERVER=1` (use an already-running server) is **fail-closed
+too**: Playwright can't control that server's `DATABASE_URL`, so this mode
+additionally requires `PLAYWRIGHT_EXTERNAL_DB_OK=1` — an explicit confirmation
+that you started the server against the test DB (`DATABASE_URL=$TEST_DATABASE_URL
+pnpm dev`). Without it, e2e refuses to run. **Never** point e2e at a server
+backed by the production database — its specs `TRUNCATE` and its app writes.
 
 ## First test to land
 
