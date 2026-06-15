@@ -2,7 +2,7 @@
 id: CB-5.3
 bet: CB-5
 type: story
-status: in-review
+status: shipped
 priority: P0
 created: 2026-06-14
 author: PM
@@ -114,7 +114,8 @@ _None at build._
 _Unit: route auth/method/kind + per-action writes (`tests/app/api/bot/override.test.ts`); reset multi-row (end+insert, history preserved) + latest-session selection in `loadSingletonSession`/`upsertSingletonBotSession` (regression tests); override DB ops. Invariant: `/api/bot/**` no-orders-import. e2e: `e2e/dashboard/override.spec.ts` (pause→resume→reset; post-reset new active session)._
 
 ## PRs
-_Auto-populated._
+- [#74](https://github.com/vivekschaudhary/crypto-bot/pull/74) — create-story (story + design + copy; multi-row reset aligned to the architecture after round-1 BLOCKER)
+- [#75](https://github.com/vivekschaudhary/crypto-bot/pull/75) — **build** (route + overrides + UI + reads; round-1 BLOCKER closed: session integrity — in-tx lock + `ended_at IS NULL` + migration 0007 unique-index; Codex e2e). Merged 2026-06-14.
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-5/brief.md. **LAST MVP STORY — closes the operator loop.**_
+_Story closed: 2026-06-14 (SHIPPED via PR #75), brief: docs/bets/CB-5/brief.md. **LAST MVP STORY — closes the operator loop; CB-5 + the MVP wedge complete.** ⚠️ Migration 0007 must be applied to prod._
