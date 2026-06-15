@@ -78,8 +78,12 @@ async function loadOrders(limit: number): Promise<{ orders: LedgerRow[]; hasMore
 async function loadPnl(): Promise<AssetPnlRow[] | null> {
   const strategy = await getActiveStrategy();
   if (!strategy) return [];
+
+  // STEP 1 — Coinbase READS. ONLY these may degrade the panel (AC 6): a
+  // network/API failure → return null (the orders table still renders).
+  let raw: { id: string; fills: Awaited<ReturnType<typeof getAccountTradeHistory>>["fills"]; currentPrice: number | null }[];
   try {
-    return await Promise.all(
+    raw = await Promise.all(
       strategy.selected_assets.map(async (asset) => {
         const id = asset.identifier;
         const [{ fills }, product] = await Promise.all([
@@ -87,13 +91,22 @@ async function loadPnl(): Promise<AssetPnlRow[] | null> {
           getProduct(id),
         ]);
         const priceNum = product.price !== undefined ? Number(product.price) : Number.NaN;
-        const currentPrice = Number.isFinite(priceNum) ? priceNum : null;
-        return { assetIdentifier: id, ...computeAssetPnl(fills, currentPrice) };
+        return { id, fills, currentPrice: Number.isFinite(priceNum) ? priceNum : null };
       }),
     );
   } catch {
-    return null; // degrade the PnL panel; orders table still renders
+    return null; // Coinbase read failure → degrade the PnL panel (AC 6)
   }
+
+  // STEP 2 — PnL COMPUTE, OUTSIDE the catch. computeAssetPnl/replayFills
+  // throws on malformed fills (Coinbase contract drift) — that MUST fail
+  // LOUD, not be swallowed as "Coinbase unavailable" (PR #73 BLOCKER; AC 1
+  // / replayFills contract). A malformed-fill throw propagates out of
+  // loadLedger → the page errors, surfacing the real data bug.
+  return raw.map(({ id, fills, currentPrice }) => ({
+    assetIdentifier: id,
+    ...computeAssetPnl(fills, currentPrice),
+  }));
 }
 
 /** Compose the ledger (orders + per-asset PnL). SSR per load. */

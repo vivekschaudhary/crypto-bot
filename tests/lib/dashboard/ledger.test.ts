@@ -72,12 +72,21 @@ describe("loadLedger — PnL", () => {
     expect(btc?.unrealizedPnlUsd).toBeCloseTo((43000 - 42000) * 0.001, 6);
   });
 
-  it("degrades pnl to null when Coinbase fetch fails (orders still load)", async () => {
+  it("degrades pnl to null when a Coinbase READ fails (orders still load)", async () => {
     orderRows = [order()];
     getAccountTradeHistory.mockRejectedValue(new Error("coinbase 503"));
     const { orders, pnl } = await loadLedger();
     expect(pnl).toBeNull();
     expect(orders).toHaveLength(1); // orders table unaffected
+  });
+
+  it("FAILS LOUD on a malformed fill — does NOT swallow it as degradation (PR #73 BLOCKER)", async () => {
+    orderRows = [order()];
+    // Coinbase READS succeed, but a fill is malformed → replayFills throws.
+    // That's contract drift, not a Coinbase outage: it must propagate, NOT
+    // be caught and returned as pnl:null.
+    getAccountTradeHistory.mockResolvedValue({ fills: [fill({ price: "not-a-number" })] });
+    await expect(loadLedger()).rejects.toThrow(/malformed fill/);
   });
 
   it("missing product price → currentPrice null → unrealized null", async () => {
