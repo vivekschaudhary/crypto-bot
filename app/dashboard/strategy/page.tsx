@@ -49,13 +49,23 @@ import {
  * form unchanged. Per copy.md § Page-level + Assets selector header +
  * Inline field errors.
  */
-const COINBASE_LABELS: StrategyFormLabels = {
-  assetsHelperText: "1-5 cryptos. The bot considers ONLY these.",
-  assetSelectorHeader: topFiveAsOfText,
-  errorOverrides: {
-    SELECTED_ASSETS_COUNT_OUT_OF_RANGE: "Pick between 1 and 5 cryptos.",
-  },
-};
+/**
+ * Build the crypto-coinbase labels for the form. `assetSelectorHeader` is
+ * computed to a STRING here (server-side) from the as-of date — it must NOT
+ * be passed as a function, which is not RSC-serializable and 500s every
+ * production render of this route (regression 2026-06-15: "Functions cannot
+ * be passed directly to Client Components"). The route layer owns composing
+ * its own header copy; the form Client Component just renders the string.
+ */
+function coinbaseLabels(topFiveAsOf: Date): StrategyFormLabels {
+  return {
+    assetsHelperText: "1-5 cryptos. The bot considers ONLY these.",
+    assetSelectorHeader: topFiveAsOfText(topFiveAsOf),
+    errorOverrides: {
+      SELECTED_ASSETS_COUNT_OUT_OF_RANGE: "Pick between 1 and 5 cryptos.",
+    },
+  };
+}
 
 /**
  * Per copy.md § Page-level — the browser title discriminates create vs
@@ -259,9 +269,8 @@ export default async function StrategyPage(): Promise<JSX.Element> {
         assetClass={COINBASE_ASSET_CLASS}
         initialPayload={initialPayload}
         candidates={topFive}
-        topFiveAsOf={topFiveAsOf}
         isRevise={isRevise}
-        labels={COINBASE_LABELS}
+        labels={coinbaseLabels(topFiveAsOf)}
       />
     </div>
   );

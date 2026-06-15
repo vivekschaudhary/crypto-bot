@@ -81,7 +81,6 @@ export interface StrategyFormClientProps {
   assetClass: AssetClass;
   initialPayload: InitialPayload;
   candidates: Asset[];
-  topFiveAsOf: Date;
   isRevise: boolean;
   labels: StrategyFormLabels;
 }
@@ -97,10 +96,12 @@ export interface StrategyFormClientProps {
  *   - assetsHelperText: the helper text below the asset selector. Crypto
  *     passes "1-5 cryptos. The bot considers ONLY these." per copy.md;
  *     equity passes "1-5 stocks. ..."
- *   - assetSelectorHeader: a `(date) => string` so the route layer can
- *     compose its own header copy with the as-of stamp. Crypto passes
- *     `topFiveAsOfText` ("Selected from top-5 by dollar volume (as of ...)");
- *     equity passes its own (e.g., "Selected from your screener (as of ...)").
+ *   - assetSelectorHeader: a precomputed STRING (the route layer composes it
+ *     with its own as-of stamp BEFORE passing it in). Crypto passes
+ *     `topFiveAsOfText(asOf)` ("Selected from top-5 by dollar volume (as of
+ *     ...)"); equity passes its own. It MUST be a plain string, never a
+ *     function — a function prop cannot cross the RSC server→client boundary
+ *     and 500s every production render of this route (regression 2026-06-15).
  *   - errorOverrides: per-app verbatim copy for inline errors where the
  *     universal default is too generic. Crypto overrides
  *     SELECTED_ASSETS_COUNT_OUT_OF_RANGE with "Pick between 1 and 5 cryptos."
@@ -109,7 +110,11 @@ export interface StrategyFormClientProps {
  */
 export interface StrategyFormLabels {
   assetsHelperText: string;
-  assetSelectorHeader: (date: Date) => string;
+  /**
+   * Precomputed header string (NOT a function — a function prop is not
+   * RSC-serializable and 500s in production; see regression note above).
+   */
+  assetSelectorHeader: string;
   errorOverrides?: Partial<Record<ValidationErrorCode, string>>;
 }
 
@@ -262,7 +267,7 @@ const modalStyle: React.CSSProperties = {
 // ──────────────────────────────────────────────────────────────────────────
 
 export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element {
-  const { assetClass, initialPayload, candidates, topFiveAsOf, isRevise, labels } = props;
+  const { assetClass, initialPayload, candidates, isRevise, labels } = props;
 
   const [name, setName] = useState(initialPayload.name);
   const [selectedAssets, setSelectedAssets] = useState<Asset[]>(
@@ -602,7 +607,7 @@ export function StrategyFormClient(props: StrategyFormClientProps): JSX.Element 
         {/* ─── Assets ─────────────────────────────────────────────── */}
         <fieldset style={sectionStyle}>
           <legend style={sectionTitleStyle}>Assets</legend>
-          <p style={helperStyle}>{labels.assetSelectorHeader(topFiveAsOf)}</p>
+          <p style={helperStyle}>{labels.assetSelectorHeader}</p>
           <div
             data-field-path="selected_assets"
             aria-describedby="selected-assets-error"
