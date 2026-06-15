@@ -2,7 +2,7 @@
 id: CB-5.3
 bet: CB-5
 type: story
-status: ready
+status: in-review
 priority: P0
 created: 2026-06-14
 author: PM
@@ -98,8 +98,16 @@ UI + write surface — load-bearing.
 - [2026-06-14] [PM] **Changing the SHIPPED cron session lookup** (`loadSingletonSession` + `upsertSingletonBotSession` → latest-session selection) — **Likelihood:** medium · **Impact:** high if wrong (the LIVE cron resolves the wrong session → ticks against a stale/ended session) · **Mitigation:** the change is localized to the read query's `ORDER BY started_at DESC` (no logic change in the cron route, which mocks these in tests); NEW unit tests assert latest-session selection + that the post-reset active row is the one picked + that an ended (`reset`) row is never returned as current; the existing CB-4.2 route tests (mocked) stay green · **Area:** regression / shipped-code
 - [2026-06-14] [PM] **reset multi-row correctness** (new session active, old session ended + preserved, activity resets) — **Likelihood:** low-medium · **Impact:** medium · **Mitigation:** transactional end+insert; unit + e2e assert post-reset: a new active row exists, the old row is `status='reset'` + `ended_at` set, historical orders survive (ledger), and "this session" activity = 0 · **Area:** correctness
 
+- [2026-06-14] [Engineer] **reset `override_events` row is attached to the ENDED (old) session_id**; pause/resume attach to the current session_id — **Likelihood:** n/a (design choice) · **Impact:** audit clarity · **Rationale:** the reset action acted ON the session it terminated, so the audit row belongs to that session; the new session begins clean. Keeps `override_events` a faithful per-session log. · **Area:** reset-semantics / audit
+- [2026-06-14] [Engineer] **`loadSessionState` in `lib/dashboard/live-state.ts` ALSO changed to latest-session selection** (beyond the two reads named in AC 5) — **Likelihood:** n/a · **Impact:** correctness · **Rationale:** the dashboard's own session read is separate from `loadSingletonSession`; without the same `ORDER BY started_at DESC` it would render the just-ended `reset` row after a reset instead of the new active session. Regression-tested. · **Area:** multi-row / dashboard
+
+### Engineer DRI Decisions (build)
+- [2026-06-14] [Engineer] **`/api/bot/override` returns `409 no-session`** when no session has been bootstrapped (no strategy saved yet) — the request is well-formed but the state doesn't permit an override. (Story didn't specify; 409 over 500 since it's not a server fault.) **Area:** api-contract
+- [2026-06-14] [Engineer] **Override DB ops live in a new `lib/bot/overrides.ts`** (not folded into `lib/ticks/db.ts`) — keeps the cron's tick-write module append-only/INSERT-only and the operator-write surface separate. Each action is ONE `sql.begin` transaction (status write + `override_events` audit commit together). **Area:** module-boundary
+- [2026-06-14] [Engineer] **The override-controls client imports `OverrideKind` as `import type`** (type-only, erased at build) so the `"use client"` component never bundles the server-only `lib/bot/overrides` (which pulls `postgres`). The write itself happens via `fetch('/api/bot/override')`, never a direct helper import — enforced by the dashboard read-only invariant (override write helpers added to its forbidden-import list). **Area:** rsc-client-boundary
+
 ### Issues
-_None at story creation._
+_None at build._
 
 ## Tests
 _Unit: route auth/method/kind + per-action writes (`tests/app/api/bot/override.test.ts`); reset multi-row (end+insert, history preserved) + latest-session selection in `loadSingletonSession`/`upsertSingletonBotSession` (regression tests); override DB ops. Invariant: `/api/bot/**` no-orders-import. e2e: `e2e/dashboard/override.spec.ts` (pause→resume→reset; post-reset new active session)._

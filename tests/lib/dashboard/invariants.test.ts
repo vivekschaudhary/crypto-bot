@@ -49,6 +49,13 @@ const MUTATING_HELPERS = [
   "upsertSingletonBotSession",
   "insertStrategy",
   "markSuperseded",
+  // CB-5.3 override DB ops: dashboard read views must reach these only via
+  // the /api/bot/override HTTP route (the override-controls client POSTs),
+  // NEVER by importing the write helper directly. (The client imports the
+  // `OverrideKind` TYPE only — `import type` is erased, so it doesn't match.)
+  "pauseSession",
+  "resumeSession",
+  "resetSession",
 ];
 
 describe("dashboard — READ-ONLY (all mutation verbs + helpers; AC 6)", () => {
