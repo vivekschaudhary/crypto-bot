@@ -89,10 +89,10 @@ UI view — mostly load-bearing.
 ## DRI Log
 
 ### Decisions
-- [2026-06-14] [PM] **Decision-trace shows DECISIONS; per-execution dry_run/live status is the ledger's job (CB-5.2)** — `bot_ticks` doesn't record `live_mode`, so a faithful per-tick badge isn't derivable here; the page-level `LiveModeBanner` supplies mode context, and the `orders` join (with `status`) lives once in CB-5.2.
-  - **Area:** scope / read-model-separation
-  - **Alternatives considered:** join `orders` per buy/sell decision here (rejected — duplicates CB-5.2's ledger join across two views; the decision-trace is about *why*, the ledger about *what executed*); add `live_mode` to `bot_ticks` via migration (rejected for MVP — extra schema + backfill for a nice-to-have; the banner covers current-mode context)
-  - **Reversibility:** moderate — a future `bot_ticks.live_mode` migration would enable per-tick badges without changing this view's contract
+- [2026-06-14] [PM] **EXECUTES the brief's amended decision-trace scope (no per-tick dry-run badge)** — the scope decision is owned by [CB-5 brief PM DRI Decision #7](../../brief.md#pm-dri-decisions), amended UPSTREAM in this same PR per AGENTS.md Principle #16 (Codex PR #70 round-1 BLOCKER: the story originally narrowed the brief unilaterally). The brief now relocates the per-execution paper/live status from the decision-trace to the CB-5.2 ledger (`orders.status`); CB-5.1 renders decisions + reasons + RSI/MA with mode context from the page-level `LiveModeBanner`. Full rationale + alternatives live at the brief decision.
+  - **Area:** scope-execution / read-model-separation
+  - **Alternatives considered:** (decided upstream at brief PM Decision #7 — keep-badge-via-orders-join + bot_ticks.live_mode-migration both rejected there)
+  - **Reversibility:** moderate — a future `bot_ticks.live_mode` migration would enable a per-tick badge without changing this view's contract
 
 ### Risks
 - [2026-06-14] [PM] **Unbounded render as tick history grows** — **Likelihood:** medium (96 ticks/day × N assets) · **Impact:** medium (slow page) · **Mitigation:** AC 7 bounded `limit=50` + "more exist" note; pagination fast-follow · **Area:** performance
