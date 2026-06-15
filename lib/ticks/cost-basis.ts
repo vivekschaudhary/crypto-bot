@@ -48,19 +48,47 @@ const EPSILON = 1e-9;
 export function aggregatePosition(
   fills: Fill[],
 ): { avgCostUsd: number; quantity: number } | null {
+  const { quantity, totalCostUsd } = replayFills(fills);
+  if (quantity <= EPSILON) return null;
+  return { avgCostUsd: totalCostUsd / quantity, quantity };
+}
+
+/**
+ * The shared chronological fill replay underlying both `aggregatePosition`
+ * (CB-4) and `computeAssetPnl` (CB-5.2). Returns the net position
+ * (`quantity`, `totalCostUsd`) AND `realizedPnlUsd` — realized gain/loss
+ * accrued on each SELL at the weighted-average cost at sale time. Pure;
+ * malformed fills throw loud (CB-2.5 contract-drift posture).
+ *
+ * CB-5.2 extracted this from `aggregatePosition` so the PnL view reuses the
+ * exact replay semantics (no duplicated loop, no divergent cost basis) —
+ * `aggregatePosition`'s external contract is unchanged (it ignores
+ * `realizedPnlUsd`).
+ *
+ * Oversell note: a SELL beyond tracked buys clamps to the held quantity
+ * (#3d) — realized PnL is computed only for the clamped, cost-basis-known
+ * portion; coins sold that were acquired before the fill window have no
+ * tracked basis and are not counted in realized.
+ */
+export function replayFills(fills: Fill[]): {
+  quantity: number;
+  totalCostUsd: number;
+  realizedPnlUsd: number;
+} {
   const chronological = [...fills].sort(
     (a, b) => new Date(a.trade_time).getTime() - new Date(b.trade_time).getTime(),
   );
 
   let quantity = 0;
   let totalCostUsd = 0;
+  let realizedPnlUsd = 0;
 
   for (const fill of chronological) {
     const price = Number(fill.price);
     const size = Number(fill.size);
     if (!Number.isFinite(price) || !Number.isFinite(size) || price <= 0 || size <= 0) {
       throw new Error(
-        `aggregatePosition: malformed fill (entry_id=${fill.entry_id}; price=${fill.price}; size=${fill.size}) — Coinbase contract drift?`,
+        `replayFills: malformed fill (entry_id=${fill.entry_id}; price=${fill.price}; size=${fill.size}) — Coinbase contract drift?`,
       );
     }
 
@@ -77,6 +105,7 @@ export function aggregatePosition(
       const sellQty = Math.min(baseQty, quantity); // #3d oversell clamp
       if (quantity > EPSILON) {
         const avg = totalCostUsd / quantity;
+        realizedPnlUsd += (price - avg) * sellQty; // CB-5.2: realized gain/loss
         totalCostUsd -= sellQty * avg;
       }
       quantity -= sellQty;
@@ -85,6 +114,5 @@ export function aggregatePosition(
     // spirit; they don't change the position math we know how to do.
   }
 
-  if (quantity <= EPSILON) return null;
-  return { avgCostUsd: totalCostUsd / quantity, quantity };
+  return { quantity, totalCostUsd, realizedPnlUsd };
 }
