@@ -192,8 +192,13 @@ export async function upsertSingletonBotSession(
 ): Promise<void> {
   const sql = db();
   await sql.begin(async (tx) => {
+    // CB-5.3 (MULTI-ROW): bot_sessions is no longer a singleton — a reset
+    // ends the current row and inserts a new active one. Select the CURRENT
+    // session — the not-yet-ended run (`ended_at IS NULL`) — so a save UPDATEs
+    // the active row, not a stale ended (`reset`) one. Matches
+    // loadSingletonSession's current-session selection.
     const existing = await tx<{ id: string }[]>`
-      SELECT id FROM bot_sessions LIMIT 1 FOR UPDATE
+      SELECT id FROM bot_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1 FOR UPDATE
     `;
     if (existing.length === 0) {
       // Bootstrap: no bot_session row yet. Insert one with status='active'.

@@ -12,7 +12,7 @@
 
 import { db } from "@/lib/db/client";
 
-/** The singleton bot session row (0001-init + 0004's active_strategy_id). */
+/** The current bot session row (0001-init + 0004's active_strategy_id). */
 export interface BotSession {
   id: string;
   status: "active" | "paused" | "reset";
@@ -67,9 +67,21 @@ export interface TickInsert {
 }
 
 /**
- * Read the singleton `bot_sessions` row. Returns null when no session has
- * ever been bootstrapped (operator hasn't saved a strategy yet — CB-3.3's
- * `upsertSingletonBotSession` creates the row on first save).
+ * Read the CURRENT `bot_sessions` row — the latest session by `started_at`.
+ * Returns null when no session has ever been bootstrapped (operator hasn't
+ * saved a strategy yet — CB-3.3's `upsertSingletonBotSession` creates the
+ * row on first save).
+ *
+ * CB-5.3 (MULTI-ROW): `bot_sessions` is no longer a singleton. A reset ENDS
+ * the current row (`status='reset'`, `ended_at` set) and INSERTs a new active
+ * row (per the foundation architecture `BotSession` model + story PM Decision
+ * #1). The CURRENT session is the not-yet-ended run: `WHERE ended_at IS NULL`
+ * (the `bot_sessions_single_current` partial unique index guarantees at most
+ * one). `ORDER BY started_at DESC LIMIT 1` is belt-and-suspenders ordering.
+ * This selects the row the cron must tick against — an ended (`reset`) row is
+ * never returned as current, even transiently. (The fn name is retained for
+ * caller stability; "singleton" is now a historical label.) Regression-guarded
+ * in tests/lib/ticks/db.test.ts.
  */
 export async function loadSingletonSession(): Promise<BotSession | null> {
   const sql = db();
@@ -78,6 +90,8 @@ export async function loadSingletonSession(): Promise<BotSession | null> {
   >`
     SELECT id, status, active_strategy_id
       FROM bot_sessions
+     WHERE ended_at IS NULL
+     ORDER BY started_at DESC
      LIMIT 1
   `;
   const row = rows[0];

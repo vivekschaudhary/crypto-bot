@@ -11,6 +11,8 @@ import type { JSX } from "react";
 
 import type { LiveState } from "@/lib/dashboard/live-state";
 
+import { OverrideControls } from "./override-controls-client";
+
 const headingStyle: React.CSSProperties = {
   fontSize: "1rem",
   fontWeight: 600,
@@ -75,6 +77,9 @@ export function LiveStatePanels({ state }: { state: LiveState }): JSX.Element {
         {" · session started "}
         {fmtTs(state.session.startedAt)}
       </p>
+      {/* CB-5.3 — safe override controls (pause/resume/reset). Status-aware
+          buttons that POST to /api/bot/override + refresh the SSR live-state. */}
+      <OverrideControls status={state.session.status} />
 
       <h2 style={headingStyle}>Holdings</h2>
       <p style={captionStyle}>From your Coinbase fills</p>

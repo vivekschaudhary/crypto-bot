@@ -222,6 +222,15 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at
 -- different ULIDs could both pass the count(*) gate.
 CREATE UNIQUE INDEX IF NOT EXISTS auth_users_singleton ON auth_users ((TRUE));
 
+-- At most one CURRENT (non-ended) bot_session — the multi-row BotSession
+-- invariant (CB-5.3 + migration 0007-one-current-session.sql). A reset ends
+-- the current run (ended_at set) and inserts a new one; precisely one row has
+-- ended_at NULL at steady state. Blocks a forked session under concurrent
+-- resets (second insert → 23505 → the override route returns 409).
+CREATE UNIQUE INDEX IF NOT EXISTS bot_sessions_single_current
+    ON bot_sessions ((TRUE))
+    WHERE ended_at IS NULL;
+
 -- ─── Row-Level Security (defense-in-depth) ────────────────────────────
 -- Per migration 0003-auth-tables-rls.sql + the 2026-06-04 security audit.
 -- The app connects via the `postgres.<project-ref>` pooler role which

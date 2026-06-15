@@ -25,7 +25,7 @@ vi.mock("@/lib/db/client", () => ({
   db: () => sqlMock,
 }));
 
-import { aggregateSessionTotals } from "@/lib/ticks/db";
+import { aggregateSessionTotals, loadSingletonSession } from "@/lib/ticks/db";
 
 beforeEach(() => {
   capturedCalls.length = 0;
@@ -34,6 +34,37 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe("loadSingletonSession — CURRENT session = latest by started_at (CB-5.3 multi-row)", () => {
+  it("selects the newest session via ORDER BY started_at DESC LIMIT 1", async () => {
+    nextResolvedValue = [
+      { id: "session-new", status: "active", active_strategy_id: "strat-1" },
+    ];
+    const session = await loadSingletonSession();
+    const q = capturedCalls[0]?.text ?? "";
+    expect(q).toContain("FROM bot_sessions");
+    // Load-bearing: the CURRENT session is the not-yet-ended run. An ENDED
+    // ('reset') row must NEVER be returned as current — the predicate, not
+    // just started_at ordering, guarantees it (round-1 BLOCKER).
+    expect(q).toContain("ended_at IS NULL");
+    expect(q).toContain("ORDER BY started_at DESC");
+    expect(q).toContain("LIMIT 1");
+    // Regression guard against the pre-multi-row bare `LIMIT 1` singleton read.
+    expect(q).not.toMatch(/FROM bot_sessions\s+LIMIT 1/);
+    expect(session).toEqual({ id: "session-new", status: "active", activeStrategyId: "strat-1" });
+  });
+
+  it("returns null when no session row exists (never bootstrapped)", async () => {
+    nextResolvedValue = [];
+    expect(await loadSingletonSession()).toBeNull();
+  });
+
+  it("maps the active_strategy_id pointer through", async () => {
+    nextResolvedValue = [{ id: "s1", status: "paused", active_strategy_id: null }];
+    const session = await loadSingletonSession();
+    expect(session).toEqual({ id: "s1", status: "paused", activeStrategyId: null });
+  });
 });
 
 describe("aggregateSessionTotals — cap totals count live deployments only (PR #65 BLOCKER)", () => {

@@ -129,4 +129,15 @@ describe("loadLiveState — session + mode", () => {
     expect(state.session?.status).toBe("active");
     expect(state.session?.startedAt.toISOString()).toBe("2026-06-12T21:45:00.000Z");
   });
+
+  it("selects the CURRENT session (latest by started_at) — multi-row, CB-5.3", async () => {
+    await loadLiveState();
+    const sessionQ = capturedQueries.find((q) => /FROM bot_sessions/.test(q)) ?? "";
+    // After a reset the dashboard must show the NEW active session, not the
+    // just-ended ('reset') row — same current-session selection as the cron
+    // (the not-yet-ended run).
+    expect(sessionQ).toContain("ended_at IS NULL");
+    expect(sessionQ).toContain("ORDER BY started_at DESC");
+    expect(sessionQ).toContain("LIMIT 1");
+  });
 });
