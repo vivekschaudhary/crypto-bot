@@ -19,6 +19,7 @@ const SESSION_SIGNING_SECRET = loadEnvValue("SESSION_SIGNING_SECRET");
 if (!SESSION_SIGNING_SECRET) {
   throw new Error("SESSION_SIGNING_SECRET is required for e2e/dashboard/override.spec.ts");
 }
+const REQUIRED_SESSION_SIGNING_SECRET = SESSION_SIGNING_SECRET;
 
 async function seedAuthenticatedSession(): Promise<{ signedCookie: string }> {
   const userId = ulid();
@@ -47,7 +48,7 @@ async function seedAuthenticatedSession(): Promise<{ signedCookie: string }> {
   `;
 
   return {
-    signedCookie: signValue(sessionId, SESSION_SIGNING_SECRET, SESSION_TTL_SECONDS),
+    signedCookie: signValue(sessionId, REQUIRED_SESSION_SIGNING_SECRET, SESSION_TTL_SECONDS),
   };
 }
 
