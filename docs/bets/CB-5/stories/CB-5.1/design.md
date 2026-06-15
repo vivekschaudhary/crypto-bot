@@ -43,5 +43,5 @@ _Designer artifact. Reuses the CB-5.0 dashboard shell + `LiveModeBanner` + inlin
 - Semantic structure: a list of ticks; each tick a section with a heading; signal rows in a definition-list or table-like layout with text labels. Decision color is reinforced by the text label (never color alone). Reason text is plain language (CB-4.1). Contrast ≥ WCAG AA on all text.
 
 ## Out of scope (design)
-- Per-tick dry-run/live badge (PM Decision #2 — banner gives mode context; per-execution status is CB-5.2's ledger).
+- Per-tick dry-run/live badge (brief PM DRI Decision #7 — banner gives mode context; per-execution status is CB-5.2's ledger).
 - Filtering/search, pagination UI (deferred), charts. CB-5.2 ledger is a separate surface.

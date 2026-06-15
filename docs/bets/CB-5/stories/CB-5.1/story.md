@@ -29,7 +29,7 @@ Reuses the CB-5.0 foundation wholesale: the `lib/dashboard/` read-model home, th
 
 ### Scope reality: `bot_ticks` does not record `live_mode`
 
-Noticed at story drafting: `bot_ticks`/`signals` carry the DECISION (buy/sell/hold + reason + RSI/MA) but NOT whether the tick ran in dry-run or live mode (that's recorded per-execution in `orders.status` = `dry_run`/`submitted`). So a faithful **per-tick** dry-run badge isn't derivable from the decision-trace tables alone. PM Decision #2 resolves this: CB-5.1's page-level `LiveModeBanner` provides the mode context; per-EXECUTION dry-run/live status is the **ledger's** job (CB-5.2, which joins `orders`). The decision-trace is about DECISIONS; the ledger is about EXECUTIONS — keeping the `orders` join in one place (CB-5.2), not duplicated.
+Noticed at story drafting: `bot_ticks`/`signals` carry the DECISION (buy/sell/hold + reason + RSI/MA) but NOT whether the tick ran in dry-run or live mode (that's recorded per-execution in `orders.status` = `dry_run`/`submitted`). So a faithful **per-tick** dry-run badge isn't derivable from the decision-trace tables alone. The brief's [PM DRI Decision #7](../../brief.md#pm-dri-decisions) (amended upstream, the owning scope decision) resolves this: CB-5.1's page-level `LiveModeBanner` provides the mode context; per-EXECUTION dry-run/live status is the **ledger's** job (CB-5.2, which joins `orders`). The decision-trace is about DECISIONS; the ledger is about EXECUTIONS — keeping the `orders` join in one place (CB-5.2), not duplicated.
 
 ## Acceptance Criteria
 
@@ -64,7 +64,7 @@ UI view — mostly load-bearing.
 
 - [ ] **Navigation** — `covered by AC 5: bidirectional links between live-state and decision-trace.`
 - [ ] **States** — `covered by AC 3 + AC 4 + AC 6: error ticks, insufficient-signal rows, empty state; SSR (no client loading).`
-- [ ] **Feedback** — `covered: the reason strings ARE the feedback — the operator reads exactly why each decision was made. LiveModeBanner gives mode context (PM Decision #2).`
+- [ ] **Feedback** — `covered: the reason strings ARE the feedback — the operator reads exactly why each decision was made. LiveModeBanner gives mode context (brief PM DRI Decision #7).`
 - [ ] **Accessibility** — `covered by design.md: semantic table/list structure, headers, readable contrast; reason text is plain language.`
 - [ ] **Edge cases** — `covered by AC 3 + AC 4 + AC 7: error ticks, null signals, bounded read + "more exist" note.`
 - [ ] **Cross-surface consistency** — `covered: reuses the CB-5.0 LiveModeBanner + chrome + inline-style conventions; same dashboard shell.`
@@ -73,7 +73,7 @@ UI view — mostly load-bearing.
 
 ### Engineer DRI Decisions
 1. **Read fn in `lib/dashboard/decision-trace.ts`** (sibling to `live-state.ts`); SELECT-only; two-query (ticks then signals) or join — Engineer's call; group signals under ticks in code.
-2. **Per-tick dry-run badge NOT shown** (bot_ticks lacks `live_mode`); page-level `LiveModeBanner` gives mode context; per-execution status is CB-5.2's ledger (`orders.status`). Avoids duplicating the orders join.
+2. **Per-tick dry-run badge NOT shown** (executes brief [PM DRI Decision #7](../../brief.md#pm-dri-decisions)) — `bot_ticks` lacks `live_mode`; page-level `LiveModeBanner` gives mode context; per-execution status is CB-5.2's ledger (`orders.status`). Avoids duplicating the orders join.
 3. **Bounded `limit=50`**; pagination deferred (AC 7) with a "more exist" note.
 4. **New route `/dashboard/trace`** (own Server Component), reusing `LiveModeBanner` + chrome.
 
