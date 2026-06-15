@@ -151,7 +151,7 @@ When the equity app is ready to consume:
 
 `/dashboard/strategy/` route:
 
-- `page.tsx` (Server Component) — invokes the concrete adapter (`makeCoinbaseAdapter()`); resolves the top-5 + active-strategy data SERVER-SIDE; constructs the asset-class-specific `labels: StrategyFormLabels` object (per-app verbatim copy.md strings); passes only PRIMITIVES + labels (`assetClass: AssetClass`, `candidates: Asset[]`, `initialPayload: StrategyFormPayload`, `topFiveAsOf: Date`, `isRevise: boolean`, `labels: StrategyFormLabels`) to the Client Component
+- `page.tsx` (Server Component) — invokes the concrete adapter (`makeCoinbaseAdapter()`); resolves the top-5 + active-strategy data SERVER-SIDE; constructs the asset-class-specific `labels: StrategyFormLabels` object (per-app verbatim copy.md strings, including the **precomputed** asset-selector header string); passes only PRIMITIVES + labels (`assetClass: AssetClass`, `candidates: Asset[]`, `initialPayload: StrategyFormPayload`, `isRevise: boolean`, `labels: StrategyFormLabels`) to the Client Component. (The `topFiveAsOf: Date` prop was removed 2026-06-15 — see Decision #6's third amendment below; the as-of stamp is now baked into the header string server-side.)
 - `strategy-form-client.tsx` (Client Component; was `_form.tsx` in original sketch) — takes asset-class primitives + a labels prop (NOT the adapter object itself; NOT crypto-flavored copy strings hardcoded); renders the asset multi-select + rule sections. Asset-class-agnostic at the data-shape AND copy levels.
 - Asset selector — inline within the form Client Component; consumes the resolved `candidates: Asset[]` prop. Does NOT call adapter methods directly (the server-rendered initial state is sufficient).
 - `strategy-actions.ts` (was `_actions.ts`) — server actions: `saveStrategy(formData)`. Validates via `lib/strategy-core/validate`; inserts via supersession; updates `bot_sessions.active_strategy_id`.
@@ -165,12 +165,14 @@ The form is generic over asset-class data; the save action is generic. Only the 
 ```ts
 interface StrategyFormLabels {
   assetsHelperText: string;                              // crypto: "1-5 cryptos. The bot considers ONLY these."
-  assetSelectorHeader: (date: Date) => string;           // crypto: topFiveAsOfText (composes "Selected from top-5 by dollar volume (as of ...)")
+  assetSelectorHeader: string;                           // PRECOMPUTED string (route calls topFiveAsOfText(asOf) server-side) — NOT a function (see Decision #6 third amendment: function props are not RSC-serializable)
   errorOverrides?: Partial<Record<ValidationErrorCode, string>>; // crypto: { SELECTED_ASSETS_COUNT_OUT_OF_RANGE: "Pick between 1 and 5 cryptos." }
 }
 ```
 
 `lib/strategies/defaults.ts` defaults are now asset-class-agnostic (`"Pick between 1 and 5 assets."`); the universal default is the fallback; per-app `errorOverrides` supplies copy.md verbatim strings. A new `formatAsOfStamp(date)` pure helper is extracted for cross-app reuse by future header-composition functions.
+
+**Decision #6 amended a THIRD time 2026-06-15 during PR #77** (production-500 fix): the PR #53 `labels` shape above defined `assetSelectorHeader: (date: Date) => string` — a **function** — and the route passed it (plus a `topFiveAsOf: Date` prop the client called it with) across the RSC boundary. This **re-introduced the exact failure Decision #6 was created to fix**: functions are not RSC-serializable, so every production render of `GET /dashboard/strategy` threw "Functions cannot be passed directly to Client Components" → 500. It stayed latent because the route was rarely loaded post-merge, e2e runs against `pnpm dev` (lenient about function props), and the dynamic route isn't prerendered by `next build` (so neither dev-e2e nor build caught it). **Fix:** `assetSelectorHeader` is now a **precomputed string** — the route layer calls `topFiveAsOfText(asOf)` server-side and passes the resolved string; the `topFiveAsOf` client prop is removed. Architectural intent unchanged (route layer owns its header copy; form stays asset-class-agnostic). **Reinforces the standing rule** (and argues for finally naming `[rsc-prop-serialization]` in `/retro`): RSC props must be plain-serializable — never functions; the guard is a render-the-page test asserting no function prop crosses the boundary (`tests/app/dashboard/strategy/page-rsc-props.test.ts`), since `JSON.stringify`-based render tests silently drop functions and miss it.
 
 ### 7. Observability shape
 
