@@ -153,7 +153,7 @@ If the dashboard surfaces, as Server-Component-rendered views on each page load:
 
 ## Researcher Open Questions
 
-- [2026-06-14] **Per-asset PnL in the ledger view — MVP or post-MVP?** Does the operator want computed realized/unrealized PnL per asset in the ledger/live-state views, or just transaction history + holdings for MVP? PnL needs cost-basis + current price (both available) but adds display + correctness surface. Lean: transaction history + holdings for MVP; PnL as a fast-follow if the dry-run review surfaces the need. Closes at `/create-story CB-5.2` (ledger view) with an Engineer/PM DRI Decision.
+- [2026-06-14] **Per-asset PnL in the ledger view — MVP or post-MVP?** — **CLOSED 2026-06-14 at `/create-story CB-5.2`: PnL IS in MVP scope** (operator decision over the history-only lean). The ledger computes per-asset realized + unrealized PnL (weighted-average cost basis, consistent with `aggregatePosition`/live-state holdings; current price via `getProduct`). See [CB-5.2 story PM DRI Decision (Q1 closed)](stories/CB-5.2/story.md#decisions). Rationale: seeing profit/loss directly is the most decision-relevant signal for the `LIVE_MODE` flip. Accuracy caveat (the CB-4.3 cost-basis pagination window) surfaced honestly in the UI.
 
 _(Researcher Q on `account_snapshots` cadence — RESOLVED at promotion; became PM Decision #6.)_
 
