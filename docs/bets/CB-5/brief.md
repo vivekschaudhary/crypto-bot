@@ -1,7 +1,7 @@
 ---
 id: CB-5
 type: feature
-status: approved
+status: shipped
 priority: P0
 parent: FOUNDATION-PRODUCT
 portfolio_stub: false
@@ -179,6 +179,7 @@ The decision-trace + reason-string observability is the product's actual moat pe
 | 2026-06-14 | Brief promoted via `/create-brief CB-5` | Promoted in parallel with the CB-4 tail (dependency satisfied — `bot_ticks`/`signals`/`orders` shipped + verified in prod). 6 PM DRI Decisions (safe-controls-first; SSR-per-load; reuse read model; inline styles; parallel_with CB-4; holdings from `aggregatePosition`). 3 PM Risks; 1 Researcher Open Question (PnL scope). 4 MVP stories forecast (CB-5.0–5.3) + a deferred CB-5.4. Estimate refined 3wk/low → 1wk/medium. `architecture_required: false` (foundation architecture + CB-4 data model cover it). Two grounding findings: `account_snapshots` + `override_events` both unpopulated (CB-5 is the first `override_events` writer; holdings come from Coinbase cost-basis). Promotion shipped via PR #66 (1 supplementary-review ISSUE closed — stale CB-4 status-row sweep; Codex was down, re-review retroactive). Awaiting HITL approval before `/create-story CB-5`. |
 | 2026-06-14 | **Brief APPROVED** (HITL milestone gate) | Operator authorized at the MVP-transition milestone ("ready to close and move to the next"). `status: proposed → approved`. Unblocks `/create-story CB-5` for CB-5.0 (live-state view + read model). No further HITL gate before `/create-story` per `hitl_level: milestones`. |
 | 2026-06-14 | **Brief amended — decision-trace dry-run badge relocated to the ledger** (PM Decision #7) | CB-5.1 story drafting surfaced that `bot_ticks` records the decision, not the execution mode (mode is in `orders.status`). Rather than narrow the brief from the story (Codex PR #70 round-1 BLOCKER, AGENTS.md Principle #16), the owning brief is amended: the per-execution paper/live status moves from the decision-trace (CB-5.1) to the transaction ledger (CB-5.2); the decision-trace keeps mode context via the LIVE_MODE banner. Hypothesis + Scope + CB-5.1/CB-5.2 forecast rows swept; CB-5.1 story now executes the amendment. CB-5.0 shipped (PR #69, Codex-clean first pass). |
+| 2026-06-14 | **CB-5 BET SHIPPED — MVP COMPLETE** | All 4 MVP stories shipped: CB-5.0 (live-state, PR #69) + CB-5.1 (decision-trace, PR #71) + CB-5.2 (ledger + PnL, PR #73) + **CB-5.3 (safe override controls, PR #75)**. `status: approved → shipped`. The operator loop is closed end-to-end: author strategy → paper-trade (cron) → review (live-state + trace + ledger + PnL) → **control (pause/resume/reset)**. CB-5.3 round-1 review: 1 Reviewer BLOCKER (session integrity on the override write path — stale/concurrent fork-or-reopen) + 1 Security MEDIUM (same root) + 1 Reviewer BLOCKER (missing AC 11 e2e); all closed (in-tx lock + `ended_at IS NULL` current-definition + migration 0007 unique-index backstop; Codex-authored e2e). **CB-5.4 (real-money force-buy/sell-N) remains DEFERRED** — post-LIVE_MODE-flip + an observed real fill (PM Decision #1); NOT part of the MVP set. ⚠️ **Migration 0007 (`bot_sessions_single_current`) must be applied to prod** (like 0005/0006). Next: `/scan CB-5` (Build → Production Ready boundary); the `LIVE_MODE=true` flip is the deliberate operator ceremony behind the ≥60-dry-run-session guardrail. |
 
 ## DRI Log
 
