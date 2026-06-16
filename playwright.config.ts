@@ -8,17 +8,23 @@
 // CB-5.0: the LIVE_MODE banner is SSR'd from `env().LIVE_MODE` (a server
 // process-env value, NOT request-overridable — it's the load-bearing
 // safety primitive). To assert BOTH banner states via Playwright (CB-5.0
-// AC 8, brief guardrail), we boot TWO dev servers — the default on :3000
-// (LIVE_MODE from .env.local = false) and a second on :3100 with
-// LIVE_MODE=true — and route `*.live.spec.ts` to the live one. This is the
-// only way to exercise the env-driven banner end-to-end in a real browser.
+// AC 8, brief guardrail), we boot TWO dev servers — one on :3200
+// (LIVE_MODE=false) and a second on :3201 with LIVE_MODE=true — and route
+// `*.live.spec.ts` to the live one. This is the only way to exercise the
+// env-driven banner end-to-end in a real browser.
+//
+// Dedicated e2e ports (:3200/:3201, NOT :3000/:3100) + reuseExistingServer:false
+// + per-port APP_ORIGIN injection: e2e ALWAYS boots its own isolated servers on
+// the test DB, so it never collides with — or silently reuses — a developer's
+// own `pnpm dev` (which loads .env.local's PROD DATABASE_URL). Closes the
+// reuse-a-prod-server hole left after the TEST_DATABASE_URL guard (PR #78).
 
 import { defineConfig, devices } from "@playwright/test";
 
 import { requireTestDatabaseUrl } from "./e2e/test-db";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-const liveBaseURL = process.env.PLAYWRIGHT_LIVE_BASE_URL ?? "http://localhost:3100";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3200";
+const liveBaseURL = process.env.PLAYWRIGHT_LIVE_BASE_URL ?? "http://localhost:3201";
 const skipWebServer = !!process.env.PLAYWRIGHT_SKIP_WEB_SERVER;
 
 // FAIL-CLOSED against production — UNCONDITIONALLY (both modes). The specs
@@ -85,22 +91,25 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: "pnpm dev",
+          command: "pnpm dev --port 3200",
           url: baseURL,
-          reuseExistingServer: !process.env.CI,
+          // NEVER reuse an already-running server — it could be a dev server on
+          // the PROD DATABASE_URL. Always boot a fresh server on the test DB.
+          reuseExistingServer: false,
           timeout: 60_000,
-          // App-under-test uses the dedicated test DB, never prod (see above).
-          env: webServerDbEnv,
+          // Test DB + a port-matching APP_ORIGIN so the CSRF/WebAuthn origin
+          // checks pass on :3200 (not .env.local's prod APP_ORIGIN).
+          env: { ...webServerDbEnv, APP_ORIGIN: baseURL },
         },
         {
-          // Second server with LIVE_MODE=true (overrides .env.local's
-          // false; Next.js still loads the rest of .env.local). Different
-          // port so both run concurrently against the test DB.
-          command: "pnpm dev --port 3100",
+          // Second server with LIVE_MODE=true (overrides .env.local's false;
+          // Next still loads the rest of .env.local). Separate port so both run
+          // concurrently against the test DB.
+          command: "pnpm dev --port 3201",
           url: liveBaseURL,
-          reuseExistingServer: !process.env.CI,
+          reuseExistingServer: false,
           timeout: 60_000,
-          env: { ...webServerDbEnv, LIVE_MODE: "true" },
+          env: { ...webServerDbEnv, APP_ORIGIN: liveBaseURL, LIVE_MODE: "true" },
         },
       ],
 });

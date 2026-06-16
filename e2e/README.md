@@ -4,6 +4,18 @@ End-to-end tests run by Playwright. **Owned by Codex** per Compass tool-division
 (`AGENTS.md` — Codex writes E2E / automation; Engineer writes unit + integration
 tests).
 
+## 🚧 Known limitation: the suite is not yet runnable on Next 16
+
+The config boots **two** dev servers (default + a LIVE_MODE=true one for the
+banner spec), but Next 16 enforces a **single `next dev` instance per project
+dir** ("Another next dev server is already running"), so the second server can't
+start. The suite has effectively been non-runnable on Next 16. **Deferred fix
+(operator decision 2026-06-15):** switch the webServers to a production build +
+two `next start` instances (no dev lock — and it would run e2e against the real
+prod build, catching prod-only bugs like the PR #77 RSC-500 that dev masked), or
+split into two sequential single-server runs. Until then, what IS shipped is the
+**safety** posture below (fail-closed DB + no prod-server reuse).
+
 ## ⚠️ e2e is FAIL-CLOSED against production (read first)
 
 Every spec `TRUNCATE`s tables in setup, so e2e runs **only** against a
