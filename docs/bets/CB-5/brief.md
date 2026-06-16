@@ -184,3 +184,10 @@ The decision-trace + reason-string observability is the product's actual moat pe
 ## DRI Log
 
 _See PM DRI Decisions + PM Risks + Researcher Open Questions above. Engineer/Designer/UX-Writer decisions are logged per story at `/create-story` + `/build` time._
+
+### Issues (Scanner-logged)
+
+- [2026-06-16] [Scanner] **Production-Ready scan v2 — 4 Critical + 2 High open** (full detail + fixes in [scan-report.md](scan-report.md)). Owner: operator/PM. These are the **pre-`LIVE_MODE`-flip checklist**, not blockers on today's paper-only operation:
+  - **[Critical] PROD_READY-02** SLO undefined · **PROD_READY-03** monitoring not wired (raised to High-confidence — the 2026-06-15 incident had no alerting) · **PROD_READY-04** rollback untested (+ `ci_cd.rollback_command: make rollback` references a non-existent target) · **PROD_READY-08** financial-data compliance determination not recorded.
+  - **[High] PROD_READY-01** runbook stale (no override-controls / DB-recovery / test-isolation sections — gaps the 2026-06-15 incident exercised) · **PROD_READY-05** on-call ack not recorded.
+  - Most resolve as short DRI determinations + a `docs/ops/runbook.md` update; SLO/monitoring are HITL-acceptable as "manual review pre-flip." Backup/restore (PROD_READY-06) is N/A per catalog (no new data store) but the incident showed the existing store has no exercised restore path — verify Supabase PITR before the flip.
