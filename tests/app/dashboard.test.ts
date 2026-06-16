@@ -52,19 +52,23 @@ beforeEach(() => {
 });
 
 describe("DashboardPage /dashboard", () => {
-  it("renders standard chrome + body lines", async () => {
+  it("renders the cockpit frame (CB-6.0 redesign)", async () => {
     headersGetMock.mockImplementation((name) => (name === "x-session-user-id" ? "u1" : null));
     state.deviceLabelRows = [{ device_label: "Safari on macOS" }];
 
     const el = await DashboardPage();
     const json = JSON.stringify(el);
-    expect(json).toContain("crypto-bot");
-    expect(json).toContain("Signed in.");
+    // CB-6.0: /dashboard is now the Crypto cockpit. JSON.stringify captures
+    // DashboardPage's own direct JSX (eyebrow/title + the CockpitSection
+    // `label` props + the trace/ledger links) — NOT nested-component output
+    // (Bot Status / banner internals are verified in e2e + their own tests).
+    expect(json).toContain("DCA + SIGNAL EXIT · COINBASE");
+    expect(json).toContain("Crypto Trading Bot");
+    expect(json).toContain("PROFIT / LOSS");
+    expect(json).toContain("TRADE LOG");
     expect(json).toContain("Create or revise your DCA strategy");
-    // CB-5.0: the CB-2 placeholder is gone — replaced by the live-state
-    // surface (LIVE_MODE banner + panels are child components, asserted in
-    // e2e + tests/lib/dashboard; JSON.stringify of the element tree only
-    // captures DashboardPage's own direct JSX, not nested-component output).
+    // The CB-1.6 "Signed in." landing + the old "crypto-bot" header are gone.
+    expect(json).not.toContain("Signed in.");
     expect(json).not.toContain("will arrive in the next bet");
   });
 

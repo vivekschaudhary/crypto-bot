@@ -72,7 +72,7 @@ async function completeSetupJourney(page: Page): Promise<number> {
   await page.getByRole("button", { name: "Register passkey" }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText("Signed in.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Crypto Trading Bot" })).toBeVisible();
   await expect(page.getByText("Connected device:")).toBeVisible();
 
   return Date.now() - startedAt;
@@ -149,7 +149,7 @@ test("CB-1.6 AC 8: returning operator journey lands on /sign-in then /dashboard"
 
     await completeSignInJourney(page);
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByText("Signed in.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crypto Trading Bot" })).toBeVisible();
     await expect.poll(authRowCounts).toEqual({
       users: 1,
       credentials: 1,
@@ -197,7 +197,7 @@ test("CB-1.6 AC 8: malicious ?next payload is dropped and falls back to /dashboa
 
     await completeSignInJourney(page);
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByText("Signed in.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crypto Trading Bot" })).toBeVisible();
 
     const currentUrl = new URL(page.url());
     if (baseURL) {
@@ -225,7 +225,7 @@ test("CB-1.6 AC 8: sign-out round trip returns to State B and re-protects /dashb
 
     await completeSignInJourney(page);
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByText("Signed in.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crypto Trading Bot" })).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/$/);

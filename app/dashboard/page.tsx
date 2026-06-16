@@ -1,16 +1,14 @@
-// CB-1.6 — /dashboard (Server Component, proxy-gated, minimal post-auth landing).
-// Per docs/bets/CB-1/stories/CB-1.6/design.md § Surface 4 + copy.md § /dashboard.
+// CB-6.0 — /dashboard is now the Crypto cockpit (single-screen), per the
+// operator design (ETH_USD Bot — Coinbase.pdf). The 3-tab shell (Mutual Funds
+// / Equity / Crypto) lives in app/dashboard/layout.tsx. This page recomposes
+// CB-5's live-state read model into the cockpit frame: section 1 (Bot Status)
+// is built; sections 2–6 (Profit/Loss · Current Position · Signals · Manual
+// Overrides · Trade Log) are "Coming soon" placeholders filled in CB-6.1–6.4.
+// The decision-trace + ledger views remain reachable via links in their cards.
+// Read-only (writes happen only via the controls' POST to /api/bot/override).
 //
-// Proxy.ts has already gated this route via verifySession + DB row check.
-// Per CB-1.4 Engineer DRI Decision #5, this page may use the proxy-forwarded
-// x-session-* headers as CONVENIENCE for rendering (NOT auth claims). The
-// page is read-only — it does not mutate state, so re-verification at the
-// handler layer is not required for this surface specifically. The Sign Out
-// button POSTs to /api/auth/sign-out which DOES re-verify (per CB-1.5).
-//
-// CB-3.3 amendment: render a success banner when ?strategy=saved is present
-// (the strategy authoring save action redirects here) + a link to
-// /dashboard/strategy so the operator has an entry point.
+// Proxy.ts gates this route; the x-session-* headers are CONVENIENCE only
+// (CB-1.4 Decision #5) — used here for the device-label footer line.
 
 import { headers } from "next/headers";
 import type { JSX } from "react";
@@ -18,42 +16,47 @@ import type { JSX } from "react";
 import { loadLiveState } from "@/lib/dashboard/live-state";
 import { db } from "@/lib/db/client";
 
+import { BotStatusPanel } from "./bot-status-panel";
+import { CockpitSection } from "./cockpit-section";
 import { LiveModeBanner } from "./live-mode-banner";
-import { LiveStatePanels } from "./live-state-panels";
 import { SignOutClient } from "./sign-out-client";
 
 const pageStyle: React.CSSProperties = {
   fontFamily: "system-ui, sans-serif",
-  padding: "2rem",
+  padding: "0 2rem 2rem",
   maxWidth: 960,
   margin: "0 auto",
 };
-
 const chromeStyle: React.CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
+  justifyContent: "flex-end",
   alignItems: "center",
-  borderBottom: "1px solid #ddd",
-  paddingBottom: "1rem",
-  marginBottom: "2rem",
+  marginBottom: "1rem",
 };
-
+const eyebrowStyle: React.CSSProperties = {
+  fontSize: "0.75rem",
+  letterSpacing: "0.1em",
+  color: "#3b5bdb",
+  fontWeight: 700,
+  marginBottom: "0.25rem",
+};
 const titleStyle: React.CSSProperties = {
-  fontSize: "1.25rem",
-  fontWeight: 600,
+  fontSize: "1.75rem",
+  fontWeight: 800,
+  marginBottom: "1.25rem",
 };
-
-const bodyStyle: React.CSSProperties = {
-  marginBottom: "1.5rem",
+const statusCardStyle: React.CSSProperties = {
+  border: "1px solid #eee",
+  borderRadius: 6,
+  padding: "1rem",
 };
-
 const deviceStyle: React.CSSProperties = {
   borderTop: "1px solid #ddd",
+  marginTop: "1.5rem",
   paddingTop: "1rem",
   color: "#777",
   fontSize: "0.875rem",
 };
-
 const successBannerStyle: React.CSSProperties = {
   background: "#e8f5e9",
   border: "1px solid #4caf50",
@@ -63,11 +66,7 @@ const successBannerStyle: React.CSSProperties = {
   marginBottom: "1.25rem",
   fontSize: "0.9375rem",
 };
-
-const linkStyle: React.CSSProperties = {
-  color: "#446",
-  textDecoration: "underline",
-};
+const linkStyle: React.CSSProperties = { color: "#446", textDecoration: "underline" };
 
 type CredRow = { device_label: string | null };
 
@@ -82,10 +81,6 @@ export default async function DashboardPage(
   const showStrategySavedBanner = resolvedSearchParams.strategy === "saved";
 
   const h = await headers();
-  // Convenience read — proxy.ts forwards the verified session ids via the
-  // cloned-request-headers mechanism (CB-1.4 AC 1). NOT trusted as an auth
-  // claim; the proxy gate already authenticated this request. We use it
-  // only to fetch the credential's device_label for the rendering line.
   const userId = h.get("x-session-user-id");
 
   let deviceLabel: string | null = null;
@@ -97,45 +92,54 @@ export default async function DashboardPage(
       `;
       deviceLabel = rows[0]?.device_label ?? null;
     } catch {
-      // Best-effort; rendering falls back to "this device" if the lookup
-      // fails. The page's correctness doesn't depend on this read.
       deviceLabel = null;
     }
   }
+  const connectedDevice = deviceLabel && deviceLabel.length > 0 ? deviceLabel : "this device";
 
-  const connectedDevice = deviceLabel && deviceLabel.length > 0
-    ? deviceLabel
-    : "this device";
-
-  // CB-5.0 — live-state read model (SSR per load; brief PM Decision #2).
+  // CB-5.0 live-state read model (SSR per load), recomposed into the cockpit.
   const liveState = await loadLiveState();
 
   return (
     <main style={pageStyle}>
       <div style={chromeStyle}>
-        <div style={titleStyle}>crypto-bot</div>
         <SignOutClient />
       </div>
+
+      <div style={eyebrowStyle}>DCA + SIGNAL EXIT · COINBASE</div>
+      <h1 style={titleStyle}>Crypto Trading Bot</h1>
+
       <LiveModeBanner liveMode={liveState.liveMode} />
-      {/* CB-1.6 post-auth confirmation — preserved (onboarding e2e contract). */}
-      <p style={bodyStyle}>Signed in.</p>
+
       {showStrategySavedBanner && (
         <div role="status" style={successBannerStyle}>
           Strategy saved. Bot will pick it up on the next tick.
         </div>
       )}
-      <LiveStatePanels state={liveState} />
-      <p style={{ marginTop: "1.5rem", marginBottom: "0.5rem" }}>
+
+      {/* Section 1 — Bot Status (built). */}
+      <div style={statusCardStyle}>
+        <BotStatusPanel session={liveState.session} />
+      </div>
+
+      {/* Sections 2–6 — scaffolded; filled in CB-6.1–6.4. */}
+      <CockpitSection label="PROFIT / LOSS" />
+      <CockpitSection label="CURRENT POSITION" />
+      <CockpitSection label="SIGNALS">
+        <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>Coming soon</p>
         <a href="/dashboard/trace" style={linkStyle}>
           View decision trace →
         </a>
-      </p>
-      <p style={{ marginBottom: "0.5rem" }}>
+      </CockpitSection>
+      <CockpitSection label="MANUAL OVERRIDES" />
+      <CockpitSection label="TRADE LOG">
+        <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>Coming soon</p>
         <a href="/dashboard/ledger" style={linkStyle}>
           View transaction ledger →
         </a>
-      </p>
-      <p style={{ marginBottom: "1.25rem" }}>
+      </CockpitSection>
+
+      <p style={{ marginTop: "1.25rem" }}>
         <a href="/dashboard/strategy" style={linkStyle}>
           Create or revise your DCA strategy
         </a>
