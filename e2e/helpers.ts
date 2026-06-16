@@ -51,5 +51,5 @@ export async function completeSetupJourney(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/setup$/);
   await page.getByRole("button", { name: "Register passkey" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText("Signed in.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Crypto Trading Bot" })).toBeVisible();
 }
