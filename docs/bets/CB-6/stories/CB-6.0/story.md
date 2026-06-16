@@ -2,7 +2,7 @@
 id: CB-6.0
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-16
 author: PM
@@ -86,4 +86,4 @@ _Unit/component co-located; e2e by Codex in `e2e/` (now runs against the dedicat
 - [2026-06-16] [PM] **Cockpit title is generic ("Crypto Trading Bot") until CB-6.1 adds the per-pair selector + per-pair title** — severity: low — owner: PM — status: open (CB-6.1) — area: scope.
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **FIRST CB-6 STORY — multi-asset shell + cockpit scaffold.**_
+_Story closed: 2026-06-16 (SHIPPED via PR #84 + Codex e2e), brief: docs/bets/CB-6/brief.md. **FIRST CB-6 STORY — multi-asset shell + cockpit scaffold.**_
