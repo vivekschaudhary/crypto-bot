@@ -13,12 +13,16 @@
 import { headers } from "next/headers";
 import type { JSX } from "react";
 
+import { loadCockpitPosition, resolveViewedPair } from "@/lib/dashboard/cockpit-position";
 import { loadLiveState } from "@/lib/dashboard/live-state";
 import { db } from "@/lib/db/client";
+import { getActiveStrategy } from "@/lib/strategies/db";
 
 import { BotStatusPanel } from "./bot-status-panel";
 import { CockpitSection } from "./cockpit-section";
+import { CurrentPositionCard } from "./current-position-card";
 import { LiveModeBanner } from "./live-mode-banner";
+import { PairSelector } from "./pair-selector-client";
 import { SignOutClient } from "./sign-out-client";
 
 const pageStyle: React.CSSProperties = {
@@ -71,7 +75,7 @@ const linkStyle: React.CSSProperties = { color: "#446", textDecoration: "underli
 type CredRow = { device_label: string | null };
 
 interface DashboardPageProps {
-  searchParams?: Promise<{ strategy?: string }>;
+  searchParams?: Promise<{ strategy?: string; pair?: string }>;
 }
 
 export default async function DashboardPage(
@@ -100,6 +104,14 @@ export default async function DashboardPage(
   // CB-5.0 live-state read model (SSR per load), recomposed into the cockpit.
   const liveState = await loadLiveState();
 
+  // CB-6.1 — per-pair view: pick the viewed pair from ?pair + the strategy's
+  // selected assets, then load that pair's Current Position (held/price/RSI).
+  const strategy = await getActiveStrategy();
+  const pairs = strategy?.selected_assets.map((a) => a.identifier) ?? [];
+  const viewedPair = resolveViewedPair(resolvedSearchParams.pair, pairs);
+  const cockpitPosition = viewedPair ? await loadCockpitPosition(viewedPair) : null;
+  const title = viewedPair ? `${viewedPair.replace("-", "/")} Trading Bot` : "Crypto Trading Bot";
+
   return (
     <main style={pageStyle}>
       <div style={chromeStyle}>
@@ -107,7 +119,8 @@ export default async function DashboardPage(
       </div>
 
       <div style={eyebrowStyle}>DCA + SIGNAL EXIT · COINBASE</div>
-      <h1 style={titleStyle}>Crypto Trading Bot</h1>
+      <h1 style={titleStyle}>{title}</h1>
+      {viewedPair && pairs.length > 0 && <PairSelector pairs={pairs} current={viewedPair} />}
 
       <LiveModeBanner liveMode={liveState.liveMode} />
 
@@ -122,9 +135,15 @@ export default async function DashboardPage(
         <BotStatusPanel session={liveState.session} />
       </div>
 
-      {/* Sections 2–6 — scaffolded; filled in CB-6.1–6.4. */}
+      {/* Sections 2–6 — Current Position built (CB-6.1); rest scaffolded. */}
       <CockpitSection label="PROFIT / LOSS" />
-      <CockpitSection label="CURRENT POSITION" />
+      {cockpitPosition ? (
+        <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
+          <CurrentPositionCard data={cockpitPosition} />
+        </div>
+      ) : (
+        <CockpitSection label="CURRENT POSITION" />
+      )}
       <CockpitSection label="SIGNALS">
         <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>Coming soon</p>
         <a href="/dashboard/trace" style={linkStyle}>

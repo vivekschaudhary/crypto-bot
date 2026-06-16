@@ -38,6 +38,14 @@ vi.mock("@/lib/dashboard/live-state", () => ({
   })),
 }));
 
+// CB-6.1: the cockpit now reads the active strategy for the pair selector.
+// Mock to null → no selected assets → resolveViewedPair returns null →
+// loadCockpitPosition is NOT called, and the title stays generic ("Crypto
+// Trading Bot"). Keeps these chrome/device-label tests isolated.
+vi.mock("@/lib/strategies/db", () => ({
+  getActiveStrategy: vi.fn(async () => null),
+}));
+
 hoisted.sqlMock.mockImplementation(async () => hoisted.state.deviceLabelRows);
 
 const { headersGetMock, sqlMock, state } = hoisted;
