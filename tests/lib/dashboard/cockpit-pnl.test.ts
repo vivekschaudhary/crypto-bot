@@ -41,7 +41,7 @@ afterEach(() => vi.clearAllMocks());
 
 describe("loadCockpitPnl", () => {
   it("session invested/buys + all-time position value/unrealized/realized", async () => {
-    const r = await loadCockpitPnl("ETH-USD");
+    const r = (await loadCockpitPnl("ETH-USD"))!;
     expect(r.invested).toBe(150);
     expect(r.buys).toBe(4);
     expect(r.currentValue).toBeCloseTo(0.069004 * 1792.39, 4);
@@ -52,7 +52,7 @@ describe("loadCockpitPnl", () => {
 
   it("Coinbase read fail → P&L fields null, invested/buys intact", async () => {
     getAccountTradeHistory.mockRejectedValue(new Error("coinbase 503"));
-    const r = await loadCockpitPnl("ETH-USD");
+    const r = (await loadCockpitPnl("ETH-USD"))!;
     expect(r.invested).toBe(150); // DB-only — unaffected
     expect(r.buys).toBe(4);
     expect(r.currentValue).toBeNull();
@@ -67,23 +67,20 @@ describe("loadCockpitPnl", () => {
 
   it("missing price → currentValue + unrealized null, realized still computed", async () => {
     getProduct.mockResolvedValue({ product_id: "ETH-USD" }); // no price
-    const r = await loadCockpitPnl("ETH-USD");
+    const r = (await loadCockpitPnl("ETH-USD"))!;
     expect(r.currentValue).toBeNull();
     expect(r.unrealizedPnlUsd).toBeNull();
     expect(r.realizedPnlUsd).toBe(0); // computeAssetPnl still ran
   });
 
-  it("no active session → invested/buys 0 (position P&L still computed)", async () => {
+  it("no active session → returns null (no P&L card; AC 5)", async () => {
     sessionRows = [];
-    const r = await loadCockpitPnl("ETH-USD");
-    expect(r.invested).toBe(0);
-    expect(r.buys).toBe(0);
-    expect(r.currentValue).not.toBeNull();
+    expect(await loadCockpitPnl("ETH-USD")).toBeNull();
   });
 
   it("0 buys this session → invested $0", async () => {
     orderAgg = [{ buy_count: 0, invested: 0 }];
-    const r = await loadCockpitPnl("ETH-USD");
+    const r = (await loadCockpitPnl("ETH-USD"))!;
     expect(r.invested).toBe(0);
     expect(r.buys).toBe(0);
   });

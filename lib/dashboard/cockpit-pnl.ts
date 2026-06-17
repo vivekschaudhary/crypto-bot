@@ -34,7 +34,7 @@ export interface CockpitPnl {
 
 const FILLS_PAGE_LIMIT = 250;
 
-export async function loadCockpitPnl(pair: string): Promise<CockpitPnl> {
+export async function loadCockpitPnl(pair: string): Promise<CockpitPnl | null> {
   const sql = db();
 
   // Current session (the not-yet-ended run — same definition as the cron/dashboard).
@@ -43,24 +43,24 @@ export async function loadCockpitPnl(pair: string): Promise<CockpitPnl> {
   `;
   const sessionId = sessionRows[0]?.id ?? null;
 
+  // No active session → NO Profit/Loss card (AC 5). Return null; the cockpit's
+  // no-session treatment (Bot Status) covers it. (Don't fetch Coinbase either.)
+  if (sessionId === null) return null;
+
   // Session-scoped invested + buy count for the pair (DB-only; mirrors
   // live-state:loadSessionActivity, scoped to asset_identifier).
-  let invested = 0;
-  let buys = 0;
-  if (sessionId) {
-    const rows = await sql<{ buy_count: number; invested: number }[]>`
-      SELECT COUNT(*)::int AS buy_count,
-             COALESCE(SUM(amount), 0)::float8 AS invested
-        FROM orders
-       WHERE session_id = ${sessionId}
-         AND asset_identifier = ${pair}
-         AND source = 'bot'
-         AND side = 'buy'
-         AND status <> 'failed'
-    `;
-    buys = rows[0]?.buy_count ?? 0;
-    invested = rows[0]?.invested ?? 0;
-  }
+  const rows = await sql<{ buy_count: number; invested: number }[]>`
+    SELECT COUNT(*)::int AS buy_count,
+           COALESCE(SUM(amount), 0)::float8 AS invested
+      FROM orders
+     WHERE session_id = ${sessionId}
+       AND asset_identifier = ${pair}
+       AND source = 'bot'
+       AND side = 'buy'
+       AND status <> 'failed'
+  `;
+  const buys = rows[0]?.buy_count ?? 0;
+  const invested = rows[0]?.invested ?? 0;
 
   // Position P&L — Coinbase READS only inside the try (degrade on failure).
   let raw:

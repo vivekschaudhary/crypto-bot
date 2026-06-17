@@ -29,15 +29,17 @@ function fmtUsd(n: number): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function fmtSignedUsd(n: number): string {
+  if (n === 0) return fmtUsd(0); // copy.md: zero is neutral/unsigned ($0.00)
   const sign = n < 0 ? "−" : "+";
   return `${sign}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function fmtSignedPct(n: number): string {
+  if (n === 0) return "0.00%"; // zero neutral/unsigned
   const sign = n < 0 ? "−" : "+";
   return `${sign}${Math.abs(n * 100).toFixed(2)}%`;
 }
 function pnlColor(n: number): string {
-  return n < 0 ? LOSS : GAIN;
+  return n < 0 ? LOSS : n > 0 ? GAIN : "#333"; // zero neutral
 }
 function buysLabel(n: number): string {
   return n === 1 ? "1 buy this session" : `${n} buys this session`;

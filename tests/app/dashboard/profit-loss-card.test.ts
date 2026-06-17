@@ -28,7 +28,8 @@ describe("ProfitLossCard", () => {
     expect(json).toContain("$123.68");
     expect(json).toContain("−$26.32"); // signed unrealized (minus glyph)
     expect(json).toContain("Realized:");
-    expect(json).toContain("+$0.00"); // signed realized
+    expect(json).toContain("$0.00"); // zero realized is neutral/unsigned (copy.md)
+    expect(json).not.toContain("+$0.00"); // not signed for zero
   });
 
   it("singular buy pluralization", () => {
