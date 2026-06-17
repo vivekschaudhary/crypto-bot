@@ -13,6 +13,7 @@
 import { headers } from "next/headers";
 import type { JSX } from "react";
 
+import { loadCockpitPnl } from "@/lib/dashboard/cockpit-pnl";
 import { loadCockpitPosition, resolveViewedPair } from "@/lib/dashboard/cockpit-position";
 import { loadLiveState } from "@/lib/dashboard/live-state";
 import { db } from "@/lib/db/client";
@@ -23,6 +24,7 @@ import { CockpitSection } from "./cockpit-section";
 import { CurrentPositionCard } from "./current-position-card";
 import { LiveModeBanner } from "./live-mode-banner";
 import { PairSelector } from "./pair-selector-client";
+import { ProfitLossCard } from "./profit-loss-card";
 import { SignOutClient } from "./sign-out-client";
 
 const pageStyle: React.CSSProperties = {
@@ -110,6 +112,7 @@ export default async function DashboardPage(
   const pairs = strategy?.selected_assets.map((a) => a.identifier) ?? [];
   const viewedPair = resolveViewedPair(resolvedSearchParams.pair, pairs);
   const cockpitPosition = viewedPair ? await loadCockpitPosition(viewedPair) : null;
+  const cockpitPnl = viewedPair ? await loadCockpitPnl(viewedPair) : null;
   const title = viewedPair ? `${viewedPair.replace("-", "/")} Trading Bot` : "Crypto Trading Bot";
 
   return (
@@ -135,8 +138,14 @@ export default async function DashboardPage(
         <BotStatusPanel session={liveState.session} />
       </div>
 
-      {/* Sections 2–6 — Current Position built (CB-6.1); rest scaffolded. */}
-      <CockpitSection label="PROFIT / LOSS" />
+      {/* Sections 2–6 — Profit/Loss (CB-6.2) + Current Position (CB-6.1) built; rest scaffolded. */}
+      {cockpitPnl ? (
+        <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
+          <ProfitLossCard data={cockpitPnl} />
+        </div>
+      ) : (
+        <CockpitSection label="PROFIT / LOSS" />
+      )}
       {cockpitPosition ? (
         <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
           <CurrentPositionCard data={cockpitPosition} />
