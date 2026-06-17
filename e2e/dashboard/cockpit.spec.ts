@@ -1,9 +1,11 @@
-// CB-6.0/CB-6.2 cockpit e2e:
+// CB-6.0/CB-6.3 cockpit e2e:
 //   - load → status → Pause→STOPPED → Start→ACTIVE
 //   - per-pair selector + Current Position happy path (held qty + avg cost +
 //     live price + latest RSI) using the operator's REAL Coinbase reads
-//   - Profit/Loss happy path (session invested + signed P&L) and degraded pair
-//     path (fake pair → no position + live-price-unavailable + P&L unavailable)
+//   - Profit/Loss happy path (session invested + signed P&L)
+//   - Signals happy path (seeded signal → RSI zone + price-vs-MA + next action)
+//   - unevaluated pair path (fake pair → no position + live-price-unavailable +
+//     P&L unavailable + "No signals yet")
 //   - Equity + Mutual Funds tabs show the "coming soon" placeholders
 //
 // Why a real Coinbase happy path here? The cockpit's Current Position card is
@@ -107,14 +109,22 @@ async function seedLatestSignals(heldPair: string): Promise<void> {
   await sql`
     INSERT INTO bot_ticks (id, session_id, tick_started_at, decision, reason, error_detail)
     VALUES
-      ('tick-held', 'sess-cockpit', '2026-06-16 00:15:00+00', 'hold', 'held pair signal', null),
-      ('tick-degrade', 'sess-cockpit', '2026-06-16 00:30:00+00', 'hold', 'degraded pair signal', null)
+      ('tick-held', 'sess-cockpit', '2026-06-16 00:15:00+00', 'hold', 'held pair signal', null)
   `;
   await sql`
     INSERT INTO signals (id, tick_id, asset_identifier, decision, reason, rsi, ma, ma_period, last_close)
     VALUES
-      ('sig-held', 'tick-held', ${heldPair}, 'hold', 'held pair latest rsi', 61, null, 20, null),
-      ('sig-degrade', 'tick-degrade', ${DEGRADE_PAIR}, 'hold', 'degraded pair latest rsi', 47, null, 20, null)
+      (
+        'sig-held',
+        'tick-held',
+        ${heldPair},
+        'hold',
+        'hold: rsi=61.00 < entry_threshold=30 BUT price=1792.39 >= ma20=1740.10; no buy at held pair',
+        61,
+        1740.1,
+        20,
+        1792.39
+      )
   `;
 }
 
@@ -165,7 +175,7 @@ async function loadHeldPairFixture(): Promise<{
   );
 }
 
-test("cockpit loads, status toggles, PnL/position update by pair, degraded pair degrades, and Equity/MF show coming soon", async ({
+test("cockpit loads, status toggles, PnL/signals/position update by pair, unevaluated pair degrades, and Equity/MF show coming soon", async ({
   page,
 }) => {
   const auth = await addVirtualAuthenticator(page);
@@ -202,6 +212,19 @@ test("cockpit loads, status toggles, PnL/position update by pair, degraded pair 
     await expect(page.getByText(`Avg cost: ${fmtUsd(held.avgCostUsd)}`)).toBeVisible();
     await expect(page.getByText(fmtUsd(held.livePrice))).toBeVisible();
     await expect(page.getByText("RSI: 61")).toBeVisible();
+    await expect(page.getByText("SIGNALS")).toBeVisible();
+    await expect(page.getByText("RSI ZONE")).toBeVisible();
+    await expect(page.getByText("61.0  ·  Neutral")).toBeVisible();
+    await expect(page.getByText("PRICE vs MA20")).toBeVisible();
+    await expect(page.getByText("$1,792.39 > $1,740.10  ·  Above")).toBeVisible();
+    await expect(page.getByText("NEXT ACTION")).toBeVisible();
+    await expect(page.getByText("HOLD")).toBeVisible();
+    await expect(
+      page.getByText(
+        "hold: rsi=61.00 < entry_threshold=30 BUT price=1792.39 >= ma20=1740.10; no buy at held pair",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "View decision trace →" })).toBeVisible();
 
     await page.getByRole("button", { name: "Pause" }).click();
     await expect(page.getByText("Bot is stopped — click Start to resume")).toBeVisible();
@@ -223,7 +246,11 @@ test("cockpit loads, status toggles, PnL/position update by pair, degraded pair 
     await expect(page.getByText("FAKE HELD")).toBeVisible();
     await expect(page.getByText("No position yet")).toBeVisible();
     await expect(page.getByText("Live price unavailable")).toBeVisible();
-    await expect(page.getByText("RSI: 47")).toBeVisible();
+    await expect(page.getByText("RSI: —")).toBeVisible();
+    await expect(
+      page.getByText("No signals yet — the bot hasn't evaluated this pair yet."),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "View decision trace →" })).toBeVisible();
 
     await page.getByRole("link", { name: "📈 Equity" }).click();
     await expect(page).toHaveURL(/\/dashboard\/equity$/);
