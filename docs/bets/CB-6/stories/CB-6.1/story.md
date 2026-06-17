@@ -2,7 +2,7 @@
 id: CB-6.1
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-16
 author: PM
@@ -82,4 +82,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (runs vs the test D
 - [2026-06-16] [PM] **Session-vs-all-time PnL scoping** (invested/buys "this session" vs all-time realized from fills) is a real modeling question — severity: low — owner: PM — status: open (resolve in CB-6.2) — area: scope.
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **SECOND CB-6 STORY — per-pair view begins.**_
+_Story closed: 2026-06-17 (SHIPPED via PR #87 + Codex e2e), brief: docs/bets/CB-6/brief.md. **SECOND CB-6 STORY — per-pair view begins.**_
