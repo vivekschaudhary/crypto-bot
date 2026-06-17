@@ -1,8 +1,9 @@
-// CB-6.0/CB-6.1 cockpit e2e:
+// CB-6.0/CB-6.2 cockpit e2e:
 //   - load → status → Pause→STOPPED → Start→ACTIVE
 //   - per-pair selector + Current Position happy path (held qty + avg cost +
 //     live price + latest RSI) using the operator's REAL Coinbase reads
-//   - degraded pair path (fake pair → no position + live-price-unavailable)
+//   - Profit/Loss happy path (session invested + signed P&L) and degraded pair
+//     path (fake pair → no position + live-price-unavailable + P&L unavailable)
 //   - Equity + Mutual Funds tabs show the "coming soon" placeholders
 //
 // Why a real Coinbase happy path here? The cockpit's Current Position card is
@@ -15,6 +16,7 @@ import { expect, test } from "@playwright/test";
 import { ulid } from "ulidx";
 
 import { getAccountTradeHistory } from "@/lib/coinbase/accounts";
+import { computeAssetPnl } from "@/lib/dashboard/pnl";
 import { getProduct } from "@/lib/coinbase/market";
 import { aggregatePosition } from "@/lib/ticks/cost-basis";
 
@@ -36,6 +38,21 @@ test.afterAll(async () => {
 
 function fmtUsd(n: number): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtSignedUsd(n: number): string {
+  if (n === 0) return fmtUsd(0);
+  const sign = n < 0 ? "−" : "+";
+  return `${sign}$${Math.abs(n).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function fmtSignedPct(n: number): string {
+  if (n === 0) return "0.00%";
+  const sign = n < 0 ? "−" : "+";
+  return `${sign}${Math.abs(n * 100).toFixed(2)}%`;
 }
 
 function slashPair(pair: string): string {
@@ -101,11 +118,26 @@ async function seedLatestSignals(heldPair: string): Promise<void> {
   `;
 }
 
+async function seedSessionOrders(heldPair: string): Promise<void> {
+  await sql`
+    INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, status)
+    VALUES
+      ('order-held-1', ${heldPair}, 'sess-cockpit', 'bot', 'buy', 100, 'dry_run'),
+      ('order-held-2', ${heldPair}, 'sess-cockpit', 'bot', 'buy', 50, 'submitted'),
+      ('order-held-failed', ${heldPair}, 'sess-cockpit', 'bot', 'buy', 999, 'failed'),
+      ('order-degrade-1', ${DEGRADE_PAIR}, 'sess-cockpit', 'bot', 'buy', 25, 'dry_run'),
+      ('order-degrade-2', ${DEGRADE_PAIR}, 'sess-cockpit', 'bot', 'buy', 5, 'submitted')
+  `;
+}
+
 async function loadHeldPairFixture(): Promise<{
   pair: string;
   quantity: number;
   avgCostUsd: number;
   livePrice: number;
+  unrealizedPnlUsd: number;
+  realizedPnlUsd: number;
+  unrealizedPct: number | null;
 }> {
   for (const pair of HELD_PAIR_CANDIDATES) {
     const { fills } = await getAccountTradeHistory({ productIds: [pair], limit: 250 });
@@ -114,11 +146,17 @@ async function loadHeldPairFixture(): Promise<{
     const product = await getProduct(pair);
     const livePrice = Number(product.price);
     if (!Number.isFinite(livePrice)) continue;
+    const pnl = computeAssetPnl(fills, livePrice);
+    const costBasis = pnl.avgCostUsd * pnl.quantity;
     return {
       pair,
       quantity: position.quantity,
       avgCostUsd: position.avgCostUsd,
       livePrice,
+      unrealizedPnlUsd: pnl.unrealizedPnlUsd ?? 0,
+      realizedPnlUsd: pnl.realizedPnlUsd,
+      unrealizedPct:
+        pnl.unrealizedPnlUsd !== null && costBasis > 0 ? pnl.unrealizedPnlUsd / costBasis : null,
     };
   }
 
@@ -127,7 +165,7 @@ async function loadHeldPairFixture(): Promise<{
   );
 }
 
-test("cockpit loads, status toggles, pair view updates, degraded pair degrades, and Equity/MF show coming soon", async ({
+test("cockpit loads, status toggles, PnL/position update by pair, degraded pair degrades, and Equity/MF show coming soon", async ({
   page,
 }) => {
   const auth = await addVirtualAuthenticator(page);
@@ -137,6 +175,7 @@ test("cockpit loads, status toggles, pair view updates, degraded pair degrades, 
     const held = await loadHeldPairFixture();
     await seedStrategyAndSession([held.pair, DEGRADE_PAIR]);
     await seedLatestSignals(held.pair);
+    await seedSessionOrders(held.pair);
 
     await page.goto("/dashboard");
 
@@ -153,6 +192,11 @@ test("cockpit loads, status toggles, pair view updates, degraded pair degrades, 
 
     await expect(page.getByText("Bot is active — running every 15 minutes.")).toBeVisible();
     await expect(page.getByText("● ACTIVE")).toBeVisible();
+    await expect(page.getByText("TOTAL INVESTED")).toBeVisible();
+    await expect(page.getByText("$150.00")).toBeVisible();
+    await expect(page.getByText("2 buys this session")).toBeVisible();
+    await expect(page.getByText("CURRENT VALUE")).toBeVisible();
+    await expect(page.getByText(`P&L: ${fmtSignedUsd(held.unrealizedPnlUsd)} (${held.unrealizedPct === null ? "—" : fmtSignedPct(held.unrealizedPct)}) · Realized: ${fmtSignedUsd(held.realizedPnlUsd)}`)).toBeVisible();
     await expect(page.getByText(`${baseOf(held.pair)} HELD`)).toBeVisible();
     await expect(page.getByText(`${held.quantity} ${baseOf(held.pair)}`)).toBeVisible();
     await expect(page.getByText(`Avg cost: ${fmtUsd(held.avgCostUsd)}`)).toBeVisible();
@@ -171,6 +215,11 @@ test("cockpit loads, status toggles, pair view updates, degraded pair degrades, 
     await page.getByLabel("Pair").selectOption(DEGRADE_PAIR);
     await expect(page).toHaveURL(/\/dashboard\?pair=FAKE-USD$/);
     await expect(page.getByRole("heading", { name: "FAKE/USD Trading Bot" })).toBeVisible();
+    await expect(page.getByText("TOTAL INVESTED")).toBeVisible();
+    await expect(page.getByText("$30.00")).toBeVisible();
+    await expect(page.getByText("2 buys this session")).toBeVisible();
+    await expect(page.getByText("CURRENT VALUE")).toBeVisible();
+    await expect(page.getByText("P&L unavailable")).toBeVisible();
     await expect(page.getByText("FAKE HELD")).toBeVisible();
     await expect(page.getByText("No position yet")).toBeVisible();
     await expect(page.getByText("Live price unavailable")).toBeVisible();
