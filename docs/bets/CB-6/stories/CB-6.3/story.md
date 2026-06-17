@@ -2,7 +2,7 @@
 id: CB-6.3
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-16
 author: PM
@@ -85,4 +85,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; issue #80
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **FOURTH CB-6 STORY — Signals + Next Action; DB-only recomposition of CB-5.1.**_
+_Story closed: 2026-06-16 (SHIPPED via PR #92 + Codex e2e), brief: docs/bets/CB-6/brief.md. **FOURTH CB-6 STORY — Signals + Next Action; DB-only recomposition of CB-5.1.**_
