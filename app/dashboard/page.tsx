@@ -15,6 +15,7 @@ import type { JSX } from "react";
 
 import { loadCockpitPnl } from "@/lib/dashboard/cockpit-pnl";
 import { loadCockpitPosition, resolveViewedPair } from "@/lib/dashboard/cockpit-position";
+import { loadCockpitSignals } from "@/lib/dashboard/cockpit-signals";
 import { loadLiveState } from "@/lib/dashboard/live-state";
 import { db } from "@/lib/db/client";
 import { getActiveStrategy } from "@/lib/strategies/db";
@@ -25,6 +26,7 @@ import { CurrentPositionCard } from "./current-position-card";
 import { LiveModeBanner } from "./live-mode-banner";
 import { PairSelector } from "./pair-selector-client";
 import { ProfitLossCard } from "./profit-loss-card";
+import { SignalsCard } from "./signals-card";
 import { SignOutClient } from "./sign-out-client";
 
 const pageStyle: React.CSSProperties = {
@@ -113,6 +115,9 @@ export default async function DashboardPage(
   const viewedPair = resolveViewedPair(resolvedSearchParams.pair, pairs);
   const cockpitPosition = viewedPair ? await loadCockpitPosition(viewedPair) : null;
   const cockpitPnl = viewedPair ? await loadCockpitPnl(viewedPair) : null;
+  // CB-6.3 — latest signal for the viewed pair (NOT session-gated; the last
+  // evaluation is meaningful even when paused/stopped).
+  const cockpitSignals = viewedPair ? await loadCockpitSignals(viewedPair) : null;
   const title = viewedPair ? `${viewedPair.replace("-", "/")} Trading Bot` : "Crypto Trading Bot";
 
   return (
@@ -153,12 +158,28 @@ export default async function DashboardPage(
       ) : (
         <CockpitSection label="CURRENT POSITION" />
       )}
-      <CockpitSection label="SIGNALS">
-        <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>Coming soon</p>
-        <a href="/dashboard/trace" style={linkStyle}>
-          View decision trace →
-        </a>
-      </CockpitSection>
+      {cockpitSignals && strategy ? (
+        <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
+          <SignalsCard
+            signal={cockpitSignals}
+            entryRsiThreshold={strategy.entry_rules.rsiThreshold}
+            exitRsiThreshold={strategy.exit_rules.rsiThreshold}
+            maPeriod={strategy.entry_rules.maPeriod}
+          />
+          <a href="/dashboard/trace" style={{ ...linkStyle, display: "inline-block", marginTop: "0.75rem", fontSize: "0.875rem" }}>
+            View decision trace →
+          </a>
+        </div>
+      ) : (
+        <CockpitSection label="SIGNALS">
+          <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>
+            No signals yet — the bot hasn&apos;t evaluated this pair yet.
+          </p>
+          <a href="/dashboard/trace" style={linkStyle}>
+            View decision trace →
+          </a>
+        </CockpitSection>
+      )}
       <CockpitSection label="MANUAL OVERRIDES" />
       <CockpitSection label="TRADE LOG">
         <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>Coming soon</p>
