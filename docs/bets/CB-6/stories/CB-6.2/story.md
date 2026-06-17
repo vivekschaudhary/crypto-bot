@@ -2,7 +2,7 @@
 id: CB-6.2
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-17
 author: PM
@@ -82,4 +82,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; issue #80
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **THIRD CB-6 STORY — Profit/Loss; resolves the session-vs-all-time scoping.**_
+_Story closed: 2026-06-16 (SHIPPED via PR #90 + Codex e2e), brief: docs/bets/CB-6/brief.md. **THIRD CB-6 STORY — Profit/Loss; resolves the session-vs-all-time scoping.**_

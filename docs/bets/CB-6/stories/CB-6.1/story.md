@@ -79,7 +79,7 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (runs vs the test D
 - [2026-06-16] [PM] **RSI staleness** — the "latest signal" may be from an older tick if the cron skipped (paused/no-strategy) — likelihood: medium — impact: low — mitigation: show the latest available RSI; "RSI: —" when none — area: correctness.
 
 ### Issues
-- [2026-06-16] [PM] **Session-vs-all-time PnL scoping** (invested/buys "this session" vs all-time realized from fills) is a real modeling question — severity: low — owner: PM — status: open (resolve in CB-6.2) — area: scope.
+- [2026-06-16] [PM] **Session-vs-all-time PnL scoping** (invested/buys "this session" vs all-time realized from fills) is a real modeling question — severity: low — owner: PM — status: resolved 2026-06-16 in CB-6.2 (invested/buys session-scoped; value/unrealized/realized = real all-time position via computeAssetPnl — see CB-6.2 DRI Decision) — area: scope.
 
 ---
 _Story closed: 2026-06-17 (SHIPPED via PR #87 + Codex e2e), brief: docs/bets/CB-6/brief.md. **SECOND CB-6 STORY — per-pair view begins.**_
