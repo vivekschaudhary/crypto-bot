@@ -71,6 +71,38 @@ export function runOutcomePhase(ok: boolean, body: Record<string, unknown> | nul
   return "done";
 }
 
+/**
+ * Run Now button + its feedback line. PURE presentational (no hooks) so the
+ * full state matrix is render-testable via JSON.stringify (the repo's pattern;
+ * no @testing-library — CB-3.3 Decision #9). BotControls owns the phase state.
+ * Copy verbatim — copy.md.
+ */
+export function RunNowControl({ phase, onRun }: { phase: RunPhase; onRun: () => void }): JSX.Element {
+  const busy = phase === "working";
+  return (
+    <>
+      <button type="button" onClick={onRun} disabled={busy} aria-busy={busy} style={buttonStyle}>
+        {busy ? COPY.running : COPY.runNow}
+      </button>
+      {phase === "done" && (
+        <span role="status" style={runStatusStyle}>
+          {COPY.runDone}
+        </span>
+      )}
+      {phase === "skipped" && (
+        <span role="status" style={runStatusStyle}>
+          {COPY.runSkipped}
+        </span>
+      )}
+      {phase === "error" && (
+        <span role="alert" style={errorStyle}>
+          {COPY.runError}
+        </span>
+      )}
+    </>
+  );
+}
+
 const buttonStyle: React.CSSProperties = {
   padding: "0.4rem 0.9rem",
   fontSize: "0.9375rem",
@@ -93,7 +125,6 @@ export function BotControls({ status }: { status: SessionStatus }): JSX.Element 
   const [phase, setPhase] = useState<Phase>("idle");
   const [runPhase, setRunPhase] = useState<RunPhase>("idle");
   const isBusy = phase === "working";
-  const runBusy = runPhase === "working";
   const { showStart, showPause, showStop } = controlsForStatus(status);
 
   async function submit(action: Action): Promise<void> {
@@ -156,28 +187,11 @@ export function BotControls({ status }: { status: SessionStatus }): JSX.Element 
           </button>
         )}
         {/* Run Now — CB-6.5: on-demand bot evaluation (dry-run while dark). */}
-        <button type="button" onClick={() => void runNow()} disabled={runBusy} aria-busy={runBusy} style={buttonStyle}>
-          {runBusy ? COPY.running : COPY.runNow}
-        </button>
+        <RunNowControl phase={runPhase} onRun={() => void runNow()} />
       </div>
       {phase === "error" && (
         <div role="alert" style={errorStyle}>
           {COPY.error}
-        </div>
-      )}
-      {runPhase === "done" && (
-        <div role="status" style={runStatusStyle}>
-          {COPY.runDone}
-        </div>
-      )}
-      {runPhase === "skipped" && (
-        <div role="status" style={runStatusStyle}>
-          {COPY.runSkipped}
-        </div>
-      )}
-      {runPhase === "error" && (
-        <div role="alert" style={errorStyle}>
-          {COPY.runError}
         </div>
       )}
     </div>

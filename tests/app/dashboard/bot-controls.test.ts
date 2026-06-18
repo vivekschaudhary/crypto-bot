@@ -6,7 +6,16 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ACTION_KIND, controlsForStatus, runOutcomePhase } from "@/app/dashboard/bot-controls-client";
+import {
+  ACTION_KIND,
+  controlsForStatus,
+  RunNowControl,
+  runOutcomePhase,
+} from "@/app/dashboard/bot-controls-client";
+
+function renderRunNow(phase: Parameters<typeof RunNowControl>[0]["phase"]): string {
+  return JSON.stringify(RunNowControl({ phase, onRun: () => {} }));
+}
 
 describe("controlsForStatus — status-aware controls", () => {
   it("active → Pause + Stop (no Start)", () => {
@@ -25,6 +34,31 @@ describe("ACTION_KIND — control → override kind (Stop = alias for pause)", (
   it("Pause → pause", () => expect(ACTION_KIND.pause).toBe("pause"));
   it("Stop → pause (alias; no new override_events kind / no migration)", () => {
     expect(ACTION_KIND.stop).toBe("pause");
+  });
+});
+
+describe("RunNowControl — CB-6.5 render coverage of every state (AC 9)", () => {
+  it("idle → enabled 'Run Now' button, no feedback line", () => {
+    const json = renderRunNow("idle");
+    expect(json).toContain("Run Now");
+    expect(json).not.toContain("Running…");
+    expect(json).toContain('"disabled":false');
+    expect(json).not.toContain("Done — see the trade log.");
+    expect(json).not.toContain("Bot is paused — resume to run.");
+  });
+  it("working → 'Running…' + disabled button", () => {
+    const json = renderRunNow("working");
+    expect(json).toContain("Running…");
+    expect(json).toContain('"disabled":true');
+  });
+  it("done → 'Done — see the trade log.'", () => {
+    expect(renderRunNow("done")).toContain("Done — see the trade log.");
+  });
+  it("skipped → 'Bot is paused — resume to run.'", () => {
+    expect(renderRunNow("skipped")).toContain("Bot is paused — resume to run.");
+  });
+  it("error → 'Run failed — try again.'", () => {
+    expect(renderRunNow("error")).toContain("Run failed — try again.");
   });
 });
 
