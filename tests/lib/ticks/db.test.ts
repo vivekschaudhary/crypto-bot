@@ -78,11 +78,12 @@ describe("aggregateSessionTotals — cap totals count live deployments only (PR 
     expect(q).not.toContain("status <> 'failed'");
   });
 
-  it("scopes to the session's bot BUY rows", async () => {
+  it("scopes to the session's BUY rows, BOT + MANUAL (CB-6.6 combined cap)", async () => {
     await aggregateSessionTotals("session-1");
     const call = capturedCalls[0];
     expect(call?.text).toContain("FROM orders");
-    expect(call?.text).toContain("source = 'bot'");
+    // CB-6.6: manual overrides count toward the caps too (combined ceiling).
+    expect(call?.text).toContain("source IN ('bot', 'manual')");
     expect(call?.text).toContain("side = 'buy'");
     expect(call?.values).toContain("session-1");
   });

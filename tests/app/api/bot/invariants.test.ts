@@ -16,6 +16,8 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..");
 const BOT_API_DIR = join(REPO_ROOT, "app", "api", "bot");
 const ORDERS_FILE = join(REPO_ROOT, "lib", "coinbase", "orders.ts");
+// The SAFE state-only helpers — must STAY order-free even after the inversion.
+const SAFE_OVERRIDES_FILE = join(REPO_ROOT, "lib", "bot", "overrides.ts");
 
 const AT_IMPORT = /^\s*import[^;]*from\s+["']@\/([^"']+)["']/gm;
 const REL_IMPORT = /^\s*import[^;]*from\s+["'](\.[^"']+)["']/gm;
@@ -63,12 +65,25 @@ function walkGraph(entries: string[]): Set<string> {
   return visited;
 }
 
-describe("/api/bot/** — SAFE controls only, no order placement (AC 8)", () => {
-  it("transitive import graph never reaches lib/coinbase/orders.ts", () => {
+describe("/api/bot/** — real-money overrides (CB-6.6; CB-5.3 invariant INVERTED)", () => {
+  // CB-5.3 asserted /api/bot/** NEVER reached lib/coinbase/orders (safe controls
+  // only). CB-6.6 DELIBERATELY inverts that: the override route dispatches the
+  // real-money kinds (force_buy/sell_*) via lib/bot/manual-orders.ts, which
+  // places orders under the LIVE_MODE gate ([cross-artifact-sweep-on-contract-shift]).
+  // The structural "never" is replaced by THIS inverted assertion + a STRUCTURAL
+  // guard that the SAFE helpers module stays order-free (below) + the BEHAVIORAL
+  // LIVE_MODE-gate tests in tests/lib/bot/manual-orders.test.ts.
+  it("the override route's transitive graph NOW reaches lib/coinbase/orders.ts (real-money kinds)", () => {
     const entries = walkTsFiles(BOT_API_DIR);
     expect(entries.length).toBeGreaterThan(0); // smoke: the route exists
     const graph = walkGraph(entries);
     expect(graph.size).toBeGreaterThan(entries.length); // smoke: it walked
+    expect(graph.has(ORDERS_FILE)).toBe(true);
+  });
+
+  it("the SAFE overrides module (lib/bot/overrides.ts) NEVER reaches orders — pause/resume/reset stay order-free", () => {
+    const graph = walkGraph([SAFE_OVERRIDES_FILE]);
+    expect(graph.size).toBeGreaterThan(1); // smoke: it walked
     expect(graph.has(ORDERS_FILE)).toBe(false);
   });
 });

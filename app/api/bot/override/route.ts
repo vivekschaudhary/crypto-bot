@@ -28,11 +28,15 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/cookie";
 import { OriginMismatchError, verifyOriginOrThrow } from "@/lib/auth/origin-check";
 import { RateLimitedError, consumeOrThrow } from "@/lib/auth/rate-limit";
 import { verifySession } from "@/lib/auth/sessions";
+import { forceBuy, sellFraction, type ManualOrderOutcome } from "@/lib/bot/manual-orders";
 import { pauseSession, resetSession, resumeSession, type OverrideKind, type OverrideOutcome } from "@/lib/bot/overrides";
 
 const SAFE_KINDS = new Set<OverrideKind>(["pause", "resume", "reset"]);
-// Real-money kinds the schema's CHECK permits but CB-5.3 does NOT ship.
-const DEFERRED_KINDS = new Set(["force_buy", "sell_50", "sell_all"]);
+// CB-6.6: real-money kinds, un-deferred from CB-5.4. The order-placing path
+// lives in lib/bot/manual-orders.ts (NOT the safe overrides module); they place
+// dry_run while LIVE_MODE=false (no bypass). The override_events.kind CHECK
+// already permits them — no migration.
+const REAL_MONEY_KINDS = new Set(["force_buy", "sell_50", "sell_all"]);
 
 function jsonResponse(status: number, body: unknown, extraHeaders: HeadersInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -92,25 +96,61 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // 4. Parse + validate the kind.
-  const body = (await request.json().catch(() => null)) as { kind?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as
+    | { kind?: unknown; asset?: unknown; idempotencyKey?: unknown }
+    | null;
   const kind = body?.kind;
-  if (typeof kind === "string" && DEFERRED_KINDS.has(kind)) {
-    // Real-money override — schema-valid, but not shipped until CB-5.4
-    // (post-LIVE_MODE-flip). Reject explicitly so the client gets a clear
-    // signal rather than a generic invalid-kind.
-    return jsonResponse(400, {
-      error: "kind-deferred",
-      reason: "force_buy / sell_* overrides are deferred to CB-5.4 (post-live-flip).",
-    });
-  }
-  if (typeof kind !== "string" || !SAFE_KINDS.has(kind as OverrideKind)) {
+  if (typeof kind !== "string" || !(SAFE_KINDS.has(kind as OverrideKind) || REAL_MONEY_KINDS.has(kind))) {
     return jsonResponse(400, { error: "invalid-kind" });
   }
 
-  // 5. Dispatch the safe override. The helper resolves + LOCKS the current
-  //    session in-transaction (it is NOT handed a session id from this
-  //    handler), so the mutation acts on a row proven-current at commit time
-  //    — closing the stale/concurrent fork-or-reopen window (round-1 BLOCKER).
+  // 5a. Real-money overrides (CB-6.6) — act on the viewed pair (`asset`); place
+  //     an order LIVE_MODE-gated (dry_run while dark). Caps + held-qty + asset
+  //     validation live in the helper (it resolves the session + strategy).
+  if (REAL_MONEY_KINDS.has(kind)) {
+    const asset = body?.asset;
+    if (typeof asset !== "string" || asset.length === 0) {
+      return jsonResponse(400, { error: "missing-asset" });
+    }
+    // A CLIENT-supplied idempotency key (stable per operator action) is
+    // REQUIRED so a double-click / retry of one intent collapses onto ONE real
+    // order at Coinbase (AC 4 / real-money dedupe). Refuse without it.
+    const idempotencyKey = body?.idempotencyKey;
+    if (typeof idempotencyKey !== "string" || idempotencyKey.length === 0) {
+      return jsonResponse(400, { error: "missing-idempotency-key" });
+    }
+    const result: ManualOrderOutcome =
+      kind === "force_buy"
+        ? await forceBuy(asset, idempotencyKey)
+        : await sellFraction(asset, kind === "sell_50" ? 0.5 : 1, kind as "sell_50" | "sell_all", idempotencyKey);
+    if (result.ok) {
+      return jsonResponse(200, {
+        ok: true,
+        status: result.status,
+        side: result.side,
+        amountUsd: result.amountUsd,
+      });
+    }
+    switch (result.reason) {
+      case "invalid-asset":
+        return jsonResponse(400, { error: "invalid-asset" });
+      case "no-session":
+      case "no-strategy":
+        return jsonResponse(409, { error: "no-session" });
+      case "cap-reached":
+        return jsonResponse(409, { error: "cap-reached" });
+      case "no-position":
+        return jsonResponse(409, { error: "no-position" });
+      case "price-unavailable":
+      case "placement-failed":
+        return jsonResponse(502, { error: result.reason });
+    }
+  }
+
+  // 5b. Safe overrides (pause/resume/reset) — state-only, NEVER place orders.
+  //     The helper resolves + LOCKS the current session in-transaction (it is
+  //     NOT handed a session id), so the mutation acts on a row proven-current
+  //     at commit time — closing the stale/concurrent fork-or-reopen window.
   let outcome: OverrideOutcome;
   try {
     outcome =
@@ -121,8 +161,7 @@ export async function POST(request: Request): Promise<Response> {
           : await resetSession();
   } catch (err) {
     // The `bot_sessions_single_current` partial unique index rejects a forked
-    // (second concurrent current) session with 23505 — surface as a conflict,
-    // not a 500. postgres.js exposes the SQLSTATE on `err.code`.
+    // (second concurrent current) session with 23505 — surface as a conflict.
     if (err instanceof Error && (err as Error & { code?: string }).code === "23505") {
       return jsonResponse(409, { error: "conflict" });
     }
@@ -130,8 +169,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!outcome.ok) {
-    // No current session (no strategy saved yet, or it was ended out from
-    // under this request). Well-formed but not permitted → 409, not 500.
+    // No current session → 409, not 500.
     return jsonResponse(409, { error: "no-session" });
   }
 

@@ -1,4 +1,4 @@
-// CB-6.0/CB-6.5 cockpit e2e:
+// CB-6.0/CB-6.6 cockpit e2e:
 //   - load → status → Pause→STOPPED → Start→ACTIVE
 //   - per-pair selector + Current Position happy path (held qty + avg cost +
 //     live price + latest RSI) using the operator's REAL Coinbase reads
@@ -7,6 +7,8 @@
 //   - Trade Log happy path (trades + skipped hold rows) + status filtering
 //   - Run Now happy path (fresh manual tick reflected in the cockpit)
 //   - paused Run Now → skip feedback (no silent no-op)
+//   - Manual Overrides happy paths: dry_run Buy → confirm → order in Trade Log;
+//     Sell All on a valid pair with no position → "No position to sell."
 //   - unevaluated pair path (fake pair → no position + live-price-unavailable +
 //     P&L unavailable + "No signals yet")
 //   - Equity + Mutual Funds tabs show the "coming soon" placeholders
@@ -30,6 +32,16 @@ import { addVirtualAuthenticator, completeSetupJourney, getSql, resetAllTables }
 const sql = getSql();
 const DEGRADE_PAIR = "FAKE-USD";
 const HELD_PAIR_CANDIDATES = ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "ZEC-USD"] as const;
+const NO_POSITION_PAIR_CANDIDATES = [
+  "BTC-USD",
+  "ETH-USD",
+  "SOL-USD",
+  "XRP-USD",
+  "ZEC-USD",
+  "LTC-USD",
+  "LINK-USD",
+  "ADA-USD",
+] as const;
 
 test.describe.configure({ mode: "serial" });
 
@@ -176,6 +188,25 @@ async function loadHeldPairFixture(): Promise<{
   );
 }
 
+async function loadNoPositionPairFixture(excludePair: string): Promise<string> {
+  for (const pair of NO_POSITION_PAIR_CANDIDATES) {
+    if (pair === excludePair) continue;
+    const [{ fills }, product] = await Promise.all([
+      getAccountTradeHistory({ productIds: [pair], limit: 250 }),
+      getProduct(pair).catch(() => null),
+    ]);
+    if (!product) continue;
+    const livePrice = Number(product.price);
+    if (!Number.isFinite(livePrice)) continue;
+    if (aggregatePosition(fills) !== null) continue;
+    return pair;
+  }
+
+  throw new Error(
+    `cockpit e2e requires a valid pair with no position among ${NO_POSITION_PAIR_CANDIDATES.join(", ")}`,
+  );
+}
+
 test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrades, and Equity/MF show coming soon", async ({
   page,
 }) => {
@@ -184,7 +215,8 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
   try {
     await completeSetupJourney(page);
     const held = await loadHeldPairFixture();
-    await seedStrategyAndSession([held.pair, DEGRADE_PAIR]);
+    const noPositionPair = await loadNoPositionPairFixture(held.pair);
+    await seedStrategyAndSession([held.pair, noPositionPair, DEGRADE_PAIR]);
     await seedLatestSignals(held.pair);
     await seedSessionOrders(held.pair);
 
@@ -255,6 +287,33 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
     await expect(tradeLog).toContainText("$999.00");
     await expect(tradeLog).toContainText("failed");
     await expect(page.getByRole("link", { name: "View transaction ledger →" })).toBeVisible();
+
+    await expect(page.getByText("MANUAL OVERRIDES")).toBeVisible();
+    await expect(page.getByText("Paper mode — orders are simulated (dry-run).")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Buy $100" })).toBeVisible();
+    const manualOrderCountBefore = await sql<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count
+        FROM orders
+       WHERE session_id = 'sess-cockpit'
+         AND source = 'manual'
+    `;
+    await page.getByRole("button", { name: "Buy $100" }).click();
+    await expect(page.getByText(`Simulate a $100 buy of ${slashPair(held.pair)}?`)).toBeVisible();
+    await page.getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByText("Order recorded — see the trade log.")).toBeVisible();
+    await expect
+      .poll(async () => {
+        const rows = await sql<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count
+            FROM orders
+           WHERE session_id = 'sess-cockpit'
+             AND source = 'manual'
+        `;
+        return rows[0]?.count ?? 0;
+      })
+      .toBe((manualOrderCountBefore[0]?.count ?? 0) + 1);
+    await expect(tradeLog).toContainText("$100.00");
+    await expect(tradeLog).toContainText("dry_run");
 
     const botTickCountBefore = await sql<{ count: number }[]>`
       SELECT COUNT(*)::int AS count
@@ -331,9 +390,20 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
     `;
     expect(pausedRunTickCountAfter[0]?.count).toBe(pausedRunTickCount[0]?.count);
 
-    await page.getByRole("button", { name: "Start" }).click();
-    await expect(page.getByText("Bot is active — running every 15 minutes.")).toBeVisible();
-    await expect(page.getByText("● ACTIVE")).toBeVisible();
+    await page.getByLabel("Pair").selectOption(noPositionPair);
+    await expect(page).toHaveURL(
+      new RegExp(`/dashboard\\?pair=${noPositionPair.replace("-", "\\-")}(?:&txStatus=all)?$`),
+    );
+    await expect(
+      page.getByRole("heading", { name: `${slashPair(noPositionPair)} Trading Bot` }),
+    ).toBeVisible();
+    await expect(page.getByText("No position yet")).toBeVisible();
+    await page.getByRole("button", { name: "Sell All" }).click();
+    await expect(
+      page.getByText(`Simulate selling your entire ${slashPair(noPositionPair)} position?`),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByText("No position to sell.")).toBeVisible();
 
     await page.getByLabel("Pair").selectOption(DEGRADE_PAIR);
     await expect(page).toHaveURL(/\/dashboard\?pair=FAKE-USD$/);

@@ -10,6 +10,8 @@
 // UPDATE path exists in this module BY DESIGN — the CI grep test
 // (tests/app/api/cron/tick/invariants.test.ts) asserts it stays that way.
 
+import { ulid } from "ulidx";
+
 import { db } from "@/lib/db/client";
 
 /** The current bot session row (0001-init + 0004's active_strategy_id). */
@@ -125,6 +127,12 @@ export async function loadSingletonSession(): Promise<BotSession | null> {
  *
  * `amount` semantics: for bot BUY orders the column stores the USD
  * notional (CB-4.1 `BuySizing.dollars` = `position_size_usd`).
+ *
+ * CB-6.6: manual overrides (`source='manual'`) ALSO count — the per-session
+ * caps are a hard real-money ceiling for the session, BOT + MANUAL combined
+ * (operator decision). `dry_run`/`failed` stay excluded (paper/no-money never
+ * counts), so while dark every override is dry_run → contributes nothing →
+ * enforcement activates only post-LIVE_MODE-flip.
  */
 export async function aggregateSessionTotals(
   sessionId: string,
@@ -135,7 +143,7 @@ export async function aggregateSessionTotals(
            COUNT(*)::int AS buy_count
       FROM orders
      WHERE session_id = ${sessionId}
-       AND source = 'bot'
+       AND source IN ('bot', 'manual')
        AND side = 'buy'
        AND status NOT IN ('failed', 'dry_run')
   `;
@@ -143,6 +151,47 @@ export async function aggregateSessionTotals(
     dollarSpent: rows[0]?.dollar_spent ?? 0,
     buyCount: rows[0]?.buy_count ?? 0,
   };
+}
+
+/**
+ * CB-6.6 — write a MANUAL override order row (`source='manual'`) + its
+ * `override_events` audit row in ONE transaction. Unlike the tick's orders
+ * (coupled to a `bot_ticks` row), a manual override has no tick; it writes a
+ * standalone order against the current session + the audit event together.
+ * INSERT-only (append-only ledger).
+ */
+export async function insertManualOrder(o: {
+  id: string;
+  sessionId: string;
+  assetIdentifier: string;
+  side: "buy" | "sell";
+  amount: number;
+  status: "dry_run" | "submitted" | "failed";
+  coinbaseOrderId: string | null;
+  errorDetail: string | null;
+  kind: "force_buy" | "sell_50" | "sell_all";
+}): Promise<void> {
+  const sql = db();
+  await sql.begin(async (tx) => {
+    await tx`
+      INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, status, coinbase_order_id, error_detail)
+      VALUES (
+        ${o.id},
+        ${o.assetIdentifier},
+        ${o.sessionId},
+        'manual',
+        ${o.side},
+        ${o.amount},
+        ${o.status},
+        ${o.coinbaseOrderId},
+        ${o.errorDetail}
+      )
+    `;
+    await tx`
+      INSERT INTO override_events (id, session_id, kind)
+      VALUES (${ulid()}, ${o.sessionId}, ${o.kind})
+    `;
+  });
 }
 
 /**

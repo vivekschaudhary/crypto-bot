@@ -24,7 +24,10 @@ vi.mock("@/lib/bot/overrides", () => ({
   resetSession: vi.fn(),
 }));
 
+vi.mock("@/lib/bot/manual-orders", () => ({ forceBuy: vi.fn(), sellFraction: vi.fn() }));
+
 import { verifySession } from "@/lib/auth/sessions";
+import { forceBuy, sellFraction } from "@/lib/bot/manual-orders";
 import { pauseSession, resetSession, resumeSession } from "@/lib/bot/overrides";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/cookie";
 import { __resetRateLimits } from "@/lib/auth/rate-limit";
@@ -34,6 +37,8 @@ const verifySessionMock = vi.mocked(verifySession);
 const pauseMock = vi.mocked(pauseSession);
 const resumeMock = vi.mocked(resumeSession);
 const resetMock = vi.mocked(resetSession);
+const forceBuyMock = vi.mocked(forceBuy);
+const sellFractionMock = vi.mocked(sellFraction);
 
 const VALID_CLAIMS = { userId: "01ARZ3NDEKTSV4RRFFQ69G5USER", sessionId: "01ARZ3NDEKTSV4RRFFQ69G5SES1" };
 
@@ -60,6 +65,8 @@ beforeEach(() => {
   pauseMock.mockResolvedValue({ ok: true, status: "paused", sessionId: "session-1" });
   resumeMock.mockResolvedValue({ ok: true, status: "active", sessionId: "session-1" });
   resetMock.mockResolvedValue({ ok: true, status: "active", sessionId: "session-2" });
+  forceBuyMock.mockResolvedValue({ ok: true, status: "dry_run", side: "buy", amountUsd: 50 });
+  sellFractionMock.mockResolvedValue({ ok: true, status: "dry_run", side: "sell", amountUsd: 30 });
 });
 
 describe("POST /api/bot/override — happy paths per kind", () => {
@@ -153,16 +160,66 @@ describe("POST /api/bot/override — kind validation", () => {
     expect(await res.json()).toEqual({ error: "invalid-kind" });
   });
 
-  it.each(["force_buy", "sell_50", "sell_all"])(
-    "deferred real-money kind %s → 400 kind-deferred, no DB op (CB-5.4)",
-    async (kind) => {
-      const res = await POST(makeRequest({ body: { kind } }));
-      expect(res.status).toBe(400);
-      expect((await res.json()).error).toBe("kind-deferred");
-      expect(pauseMock).not.toHaveBeenCalled();
-      expect(resetMock).not.toHaveBeenCalled();
-    },
-  );
+});
+
+describe("POST /api/bot/override — real-money kinds (CB-6.6, un-deferred)", () => {
+  it("force_buy WITHOUT asset → 400 missing-asset, no placement", async () => {
+    const res = await POST(makeRequest({ body: { kind: "force_buy" } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "missing-asset" });
+    expect(forceBuyMock).not.toHaveBeenCalled();
+  });
+
+  it("force_buy WITHOUT idempotencyKey → 400 missing-idempotency-key, no placement", async () => {
+    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "BTC-USD" } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "missing-idempotency-key" });
+    expect(forceBuyMock).not.toHaveBeenCalled();
+  });
+
+  it("force_buy with asset → 200 + forceBuy(asset)", async () => {
+    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, status: "dry_run", side: "buy" });
+    expect(forceBuyMock).toHaveBeenCalledWith("BTC-USD", "idem-1");
+  });
+
+  it("sell_50 → sellFraction(asset, 0.5, 'sell_50')", async () => {
+    await POST(makeRequest({ body: { kind: "sell_50", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
+    expect(sellFractionMock).toHaveBeenCalledWith("BTC-USD", 0.5, "sell_50", "idem-1");
+  });
+
+  it("sell_all → sellFraction(asset, 1, 'sell_all')", async () => {
+    await POST(makeRequest({ body: { kind: "sell_all", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
+    expect(sellFractionMock).toHaveBeenCalledWith("BTC-USD", 1, "sell_all", "idem-1");
+  });
+
+  it("cap-reached → 409 cap-reached", async () => {
+    forceBuyMock.mockResolvedValue({ ok: false, reason: "cap-reached" });
+    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "cap-reached" });
+  });
+
+  it("no-position → 409 no-position", async () => {
+    sellFractionMock.mockResolvedValue({ ok: false, reason: "no-position" });
+    const res = await POST(makeRequest({ body: { kind: "sell_all", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "no-position" });
+  });
+
+  it("invalid-asset (helper) → 400 invalid-asset", async () => {
+    forceBuyMock.mockResolvedValue({ ok: false, reason: "invalid-asset" });
+    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "DOGE-USD", idempotencyKey: "idem-1" } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid-asset" });
+  });
+
+  it("a SAFE kind (pause) does NOT call the real-money helpers", async () => {
+    await POST(makeRequest({ body: { kind: "pause" } }));
+    expect(forceBuyMock).not.toHaveBeenCalled();
+    expect(sellFractionMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("/api/bot/override — method discipline (typed 405)", () => {
