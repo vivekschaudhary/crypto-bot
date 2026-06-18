@@ -27,6 +27,7 @@ import { CurrentPositionCard } from "./current-position-card";
 import { LiveModeBanner } from "./live-mode-banner";
 import { PairSelector } from "./pair-selector-client";
 import { ProfitLossCard } from "./profit-loss-card";
+import { ManualOverridesCard } from "./manual-overrides-card";
 import { SignalsCard } from "./signals-card";
 import { SignOutClient } from "./sign-out-client";
 import { TradeLogCard } from "./trade-log-card";
@@ -186,7 +187,17 @@ export default async function DashboardPage(
           </a>
         </CockpitSection>
       )}
-      <CockpitSection label="MANUAL OVERRIDES" />
+      {viewedPair && strategy ? (
+        <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
+          <ManualOverridesCard
+            pair={viewedPair}
+            buyDollars={strategy.position_size_usd}
+            liveMode={liveState.liveMode}
+          />
+        </div>
+      ) : (
+        <CockpitSection label="MANUAL OVERRIDES" />
+      )}
       {viewedPair && tradeLog ? (
         <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
           <TradeLogCard rows={tradeLog.rows} status={txStatus} pair={viewedPair} />
