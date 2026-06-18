@@ -2,7 +2,7 @@
 id: CB-6.6
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-17
 author: PM
@@ -92,4 +92,4 @@ _Unit/component co-located; e2e by Codex; **MANDATORY Security Reviewer pass** (
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **FINAL CB-6 STORY — real-money manual overrides; inverts the CB-5.3 no-orders invariant; mandatory Security Reviewer.**_
+_Story closed: 2026-06-18 (SHIPPED via PR #98; Codex-clean after 3 BLOCKERs [render coverage, projected cap, idempotency] + **MANDATORY Security Reviewer pass** + Codex e2e committed/CI-typechecked — local e2e EXECUTION deferred under issue #80), brief: docs/bets/CB-6/brief.md. **FINAL CB-6 STORY — real-money manual overrides; inverted the CB-5.3 no-orders invariant; mandatory Security Reviewer. CB-6 BET COMPLETE.**_
