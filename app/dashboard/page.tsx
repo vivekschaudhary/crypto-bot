@@ -16,6 +16,7 @@ import type { JSX } from "react";
 import { loadCockpitPnl } from "@/lib/dashboard/cockpit-pnl";
 import { loadCockpitPosition, resolveViewedPair } from "@/lib/dashboard/cockpit-position";
 import { loadCockpitSignals } from "@/lib/dashboard/cockpit-signals";
+import { loadCockpitTradeLog, parseTradeLogStatus } from "@/lib/dashboard/cockpit-trade-log";
 import { loadLiveState } from "@/lib/dashboard/live-state";
 import { db } from "@/lib/db/client";
 import { getActiveStrategy } from "@/lib/strategies/db";
@@ -28,6 +29,7 @@ import { PairSelector } from "./pair-selector-client";
 import { ProfitLossCard } from "./profit-loss-card";
 import { SignalsCard } from "./signals-card";
 import { SignOutClient } from "./sign-out-client";
+import { TradeLogCard } from "./trade-log-card";
 
 const pageStyle: React.CSSProperties = {
   fontFamily: "system-ui, sans-serif",
@@ -79,7 +81,7 @@ const linkStyle: React.CSSProperties = { color: "#446", textDecoration: "underli
 type CredRow = { device_label: string | null };
 
 interface DashboardPageProps {
-  searchParams?: Promise<{ strategy?: string; pair?: string }>;
+  searchParams?: Promise<{ strategy?: string; pair?: string; txStatus?: string }>;
 }
 
 export default async function DashboardPage(
@@ -118,6 +120,10 @@ export default async function DashboardPage(
   // CB-6.3 — latest signal for the viewed pair (NOT session-gated; the last
   // evaluation is meaningful even when paused/stopped).
   const cockpitSignals = viewedPair ? await loadCockpitSignals(viewedPair) : null;
+  // CB-6.4 — Trade Log (orders ⋈ hold-skips) for the viewed pair, filtered by
+  // ?txStatus= (all-time recent, NOT session-scoped).
+  const txStatus = parseTradeLogStatus(resolvedSearchParams.txStatus);
+  const tradeLog = viewedPair ? await loadCockpitTradeLog(viewedPair, txStatus) : null;
   const title = viewedPair ? `${viewedPair.replace("-", "/")} Trading Bot` : "Crypto Trading Bot";
 
   return (
@@ -181,12 +187,18 @@ export default async function DashboardPage(
         </CockpitSection>
       )}
       <CockpitSection label="MANUAL OVERRIDES" />
-      <CockpitSection label="TRADE LOG">
-        <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>Coming soon</p>
-        <a href="/dashboard/ledger" style={linkStyle}>
-          View transaction ledger →
-        </a>
-      </CockpitSection>
+      {viewedPair && tradeLog ? (
+        <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
+          <TradeLogCard rows={tradeLog.rows} status={txStatus} pair={viewedPair} />
+        </div>
+      ) : (
+        <CockpitSection label="TRADE LOG">
+          <p style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem" }}>Coming soon</p>
+          <a href="/dashboard/ledger" style={linkStyle}>
+            View transaction ledger →
+          </a>
+        </CockpitSection>
+      )}
 
       <p style={{ marginTop: "1.25rem" }}>
         <a href="/dashboard/strategy" style={linkStyle}>

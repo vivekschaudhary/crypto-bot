@@ -1,9 +1,10 @@
-// CB-6.0/CB-6.3 cockpit e2e:
+// CB-6.0/CB-6.4 cockpit e2e:
 //   - load → status → Pause→STOPPED → Start→ACTIVE
 //   - per-pair selector + Current Position happy path (held qty + avg cost +
 //     live price + latest RSI) using the operator's REAL Coinbase reads
 //   - Profit/Loss happy path (session invested + signed P&L)
 //   - Signals happy path (seeded signal → RSI zone + price-vs-MA + next action)
+//   - Trade Log happy path (trades + skipped hold rows) + status filtering
 //   - unevaluated pair path (fake pair → no position + live-price-unavailable +
 //     P&L unavailable + "No signals yet")
 //   - Equity + Mutual Funds tabs show the "coming soon" placeholders
@@ -175,7 +176,7 @@ async function loadHeldPairFixture(): Promise<{
   );
 }
 
-test("cockpit loads, status toggles, PnL/signals/position update by pair, unevaluated pair degrades, and Equity/MF show coming soon", async ({
+test("cockpit loads, status toggles, cockpit sections update by pair, trade-log filters work, unevaluated pair degrades, and Equity/MF show coming soon", async ({
   page,
 }) => {
   const auth = await addVirtualAuthenticator(page);
@@ -225,6 +226,61 @@ test("cockpit loads, status toggles, PnL/signals/position update by pair, uneval
       ),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "View decision trace →" })).toBeVisible();
+    await expect(page.getByText("TRADE LOG")).toBeVisible();
+    await expect(page.getByText("Time")).toBeVisible();
+    await expect(page.getByText("Side")).toBeVisible();
+    await expect(page.getByText("USD")).toBeVisible();
+    await expect(page.getByText("Reason")).toBeVisible();
+    await expect(page.getByText("Status")).toBeVisible();
+    await expect(page.getByLabel("Status")).toHaveValue("all");
+    await expect(page.getByRole("option", { name: "All statuses" })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Dry run" })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Submitted" })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Failed" })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Skipped" })).toBeVisible();
+
+    const tradeLog = page.getByRole("table");
+    await expect(tradeLog.getByText("SKIPPED")).toBeVisible();
+    await expect(
+      tradeLog.getByText(
+        "hold: rsi=61.00 < entry_threshold=30 BUT price=1792.39 >= ma20=1740.10; no buy at held pair",
+      ),
+    ).toBeVisible();
+    await expect(tradeLog.getByText("buy")).toBeVisible();
+    await expect(tradeLog.getByText("$100.00")).toBeVisible();
+    await expect(tradeLog.getByText("dry_run")).toBeVisible();
+    await expect(tradeLog.getByText("$50.00")).toBeVisible();
+    await expect(tradeLog.getByText("submitted")).toBeVisible();
+    await expect(tradeLog.getByText("$999.00")).toBeVisible();
+    await expect(tradeLog.getByText("failed")).toBeVisible();
+    await expect(page.getByRole("link", { name: "View transaction ledger →" })).toBeVisible();
+
+    await page.getByLabel("Status").selectOption("skipped");
+    await expect(page).toHaveURL(new RegExp(`/dashboard\\?pair=${held.pair}&txStatus=skipped$`));
+    await expect(page.getByLabel("Status")).toHaveValue("skipped");
+    const skippedLog = page.getByRole("table");
+    await expect(skippedLog.getByText("SKIPPED")).toBeVisible();
+    await expect(
+      skippedLog.getByText(
+        "hold: rsi=61.00 < entry_threshold=30 BUT price=1792.39 >= ma20=1740.10; no buy at held pair",
+      ),
+    ).toBeVisible();
+    await expect(skippedLog.getByText("dry_run")).toHaveCount(0);
+    await expect(skippedLog.getByText("submitted")).toHaveCount(0);
+    await expect(skippedLog.getByText("failed")).toHaveCount(0);
+
+    await page.getByLabel("Status").selectOption("failed");
+    await expect(page).toHaveURL(new RegExp(`/dashboard\\?pair=${held.pair}&txStatus=failed$`));
+    await expect(page.getByLabel("Status")).toHaveValue("failed");
+    const failedLog = page.getByRole("table");
+    await expect(failedLog.getByText("failed")).toBeVisible();
+    await expect(failedLog.getByText("$999.00")).toBeVisible();
+    await expect(failedLog.getByText("SKIPPED")).toHaveCount(0);
+    await expect(failedLog.getByText("dry_run")).toHaveCount(0);
+    await expect(failedLog.getByText("submitted")).toHaveCount(0);
+
+    await page.getByLabel("Status").selectOption("all");
+    await expect(page.getByLabel("Status")).toHaveValue("all");
 
     await page.getByRole("button", { name: "Pause" }).click();
     await expect(page.getByText("Bot is stopped — click Start to resume")).toBeVisible();
