@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ACTION_KIND, controlsForStatus } from "@/app/dashboard/bot-controls-client";
+import { ACTION_KIND, controlsForStatus, runOutcomePhase } from "@/app/dashboard/bot-controls-client";
 
 describe("controlsForStatus — status-aware controls", () => {
   it("active → Pause + Stop (no Start)", () => {
@@ -25,5 +25,19 @@ describe("ACTION_KIND — control → override kind (Stop = alias for pause)", (
   it("Pause → pause", () => expect(ACTION_KIND.pause).toBe("pause"));
   it("Stop → pause (alias; no new override_events kind / no migration)", () => {
     expect(ACTION_KIND.stop).toBe("pause");
+  });
+});
+
+describe("runOutcomePhase — CB-6.5 Run Now response → feedback phase", () => {
+  it("ok + ran/duplicate body → done", () => {
+    expect(runOutcomePhase(true, { ran: true })).toBe("done");
+    expect(runOutcomePhase(true, { duplicate: true })).toBe("done");
+  });
+  it("ok + skipped body → skipped", () => {
+    expect(runOutcomePhase(true, { skipped: "session_paused" })).toBe("skipped");
+  });
+  it("non-ok response → error", () => {
+    expect(runOutcomePhase(false, { error: "boom" })).toBe("error");
+    expect(runOutcomePhase(false, null)).toBe("error");
   });
 });
