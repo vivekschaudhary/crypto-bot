@@ -47,9 +47,14 @@ export type ManualOrderOutcome =
         | "placement-failed";
     };
 
-/** Deterministic Coinbase client_order_id for a manual override (idempotency). */
-function manualClientOrderId(sessionId: string, orderId: string, asset: string): string {
-  const seed = `manual|${sessionId}|${orderId}|${asset}`;
+/**
+ * Deterministic Coinbase client_order_id for a manual override. Seeded with the
+ * CLIENT-supplied `idempotencyKey` (stable per operator action, survives a
+ * retry of the SAME intent) — NOT a per-request id — so a double-click / retry
+ * of one action collapses onto ONE order at Coinbase (real-money dedupe; AC 4).
+ */
+function manualClientOrderId(sessionId: string, idempotencyKey: string, asset: string): string {
+  const seed = `manual|${sessionId}|${idempotencyKey}|${asset}`;
   return createHash("sha256").update(seed).digest("hex").slice(0, 32);
 }
 
@@ -83,6 +88,7 @@ async function placeAndRecord(args: {
   kind: ManualOrderKind;
   config: import("@/lib/coinbase/order-schemas").OrderConfiguration;
   amountUsd: number;
+  idempotencyKey: string;
 }): Promise<ManualOrderOutcome> {
   const orderId = ulid();
   const liveMode = env().LIVE_MODE;
@@ -104,7 +110,7 @@ async function placeAndRecord(args: {
   }
 
   // LIVE — place the real order (network, outside any tx), then persist.
-  const clientOrderId = manualClientOrderId(args.sessionId, orderId, args.asset);
+  const clientOrderId = manualClientOrderId(args.sessionId, args.idempotencyKey, args.asset);
   let status: "submitted" | "failed" = "failed";
   let coinbaseOrderId: string | null = null;
   let errorDetail: string | null = null;
@@ -146,7 +152,7 @@ async function placeAndRecord(args: {
 }
 
 /** force_buy — a manual buy of `position_size_usd` of the viewed pair. */
-export async function forceBuy(asset: string): Promise<ManualOrderOutcome> {
+export async function forceBuy(asset: string, idempotencyKey: string): Promise<ManualOrderOutcome> {
   const session = await currentSession();
   if (!session) return { ok: false, reason: "no-session" };
   if (!session.activeStrategyId) return { ok: false, reason: "no-strategy" };
@@ -156,12 +162,14 @@ export async function forceBuy(asset: string): Promise<ManualOrderOutcome> {
     return { ok: false, reason: "invalid-asset" };
   }
 
-  // Caps (combined bot+manual; submitted-only → a no-op while dark). Same
-  // already-at-or-over semantics as the bot's evaluate (lib/decisions).
+  // Caps (combined bot+manual; submitted-only → a no-op while dark). PROJECTED
+  // check (AC 6): reject when THIS buy would push the session PAST either cap —
+  // not merely when already at it (a near-cap buy must be refused BEFORE
+  // placement, never crossing the configured real-money ceiling).
   const totals = await aggregateSessionTotals(session.id);
   if (
-    totals.dollarSpent >= strategy.per_session_dollar_cap ||
-    totals.buyCount >= strategy.per_session_buy_count_cap
+    totals.dollarSpent + strategy.position_size_usd > strategy.per_session_dollar_cap ||
+    totals.buyCount + 1 > strategy.per_session_buy_count_cap
   ) {
     return { ok: false, reason: "cap-reached" };
   }
@@ -189,6 +197,7 @@ export async function forceBuy(asset: string): Promise<ManualOrderOutcome> {
     kind: "force_buy",
     config: built.config,
     amountUsd: built.amountUsd,
+    idempotencyKey,
   });
 }
 
@@ -197,6 +206,7 @@ export async function sellFraction(
   asset: string,
   fraction: number,
   kind: "sell_50" | "sell_all",
+  idempotencyKey: string,
 ): Promise<ManualOrderOutcome> {
   const session = await currentSession();
   if (!session) return { ok: false, reason: "no-session" };
@@ -240,5 +250,6 @@ export async function sellFraction(
     kind,
     config: built.config,
     amountUsd: built.amountUsd,
+    idempotencyKey,
   });
 }

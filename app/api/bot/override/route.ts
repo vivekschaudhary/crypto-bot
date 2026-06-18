@@ -96,7 +96,9 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // 4. Parse + validate the kind.
-  const body = (await request.json().catch(() => null)) as { kind?: unknown; asset?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as
+    | { kind?: unknown; asset?: unknown; idempotencyKey?: unknown }
+    | null;
   const kind = body?.kind;
   if (typeof kind !== "string" || !(SAFE_KINDS.has(kind as OverrideKind) || REAL_MONEY_KINDS.has(kind))) {
     return jsonResponse(400, { error: "invalid-kind" });
@@ -110,10 +112,17 @@ export async function POST(request: Request): Promise<Response> {
     if (typeof asset !== "string" || asset.length === 0) {
       return jsonResponse(400, { error: "missing-asset" });
     }
+    // A CLIENT-supplied idempotency key (stable per operator action) is
+    // REQUIRED so a double-click / retry of one intent collapses onto ONE real
+    // order at Coinbase (AC 4 / real-money dedupe). Refuse without it.
+    const idempotencyKey = body?.idempotencyKey;
+    if (typeof idempotencyKey !== "string" || idempotencyKey.length === 0) {
+      return jsonResponse(400, { error: "missing-idempotency-key" });
+    }
     const result: ManualOrderOutcome =
       kind === "force_buy"
-        ? await forceBuy(asset)
-        : await sellFraction(asset, kind === "sell_50" ? 0.5 : 1, kind as "sell_50" | "sell_all");
+        ? await forceBuy(asset, idempotencyKey)
+        : await sellFraction(asset, kind === "sell_50" ? 0.5 : 1, kind as "sell_50" | "sell_all", idempotencyKey);
     if (result.ok) {
       return jsonResponse(200, {
         ok: true,

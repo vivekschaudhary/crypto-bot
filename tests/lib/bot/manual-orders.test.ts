@@ -42,6 +42,8 @@ vi.mock("@/lib/env", () => ({ env: () => ({ LIVE_MODE: liveModeMock }) }));
 
 import { forceBuy, sellFraction } from "@/lib/bot/manual-orders";
 
+const KEY = "idem-action-1";
+
 function strategy() {
   return {
     selected_assets: [{ assetClass: "crypto-coinbase", identifier: "BTC-USD" }],
@@ -68,7 +70,7 @@ afterEach(() => vi.clearAllMocks());
 
 describe("forceBuy — LIVE_MODE gate (security)", () => {
   it("LIVE_MODE=false → dry_run row, placeOrder NEVER called", async () => {
-    const r = await forceBuy("BTC-USD");
+    const r = await forceBuy("BTC-USD", KEY);
     expect(r).toMatchObject({ ok: true, status: "dry_run", side: "buy" });
     expect(placeOrder).not.toHaveBeenCalled();
     expect(insertManualOrder).toHaveBeenCalledWith(
@@ -80,7 +82,7 @@ describe("forceBuy — LIVE_MODE gate (security)", () => {
 
   it("LIVE_MODE=true → placeOrder called, submitted row", async () => {
     liveModeMock = true;
-    const r = await forceBuy("BTC-USD");
+    const r = await forceBuy("BTC-USD", KEY);
     expect(placeOrder).toHaveBeenCalledTimes(1);
     expect(r).toMatchObject({ ok: true, status: "submitted" });
     expect(insertManualOrder).toHaveBeenCalledWith(expect.objectContaining({ status: "submitted", coinbaseOrderId: "cb-1" }));
@@ -90,7 +92,7 @@ describe("forceBuy — LIVE_MODE gate (security)", () => {
 describe("forceBuy — caps + validation (no order placed on refusal)", () => {
   it("dollar cap reached → cap-reached, no placement/insert", async () => {
     aggregateSessionTotals.mockResolvedValue({ dollarSpent: 500, buyCount: 0 });
-    const r = await forceBuy("BTC-USD");
+    const r = await forceBuy("BTC-USD", KEY);
     expect(r).toEqual({ ok: false, reason: "cap-reached" });
     expect(placeOrder).not.toHaveBeenCalled();
     expect(insertManualOrder).not.toHaveBeenCalled();
@@ -98,31 +100,45 @@ describe("forceBuy — caps + validation (no order placed on refusal)", () => {
 
   it("buy-count cap reached → cap-reached", async () => {
     aggregateSessionTotals.mockResolvedValue({ dollarSpent: 0, buyCount: 10 });
-    expect(await forceBuy("BTC-USD")).toEqual({ ok: false, reason: "cap-reached" });
+    expect(await forceBuy("BTC-USD", KEY)).toEqual({ ok: false, reason: "cap-reached" });
+  });
+
+  it("PROJECTED cap: a near-cap buy that WOULD cross the dollar cap is refused (regression)", async () => {
+    // spent 490 + a 50 buy = 540 > 500 cap → must reject BEFORE placement.
+    aggregateSessionTotals.mockResolvedValue({ dollarSpent: 490, buyCount: 0 });
+    expect(await forceBuy("BTC-USD", KEY)).toEqual({ ok: false, reason: "cap-reached" });
+    expect(placeOrder).not.toHaveBeenCalled();
+    expect(insertManualOrder).not.toHaveBeenCalled();
+  });
+
+  it("PROJECTED cap: a buy that lands exactly AT the cap is allowed", async () => {
+    // spent 450 + a 50 buy = 500 == cap (not over) → allowed.
+    aggregateSessionTotals.mockResolvedValue({ dollarSpent: 450, buyCount: 0 });
+    expect(await forceBuy("BTC-USD", KEY)).toMatchObject({ ok: true, status: "dry_run" });
   });
 
   it("asset not in the strategy → invalid-asset", async () => {
-    expect(await forceBuy("DOGE-USD")).toEqual({ ok: false, reason: "invalid-asset" });
+    expect(await forceBuy("DOGE-USD", KEY)).toEqual({ ok: false, reason: "invalid-asset" });
     expect(insertManualOrder).not.toHaveBeenCalled();
   });
 
   it("no current session → no-session", async () => {
     sessionRows = [];
-    expect(await forceBuy("BTC-USD")).toEqual({ ok: false, reason: "no-session" });
+    expect(await forceBuy("BTC-USD", KEY)).toEqual({ ok: false, reason: "no-session" });
   });
 });
 
 describe("sellFraction — held-qty + gate", () => {
   it("no held position → no-position, no placement", async () => {
     aggregatePosition.mockReturnValue(null);
-    const r = await sellFraction("BTC-USD", 0.5, "sell_50");
+    const r = await sellFraction("BTC-USD", 0.5, "sell_50", KEY);
     expect(r).toEqual({ ok: false, reason: "no-position" });
     expect(placeOrder).not.toHaveBeenCalled();
     expect(insertManualOrder).not.toHaveBeenCalled();
   });
 
   it("LIVE_MODE=false + held position → dry_run sell row, placeOrder NEVER called", async () => {
-    const r = await sellFraction("BTC-USD", 0.5, "sell_50");
+    const r = await sellFraction("BTC-USD", 0.5, "sell_50", KEY);
     expect(r).toMatchObject({ ok: true, status: "dry_run", side: "sell" });
     expect(placeOrder).not.toHaveBeenCalled();
     expect(insertManualOrder).toHaveBeenCalledWith(expect.objectContaining({ side: "sell", kind: "sell_50", status: "dry_run" }));
@@ -130,8 +146,29 @@ describe("sellFraction — held-qty + gate", () => {
 
   it("LIVE_MODE=true sell_all → placeOrder called, submitted", async () => {
     liveModeMock = true;
-    const r = await sellFraction("BTC-USD", 1, "sell_all");
+    const r = await sellFraction("BTC-USD", 1, "sell_all", KEY);
     expect(placeOrder).toHaveBeenCalledTimes(1);
     expect(r).toMatchObject({ ok: true, status: "submitted", side: "sell" });
+  });
+});
+
+describe("idempotency (real-money dedupe; AC 4)", () => {
+  it("same idempotencyKey → SAME clientOrderId (Coinbase collapses the duplicate)", async () => {
+    liveModeMock = true;
+    await forceBuy("BTC-USD", KEY);
+    await forceBuy("BTC-USD", KEY);
+    expect(placeOrder).toHaveBeenCalledTimes(2);
+    const first = (placeOrder.mock.calls[0]?.[0] as { clientOrderId: string }).clientOrderId;
+    const second = (placeOrder.mock.calls[1]?.[0] as { clientOrderId: string }).clientOrderId;
+    expect(first).toBe(second);
+  });
+
+  it("different idempotencyKey → DIFFERENT clientOrderId (a genuine new action)", async () => {
+    liveModeMock = true;
+    await forceBuy("BTC-USD", "idem-action-1");
+    await forceBuy("BTC-USD", "idem-action-2");
+    const first = (placeOrder.mock.calls[0]?.[0] as { clientOrderId: string }).clientOrderId;
+    const second = (placeOrder.mock.calls[1]?.[0] as { clientOrderId: string }).clientOrderId;
+    expect(first).not.toBe(second);
   });
 });

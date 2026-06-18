@@ -158,6 +158,10 @@ export function ManualOverridesCard({
   const [confirming, setConfirming] = useState<ManualAction | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  // A stable idempotency key per operator action (generated when the action is
+  // chosen, reused across a retry of the SAME confirm) so a double-click / retry
+  // collapses onto ONE real order at Coinbase (real-money dedupe).
+  const [idempotencyKey, setIdempotencyKey] = useState<string>("");
 
   async function submit(): Promise<void> {
     if (!confirming) return;
@@ -168,7 +172,9 @@ export function ManualOverridesCard({
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(action === "reset" ? { kind: "reset" } : { kind: action, asset: pair }),
+        body: JSON.stringify(
+          action === "reset" ? { kind: "reset" } : { kind: action, asset: pair, idempotencyKey },
+        ),
       });
       const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
       setConfirming(null);
@@ -203,6 +209,7 @@ export function ManualOverridesCard({
       message={message}
       onAction={(a) => {
         setConfirming(a);
+        setIdempotencyKey(crypto.randomUUID());
         setPhase("idle");
         setMessage(null);
       }}

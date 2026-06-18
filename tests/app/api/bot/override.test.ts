@@ -170,40 +170,47 @@ describe("POST /api/bot/override — real-money kinds (CB-6.6, un-deferred)", ()
     expect(forceBuyMock).not.toHaveBeenCalled();
   });
 
-  it("force_buy with asset → 200 + forceBuy(asset)", async () => {
+  it("force_buy WITHOUT idempotencyKey → 400 missing-idempotency-key, no placement", async () => {
     const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "BTC-USD" } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "missing-idempotency-key" });
+    expect(forceBuyMock).not.toHaveBeenCalled();
+  });
+
+  it("force_buy with asset → 200 + forceBuy(asset)", async () => {
+    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, status: "dry_run", side: "buy" });
-    expect(forceBuyMock).toHaveBeenCalledWith("BTC-USD");
+    expect(forceBuyMock).toHaveBeenCalledWith("BTC-USD", "idem-1");
   });
 
   it("sell_50 → sellFraction(asset, 0.5, 'sell_50')", async () => {
-    await POST(makeRequest({ body: { kind: "sell_50", asset: "BTC-USD" } }));
-    expect(sellFractionMock).toHaveBeenCalledWith("BTC-USD", 0.5, "sell_50");
+    await POST(makeRequest({ body: { kind: "sell_50", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
+    expect(sellFractionMock).toHaveBeenCalledWith("BTC-USD", 0.5, "sell_50", "idem-1");
   });
 
   it("sell_all → sellFraction(asset, 1, 'sell_all')", async () => {
-    await POST(makeRequest({ body: { kind: "sell_all", asset: "BTC-USD" } }));
-    expect(sellFractionMock).toHaveBeenCalledWith("BTC-USD", 1, "sell_all");
+    await POST(makeRequest({ body: { kind: "sell_all", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
+    expect(sellFractionMock).toHaveBeenCalledWith("BTC-USD", 1, "sell_all", "idem-1");
   });
 
   it("cap-reached → 409 cap-reached", async () => {
     forceBuyMock.mockResolvedValue({ ok: false, reason: "cap-reached" });
-    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "BTC-USD" } }));
+    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "cap-reached" });
   });
 
   it("no-position → 409 no-position", async () => {
     sellFractionMock.mockResolvedValue({ ok: false, reason: "no-position" });
-    const res = await POST(makeRequest({ body: { kind: "sell_all", asset: "BTC-USD" } }));
+    const res = await POST(makeRequest({ body: { kind: "sell_all", asset: "BTC-USD", idempotencyKey: "idem-1" } }));
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "no-position" });
   });
 
   it("invalid-asset (helper) → 400 invalid-asset", async () => {
     forceBuyMock.mockResolvedValue({ ok: false, reason: "invalid-asset" });
-    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "DOGE-USD" } }));
+    const res = await POST(makeRequest({ body: { kind: "force_buy", asset: "DOGE-USD", idempotencyKey: "idem-1" } }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid-asset" });
   });
