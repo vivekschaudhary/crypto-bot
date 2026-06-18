@@ -2,7 +2,7 @@
 id: CB-6.4
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-17
 author: PM
@@ -86,4 +86,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; issue #80
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **FIFTH CB-6 STORY — Trade Log; orders⋈skips merge, status filter. Read-only, no migration.**_
+_Story closed: 2026-06-17 (SHIPPED via PR #94; Codex-clean code + Codex e2e committed & CI-typechecked — local e2e EXECUTION deferred under issue #80 / Docker test-DB availability, as for CB-6.0–6.3), brief: docs/bets/CB-6/brief.md. **FIFTH CB-6 STORY — Trade Log; orders⋈skips merge, status filter. Read-only, no migration.**_
