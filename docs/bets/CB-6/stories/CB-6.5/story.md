@@ -2,7 +2,7 @@
 id: CB-6.5
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-17
 author: PM
@@ -87,4 +87,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/`; **Security Reviewe
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **SIXTH CB-6 STORY — Run Now; on-demand tick via the shared handler. Security Reviewer engages (auth + order-trigger).**_
+_Story closed: 2026-06-17 (SHIPPED via PR #96; Codex-clean + **Security Reviewer pass** + Codex e2e committed/CI-typechecked — local e2e EXECUTION deferred under issue #80, as for CB-6.0–6.4), brief: docs/bets/CB-6/brief.md. **SIXTH CB-6 STORY — Run Now; on-demand tick via the shared handler. Security Reviewer engaged (auth + order-trigger).**_
