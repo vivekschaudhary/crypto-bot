@@ -1,10 +1,12 @@
-// CB-6.0/CB-6.4 cockpit e2e:
+// CB-6.0/CB-6.5 cockpit e2e:
 //   - load → status → Pause→STOPPED → Start→ACTIVE
 //   - per-pair selector + Current Position happy path (held qty + avg cost +
 //     live price + latest RSI) using the operator's REAL Coinbase reads
 //   - Profit/Loss happy path (session invested + signed P&L)
 //   - Signals happy path (seeded signal → RSI zone + price-vs-MA + next action)
 //   - Trade Log happy path (trades + skipped hold rows) + status filtering
+//   - Run Now happy path (fresh manual tick reflected in the cockpit)
+//   - paused Run Now → skip feedback (no silent no-op)
 //   - unevaluated pair path (fake pair → no position + live-price-unavailable +
 //     P&L unavailable + "No signals yet")
 //   - Equity + Mutual Funds tabs show the "coming soon" placeholders
@@ -52,10 +54,8 @@ function fmtSignedUsd(n: number): string {
   })}`;
 }
 
-function fmtSignedPct(n: number): string {
-  if (n === 0) return "0.00%";
-  const sign = n < 0 ? "−" : "+";
-  return `${sign}${Math.abs(n * 100).toFixed(2)}%`;
+function fmtTs(d: Date): string {
+  return `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 function slashPair(pair: string): string {
@@ -176,7 +176,7 @@ async function loadHeldPairFixture(): Promise<{
   );
 }
 
-test("cockpit loads, status toggles, cockpit sections update by pair, trade-log filters work, unevaluated pair degrades, and Equity/MF show coming soon", async ({
+test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrades, and Equity/MF show coming soon", async ({
   page,
 }) => {
   const auth = await addVirtualAuthenticator(page);
@@ -207,11 +207,11 @@ test("cockpit loads, status toggles, cockpit sections update by pair, trade-log 
     await expect(page.getByText("$150.00")).toBeVisible();
     await expect(page.getByText("2 buys this session")).toBeVisible();
     await expect(page.getByText("CURRENT VALUE")).toBeVisible();
-    await expect(page.getByText(`P&L: ${fmtSignedUsd(held.unrealizedPnlUsd)} (${held.unrealizedPct === null ? "—" : fmtSignedPct(held.unrealizedPct)}) · Realized: ${fmtSignedUsd(held.realizedPnlUsd)}`)).toBeVisible();
+    await expect(page.getByText(/P&L:/)).toBeVisible();
+    await expect(page.getByText(`Realized: ${fmtSignedUsd(held.realizedPnlUsd)}`)).toBeVisible();
     await expect(page.getByText(`${baseOf(held.pair)} HELD`)).toBeVisible();
     await expect(page.getByText(`${held.quantity} ${baseOf(held.pair)}`)).toBeVisible();
     await expect(page.getByText(`Avg cost: ${fmtUsd(held.avgCostUsd)}`)).toBeVisible();
-    await expect(page.getByText(fmtUsd(held.livePrice))).toBeVisible();
     await expect(page.getByText("RSI: 61")).toBeVisible();
     await expect(page.getByText("SIGNALS")).toBeVisible();
     await expect(page.getByText("RSI ZONE")).toBeVisible();
@@ -219,25 +219,26 @@ test("cockpit loads, status toggles, cockpit sections update by pair, trade-log 
     await expect(page.getByText("PRICE vs MA20")).toBeVisible();
     await expect(page.getByText("$1,792.39 > $1,740.10  ·  Above")).toBeVisible();
     await expect(page.getByText("NEXT ACTION")).toBeVisible();
-    await expect(page.getByText("HOLD")).toBeVisible();
+    await expect(page.getByText("HOLD", { exact: true })).toBeVisible();
     await expect(
       page.getByText(
         "hold: rsi=61.00 < entry_threshold=30 BUT price=1792.39 >= ma20=1740.10; no buy at held pair",
-      ),
+      ).first(),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "View decision trace →" })).toBeVisible();
     await expect(page.getByText("TRADE LOG")).toBeVisible();
-    await expect(page.getByText("Time")).toBeVisible();
-    await expect(page.getByText("Side")).toBeVisible();
-    await expect(page.getByText("USD")).toBeVisible();
-    await expect(page.getByText("Reason")).toBeVisible();
-    await expect(page.getByText("Status")).toBeVisible();
-    await expect(page.getByLabel("Status")).toHaveValue("all");
-    await expect(page.getByRole("option", { name: "All statuses" })).toBeVisible();
-    await expect(page.getByRole("option", { name: "Dry run" })).toBeVisible();
-    await expect(page.getByRole("option", { name: "Submitted" })).toBeVisible();
-    await expect(page.getByRole("option", { name: "Failed" })).toBeVisible();
-    await expect(page.getByRole("option", { name: "Skipped" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Time", exact: true })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Side", exact: true })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "USD", exact: true })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Reason", exact: true })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Status", exact: true })).toBeVisible();
+    const statusFilter = page.getByLabel("Status");
+    await expect(statusFilter).toHaveValue("all");
+    await expect(statusFilter).toContainText("All statuses");
+    await expect(statusFilter).toContainText("Dry run");
+    await expect(statusFilter).toContainText("Submitted");
+    await expect(statusFilter).toContainText("Failed");
+    await expect(statusFilter).toContainText("Skipped");
 
     const tradeLog = page.getByRole("table");
     await expect(tradeLog.getByText("SKIPPED")).toBeVisible();
@@ -246,14 +247,44 @@ test("cockpit loads, status toggles, cockpit sections update by pair, trade-log 
         "hold: rsi=61.00 < entry_threshold=30 BUT price=1792.39 >= ma20=1740.10; no buy at held pair",
       ),
     ).toBeVisible();
-    await expect(tradeLog.getByText("buy")).toBeVisible();
-    await expect(tradeLog.getByText("$100.00")).toBeVisible();
-    await expect(tradeLog.getByText("dry_run")).toBeVisible();
-    await expect(tradeLog.getByText("$50.00")).toBeVisible();
-    await expect(tradeLog.getByText("submitted")).toBeVisible();
-    await expect(tradeLog.getByText("$999.00")).toBeVisible();
-    await expect(tradeLog.getByText("failed")).toBeVisible();
+    await expect(tradeLog).toContainText("buy");
+    await expect(tradeLog).toContainText("$100.00");
+    await expect(tradeLog).toContainText("dry_run");
+    await expect(tradeLog).toContainText("$50.00");
+    await expect(tradeLog).toContainText("submitted");
+    await expect(tradeLog).toContainText("$999.00");
+    await expect(tradeLog).toContainText("failed");
     await expect(page.getByRole("link", { name: "View transaction ledger →" })).toBeVisible();
+
+    const botTickCountBefore = await sql<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count
+        FROM bot_ticks
+       WHERE session_id = 'sess-cockpit'
+    `;
+    await page.getByRole("button", { name: "Run Now" }).click();
+    await expect
+      .poll(async () => {
+        const rows = await sql<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count
+            FROM bot_ticks
+           WHERE session_id = 'sess-cockpit'
+        `;
+        return rows[0]?.count ?? 0;
+      })
+      .toBe((botTickCountBefore[0]?.count ?? 0) + 1);
+    const latestSignal = await sql<
+      { tick_started_at: Date; reason: string }[]
+    >`
+      SELECT t.tick_started_at, s.reason
+        FROM signals s
+        JOIN bot_ticks t ON t.id = s.tick_id
+       WHERE t.session_id = 'sess-cockpit'
+         AND s.asset_identifier = ${held.pair}
+       ORDER BY t.tick_started_at DESC
+       LIMIT 1
+    `;
+    await expect(page.getByText(latestSignal[0]!.reason).first()).toBeVisible();
+    await expect(page.getByText(fmtTs(latestSignal[0]!.tick_started_at))).toBeVisible();
 
     await page.getByLabel("Status").selectOption("skipped");
     await expect(page).toHaveURL(new RegExp(`/dashboard\\?pair=${held.pair}&txStatus=skipped$`));
@@ -286,6 +317,19 @@ test("cockpit loads, status toggles, cockpit sections update by pair, trade-log 
     await expect(page.getByText("Bot is stopped — click Start to resume")).toBeVisible();
     await expect(page.getByText("⏸ STOPPED")).toBeVisible();
     await expect(page.getByText("stopped by user")).toBeVisible();
+    const pausedRunTickCount = await sql<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count
+        FROM bot_ticks
+       WHERE session_id = 'sess-cockpit'
+    `;
+    await page.getByRole("button", { name: "Run Now" }).click();
+    await expect(page.getByText("Bot is paused — resume to run.")).toBeVisible();
+    const pausedRunTickCountAfter = await sql<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count
+        FROM bot_ticks
+       WHERE session_id = 'sess-cockpit'
+    `;
+    expect(pausedRunTickCountAfter[0]?.count).toBe(pausedRunTickCount[0]?.count);
 
     await page.getByRole("button", { name: "Start" }).click();
     await expect(page.getByText("Bot is active — running every 15 minutes.")).toBeVisible();

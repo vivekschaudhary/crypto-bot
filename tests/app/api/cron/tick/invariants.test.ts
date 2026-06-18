@@ -26,6 +26,10 @@ import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..", "..");
 const ROUTE_FILE = join(REPO_ROOT, "app", "api", "cron", "tick", "route.ts");
+// CB-6.5: the evaluation pipeline (incl. the duplicate catch) was extracted to
+// the shared lib/ticks/run-tick.ts; the route is now a thin caller. The route's
+// transitive graph STILL reaches orders.ts via run-tick (graph walk below).
+const RUN_TICK_FILE = join(REPO_ROOT, "lib", "ticks", "run-tick.ts");
 const ORDERS_FILE = join(REPO_ROOT, "lib", "coinbase", "orders.ts");
 
 const INTERNAL_AT_IMPORT_PATTERN =
@@ -135,9 +139,9 @@ describe("cron tick — append-only event log (AC 13; brief guardrail)", () => {
 });
 
 describe("cron tick — no-silent-swallow (AC 5)", () => {
-  it("the duplicate catch matches Postgres 23505 explicitly", () => {
-    const route = readFileSync(ROUTE_FILE, "utf8");
-    expect(route).toContain('"23505"');
+  it("the duplicate catch matches Postgres 23505 explicitly (now in run-tick.ts)", () => {
+    const runTick = readFileSync(RUN_TICK_FILE, "utf8");
+    expect(runTick).toContain('"23505"');
   });
 
   it("lib/ticks/ + the route contain no empty catch blocks (trace.ts logging swallow is the single documented exception)", () => {
