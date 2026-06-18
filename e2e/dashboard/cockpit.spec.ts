@@ -54,12 +54,6 @@ function fmtSignedUsd(n: number): string {
   })}`;
 }
 
-function fmtSignedPct(n: number): string {
-  if (n === 0) return "0.00%";
-  const sign = n < 0 ? "−" : "+";
-  return `${sign}${Math.abs(n * 100).toFixed(2)}%`;
-}
-
 function fmtTs(d: Date): string {
   return `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
