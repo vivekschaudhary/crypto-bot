@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-18 (**CB-6 BET RE-SHIPPED** (PR #100) — 8 cockpit stories (6.0–6.7). CB-6.7 fixed the live money-display bug (paper `dry_run` invested vs real position → "$400/$0") via a mode-switched position (paper-while-dark from the dry_run ledger / real post-flip; migration 0008 `orders.base_quantity`; reuses computeAssetPnl). ⚠️ **Apply migration 0008 to prod** + **Reset Session** so fresh buys carry qty. Then operator-side: LIVE_MODE flip ceremony; /scan CB-6 Production-Ready findings; CB-7; #80. MVP [CB-1..CB-5] + CB-6 complete.)_
+_Last updated: 2026-06-19 (**CB-8 brief PROPOSED** — responsive left-sidebar dashboard nav (replaces the top 3-tab strip; responsive mobile/iPad/laptop + desktop-collapsible). Layout/chrome only; `architecture_required: true` (introduces the project's first CSS layer + @media + viewport meta). Awaiting operator approval → `/create-bet-architecture CB-8`. CB-6 done (8 stories, e2e green, migration 0008 applied to prod + session reset). Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7 (equity/Zerodha); #80. MVP [CB-1..CB-5] + CB-6 complete.)_
 
 ## In flight
 
