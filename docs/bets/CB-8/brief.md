@@ -1,7 +1,7 @@
 ---
 id: CB-8
 type: feature
-status: proposed
+status: approved
 priority: P2
 parent: FOUNDATION-PRODUCT
 portfolio_stub: false
@@ -56,6 +56,7 @@ See `key_metric` (frontmatter): every route reachable + cockpit readable at all 
 ## Scope
 
 ### In scope
+
 - **Left-sidebar nav** replacing the top 3-tab strip — crypto-app's own items: **🤖 Crypto** (cockpit `/dashboard`) · **📈 Equity** · **📊 Mutual Funds** · **Strategy** · **Decision trace** · **Ledger** (the last three currently reachable only via in-page links).
 - **Responsive behavior:** laptop/desktop → sidebar visible; **desktop → collapse/expand toggle** (persisted, e.g. `localStorage`) to reclaim width; tablet → visible or collapsible; mobile → off-canvas drawer + hamburger.
 - **The project's first styling layer:** a global stylesheet with `@media` breakpoints (recommended) + a **viewport meta** (`export const viewport` in `app/layout.tsx`) — both absent today. Inline styles remain for component internals; the responsive shell uses CSS.
@@ -63,6 +64,7 @@ See `key_metric` (frontmatter): every route reachable + cockpit readable at all 
 - Active-route highlight (reuse the `usePathname` pattern from `dashboard-tabs.tsx`).
 
 ### Out of scope
+
 - Any cockpit **content** change (cards, data, trading logic) — purely shell/chrome.
 - The mockup's finance features (Budget & Spending, Goals, Debt payoff, Net worth, Subscriptions, Transactions, Accounts) — the other app.
 - Storing/displaying user **email** (use device label; revisit only if asked).
@@ -72,6 +74,7 @@ See `key_metric` (frontmatter): every route reachable + cockpit readable at all 
 ## Architecture (why `architecture_required: true`)
 
 `/create-bet-architecture CB-8` must decide the **styling approach** — the load-bearing call in a codebase that is 100% inline `React.CSSProperties` with no CSS layer:
+
 - (a) a global `app/globals.css` with `@media` + classNames — **recommended** (lowest-disruption, server-rendered, no hydration risk);
 - (b) CSS modules per component;
 - (c) JS `matchMedia` / `useWindowSize` (hydration-mismatch risk).
@@ -79,38 +82,45 @@ See `key_metric` (frontmatter): every route reachable + cockpit readable at all 
 Plus: the breakpoint set (mobile/tablet/laptop/desktop), the collapse-state mechanism + persistence (avoid SSR flash), and how the shell flexes the content area (pages currently each set their own `maxWidth` 960/640 as if full-width).
 
 ## Open questions for Researcher / Architect
+
 - Confirm the styling approach (global CSS recommended) + the breakpoint values.
 - Collapse-state persistence (localStorage) without an SSR layout flash.
 - Whether trace/ledger become top-level sidebar items (changes `dashboard-tabs.tsx:activeTab()` logic).
 - Per-page `maxWidth` (960/640) pass under a sidebar — which pages need width adjustment.
 
 ## Stories (forecast — decomposed one at a time via `/create-story CB-8` after architecture)
+
 - **CB-8.0** styling layer (global CSS + breakpoints) + viewport meta + shell scaffold (flex `[sidebar | content]`).
 - **CB-8.1** sidebar nav + active-route highlight (replaces the top tabs).
 - **CB-8.2** desktop collapse/expand + persistence.
 - **CB-8.3** mobile drawer + hamburger.
 - **CB-8.4** per-page content-width pass (relax the 960/640 assumptions).
-_Forecast only._
+  _Forecast only._
 
 ## DRI Log
 
 ### Decisions
+
 - [2026-06-19] [Operator/PM] **Target = crypto-app, layout pattern only.** The attached mockup is a separate finance app; crypto-app adopts its left-sidebar LAYOUT with crypto-app's own nav items — not its content. — area: scope — reversibility: easy.
 - [2026-06-19] [PM] **`architecture_required: true`.** Responsive needs the project's first CSS layer (@media) + viewport meta — a cross-cutting styling-convention decision, deferred to `/create-bet-architecture CB-8`. — area: architecture — reversibility: medium.
 - [2026-06-19] [PM] **Identity = device label, not email.** The app does not store user email; the sidebar footer reuses the existing `device_label`. — area: scope — alternatives: add email storage (rejected for now) — reversibility: easy.
 - [2026-06-19] [PM] **CB-8 (not CB-7).** CB-7 stays reserved for equity/Zerodha. — area: planning — reversibility: easy.
 
 ### Risks
+
 - [2026-06-19] [PM] **New styling convention** in a pure-inline-styles codebase — sets precedent — likelihood: low (with arch review) — impact: high — mitigation: the architecture phase pins the approach (global CSS recommended) — area: architecture.
 - [2026-06-19] [Engineer] **Per-page `maxWidth` (960/640) breaks under a sidebar** — likelihood: high — impact: medium — mitigation: a dedicated per-page width pass (CB-8.4) — area: ui.
 - [2026-06-19] [Engineer] **Hydration mismatch** if responsive is JS-driven — likelihood: medium — impact: medium — mitigation: prefer CSS `@media` (server-rendered) — area: correctness.
 - [2026-06-19] [Engineer] **Collapse-state SSR flash** (client-only persistence) — likelihood: medium — impact: low — mitigation: a no-flash default; resolve in CB-8.2 — area: ui.
 
 ### Issues
+
 _None at brief creation._
 
 ## Research findings
+
 _To be filled by Researcher/Architect. Initial: the redesign is self-contained to the dashboard shell + a new global CSS layer; no backend, no migration, no Coinbase. The single genuinely-new architectural element is the styling system (the app has had none)._
 
 ---
+
 _Brief status: `proposed` → awaiting operator HITL approval. Jira mirror skipped (Atlassian MCP not connected this session). Next: operator approves → `/create-bet-architecture CB-8` → `/create-story CB-8`._
