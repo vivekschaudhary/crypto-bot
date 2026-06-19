@@ -8,6 +8,7 @@ portfolio_stub: false
 depends_on: [CB-6]
 parallel_with: []
 architecture_required: true
+architecture_status: approved
 created: 2026-06-19
 author: PM
 sources:

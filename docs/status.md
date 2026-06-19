@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-19 (**CB-8 brief PROPOSED** — responsive left-sidebar dashboard nav (replaces the top 3-tab strip; responsive mobile/iPad/laptop + desktop-collapsible). Layout/chrome only; `architecture_required: true` (introduces the project's first CSS layer + @media + viewport meta). Awaiting operator approval → `/create-bet-architecture CB-8`. CB-6 done (8 stories, e2e green, migration 0008 applied to prod + session reset). Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7 (equity/Zerodha); #80. MVP [CB-1..CB-5] + CB-6 complete.)_
+_Last updated: 2026-06-19 (**CB-8 brief APPROVED + architecture PROPOSED** — responsive left-sidebar dashboard nav. Architecture: global `app/globals.css` + `@media` + viewport meta (native Next, no foundational amend); one breakpoint (768) → mobile drawer / docked sidebar; collapse persisted via a no-flash `<html>` script; new `dashboard-sidebar.tsx`. Awaiting architecture HITL → `/create-story CB-8` (8.0 styling+shell → 8.1 nav → 8.2 collapse → 8.3 drawer → 8.4 width pass). CB-6 done. Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7; #80.)_
 
 ## In flight
 
