@@ -19,6 +19,18 @@ const headingStyle: React.CSSProperties = {
   color: "#888",
   marginBottom: "0.5rem",
 };
+// CB-6.7 — paper-mode badge next to the heading while LIVE_MODE=false.
+const paperBadgeStyle: React.CSSProperties = {
+  marginLeft: "0.5rem",
+  padding: "0.05rem 0.4rem",
+  fontSize: "0.625rem",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  color: "#8a6d00",
+  background: "#fff8e1",
+  border: "1px solid #f0e0a0",
+  borderRadius: 3,
+};
 const cellsStyle: React.CSSProperties = { display: "flex", gap: "2rem", flexWrap: "wrap" };
 const cellLabelStyle: React.CSSProperties = { fontSize: "0.6875rem", letterSpacing: "0.06em", color: "#aaa" };
 const valueStyle: React.CSSProperties = { fontSize: "1.125rem", fontWeight: 700 };
@@ -51,7 +63,10 @@ export function ProfitLossCard({ data }: { data: CockpitPnl }): JSX.Element {
 
   return (
     <section>
-      <h2 style={headingStyle}>PROFIT / LOSS</h2>
+      <h2 style={headingStyle}>
+        PROFIT / LOSS
+        {data.paper && <span style={paperBadgeStyle}>Paper</span>}
+      </h2>
       <div style={cellsStyle}>
         {/* Invested cell (session-scoped; DB-only — always renders). */}
         <div>

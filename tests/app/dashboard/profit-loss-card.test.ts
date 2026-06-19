@@ -14,6 +14,7 @@ function data(over: Partial<CockpitPnl> = {}): CockpitPnl {
     unrealizedPnlUsd: -26.32,
     realizedPnlUsd: 0,
     unrealizedPct: -0.1755,
+    paper: false,
     ...over,
   };
 }
@@ -40,6 +41,11 @@ describe("ProfitLossCard", () => {
     const json = JSON.stringify(ProfitLossCard({ data: data({ currentValue: null, unrealizedPnlUsd: null, realizedPnlUsd: null, unrealizedPct: null }) }));
     expect(json).toContain("P&L unavailable");
     expect(json).toContain("$150.00"); // invested still renders
+  });
+
+  it("paper=true → shows the Paper badge; paper=false → does not (CB-6.7)", () => {
+    expect(JSON.stringify(ProfitLossCard({ data: data({ paper: true }) }))).toContain("Paper");
+    expect(JSON.stringify(ProfitLossCard({ data: data({ paper: false }) }))).not.toContain("Paper");
   });
 
   it("flat (no position) → unrealized em dash", () => {

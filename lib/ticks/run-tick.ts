@@ -135,6 +135,7 @@ async function buildOrderRows(args: {
       assetIdentifier: d.asset.identifier,
       side: d.decision === "buy" ? "buy" : "sell",
       amount: built.amountUsd,
+      baseQuantity: built.baseQuantity,
     };
 
     if (!args.liveMode) {
@@ -177,6 +178,7 @@ async function buildOrderRows(args: {
         rows.push({
           ...base,
           amount: live.amountUsd,
+          baseQuantity: live.baseQuantity,
           status: "submitted",
           coinbaseOrderId: resp.success_response.order_id,
           errorDetail: null,
@@ -196,7 +198,7 @@ async function buildOrderRows(args: {
           status: "failed",
           errorDetail: reason,
         });
-        rows.push({ ...base, amount: live.amountUsd, status: "failed", coinbaseOrderId: null, errorDetail: reason });
+        rows.push({ ...base, amount: live.amountUsd, baseQuantity: live.baseQuantity, status: "failed", coinbaseOrderId: null, errorDetail: reason });
       }
     } catch (err) {
       const reason = sanitizeErrorDetail(err instanceof Error ? err.message : String(err));

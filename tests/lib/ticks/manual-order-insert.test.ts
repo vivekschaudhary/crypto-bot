@@ -28,6 +28,7 @@ describe("insertManualOrder — manual order + override_events in one tx", () =>
       assetIdentifier: "BTC-USD",
       side: "buy",
       amount: 50,
+      baseQuantity: 0.0125,
       status: "dry_run",
       coinbaseOrderId: null,
       errorDetail: null,
@@ -40,6 +41,7 @@ describe("insertManualOrder — manual order + override_events in one tx", () =>
     expect(orderInsert?.values).toContain("order-1");
     expect(orderInsert?.values).toContain("BTC-USD");
     expect(orderInsert?.values).toContain("dry_run");
+    expect(orderInsert?.values).toContain(0.0125); // base_quantity (CB-6.7)
 
     const eventInsert = calls.find((c) => /INSERT INTO override_events/.test(c.text));
     expect(eventInsert?.values).toContain("session-1");
