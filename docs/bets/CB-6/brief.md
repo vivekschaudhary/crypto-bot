@@ -1,7 +1,7 @@
 ---
 id: CB-6
 type: feature
-status: shipped
+status: approved
 priority: P1
 parent: FOUNDATION-PRODUCT
 portfolio_stub: false
