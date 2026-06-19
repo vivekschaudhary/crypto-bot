@@ -57,15 +57,6 @@ function fmtUsd(n: number): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtSignedUsd(n: number): string {
-  if (n === 0) return fmtUsd(0);
-  const sign = n < 0 ? "−" : "+";
-  return `${sign}$${Math.abs(n).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
 function fmtTs(d: Date): string {
   return `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
@@ -141,15 +132,19 @@ async function seedLatestSignals(heldPair: string): Promise<void> {
   `;
 }
 
-async function seedSessionOrders(heldPair: string): Promise<void> {
+async function seedSessionOrders(held: {
+  pair: string;
+  avgCostUsd: number;
+}): Promise<void> {
+  const paperBaseQuantity = 100 / held.avgCostUsd;
   await sql`
-    INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, status)
+    INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, base_quantity, status)
     VALUES
-      ('order-held-1', ${heldPair}, 'sess-cockpit', 'bot', 'buy', 100, 'dry_run'),
-      ('order-held-2', ${heldPair}, 'sess-cockpit', 'bot', 'buy', 50, 'submitted'),
-      ('order-held-failed', ${heldPair}, 'sess-cockpit', 'bot', 'buy', 999, 'failed'),
-      ('order-degrade-1', ${DEGRADE_PAIR}, 'sess-cockpit', 'bot', 'buy', 25, 'dry_run'),
-      ('order-degrade-2', ${DEGRADE_PAIR}, 'sess-cockpit', 'bot', 'buy', 5, 'submitted')
+      ('order-held-1', ${held.pair}, 'sess-cockpit', 'bot', 'buy', 100, ${paperBaseQuantity}, 'dry_run'),
+      ('order-held-2', ${held.pair}, 'sess-cockpit', 'bot', 'buy', 50, null, 'submitted'),
+      ('order-held-failed', ${held.pair}, 'sess-cockpit', 'bot', 'buy', 999, null, 'failed'),
+      ('order-degrade-1', ${DEGRADE_PAIR}, 'sess-cockpit', 'bot', 'buy', 25, null, 'dry_run'),
+      ('order-degrade-2', ${DEGRADE_PAIR}, 'sess-cockpit', 'bot', 'buy', 5, null, 'submitted')
   `;
 }
 
@@ -188,7 +183,11 @@ async function loadHeldPairFixture(): Promise<{
   );
 }
 
-async function loadNoPositionPairFixture(excludePair: string): Promise<string> {
+async function loadNoPositionPairFixtures(
+  excludePair: string,
+  count: number,
+): Promise<string[]> {
+  const matches: string[] = [];
   for (const pair of NO_POSITION_PAIR_CANDIDATES) {
     if (pair === excludePair) continue;
     const [{ fills }, product] = await Promise.all([
@@ -199,11 +198,12 @@ async function loadNoPositionPairFixture(excludePair: string): Promise<string> {
     const livePrice = Number(product.price);
     if (!Number.isFinite(livePrice)) continue;
     if (aggregatePosition(fills) !== null) continue;
-    return pair;
+    matches.push(pair);
+    if (matches.length === count) return matches;
   }
 
   throw new Error(
-    `cockpit e2e requires a valid pair with no position among ${NO_POSITION_PAIR_CANDIDATES.join(", ")}`,
+    `cockpit e2e requires ${count} valid pair(s) with no position among ${NO_POSITION_PAIR_CANDIDATES.join(", ")}`,
   );
 }
 
@@ -215,10 +215,13 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
   try {
     await completeSetupJourney(page);
     const held = await loadHeldPairFixture();
-    const noPositionPair = await loadNoPositionPairFixture(held.pair);
-    await seedStrategyAndSession([held.pair, noPositionPair, DEGRADE_PAIR]);
+    const heldPaperQuantity = 100 / held.avgCostUsd;
+    const noPositionPairs = await loadNoPositionPairFixtures(held.pair, 2);
+    const paperBuyPair = noPositionPairs[0]!;
+    const noPositionSellPair = noPositionPairs[1]!;
+    await seedStrategyAndSession([held.pair, paperBuyPair, noPositionSellPair, DEGRADE_PAIR]);
     await seedLatestSignals(held.pair);
-    await seedSessionOrders(held.pair);
+    await seedSessionOrders(held);
 
     await page.goto("/dashboard");
 
@@ -236,13 +239,12 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
     await expect(page.getByText("Bot is active — running every 15 minutes.")).toBeVisible();
     await expect(page.getByText("● ACTIVE")).toBeVisible();
     await expect(page.getByText("TOTAL INVESTED")).toBeVisible();
-    await expect(page.getByText("$150.00")).toBeVisible();
-    await expect(page.getByText("2 buys this session")).toBeVisible();
+    await expect(page.getByText("$100.00").first()).toBeVisible();
+    await expect(page.getByText("1 buy this session")).toBeVisible();
     await expect(page.getByText("CURRENT VALUE")).toBeVisible();
-    await expect(page.getByText(/P&L:/)).toBeVisible();
-    await expect(page.getByText(`Realized: ${fmtSignedUsd(held.realizedPnlUsd)}`)).toBeVisible();
+    await expect(page.getByText("P&L unavailable")).toHaveCount(0);
     await expect(page.getByText(`${baseOf(held.pair)} HELD`)).toBeVisible();
-    await expect(page.getByText(`${held.quantity} ${baseOf(held.pair)}`)).toBeVisible();
+    await expect(page.getByText(`${heldPaperQuantity} ${baseOf(held.pair)}`)).toBeVisible();
     await expect(page.getByText(`Avg cost: ${fmtUsd(held.avgCostUsd)}`)).toBeVisible();
     await expect(page.getByText("RSI: 61")).toBeVisible();
     await expect(page.getByText("SIGNALS")).toBeVisible();
@@ -314,6 +316,48 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
       .toBe((manualOrderCountBefore[0]?.count ?? 0) + 1);
     await expect(tradeLog).toContainText("$100.00");
     await expect(tradeLog).toContainText("dry_run");
+
+    await page.getByLabel("Pair").selectOption(paperBuyPair);
+    await expect(page).toHaveURL(
+      new RegExp(`/dashboard\\?pair=${paperBuyPair.replace("-", "\\-")}(?:&txStatus=all)?$`),
+    );
+    await expect(
+      page.getByRole("heading", { name: `${slashPair(paperBuyPair)} Trading Bot` }),
+    ).toBeVisible();
+    await expect(page.getByText("No position yet")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Buy $100" })).toBeVisible();
+    await page.getByRole("button", { name: "Buy $100" }).click();
+    await expect(page.getByText(`Simulate a $100 buy of ${slashPair(paperBuyPair)}?`)).toBeVisible();
+    await page.getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByText("Order recorded — see the trade log.")).toBeVisible();
+    const paperManualOrder = await sql<
+      { amount: number; base_quantity: number }[]
+    >`
+      SELECT amount::float8 AS amount, base_quantity::float8 AS base_quantity
+        FROM orders
+       WHERE session_id = 'sess-cockpit'
+         AND asset_identifier = ${paperBuyPair}
+         AND source = 'manual'
+         AND status = 'dry_run'
+       ORDER BY created_at DESC
+       LIMIT 1
+    `;
+    const paperLiveProduct = await getProduct(paperBuyPair);
+    const paperLivePrice = Number(paperLiveProduct.price);
+    expect(Number.isFinite(paperLivePrice)).toBe(true);
+    const expectedPaperValue = paperManualOrder[0]!.base_quantity * paperLivePrice;
+    await expect(page.getByText("Paper", { exact: true })).toHaveCount(2);
+    await expect(page.getByText("1 buy this session")).toBeVisible();
+    await expect(page.getByText("$100.00").first()).toBeVisible();
+    await expect(page.getByText(fmtUsd(expectedPaperValue))).toBeVisible();
+    await expect(page.getByText("P&L unavailable")).toHaveCount(0);
+    await expect(page.getByText("No position yet")).toHaveCount(0);
+
+    await page.getByLabel("Pair").selectOption(held.pair);
+    await expect(page).toHaveURL(new RegExp(`/dashboard\\?pair=${held.pair.replace("-", "\\-")}(?:&txStatus=all)?$`));
+    await expect(
+      page.getByRole("heading", { name: `${slashPair(held.pair)} Trading Bot` }),
+    ).toBeVisible();
 
     const botTickCountBefore = await sql<{ count: number }[]>`
       SELECT COUNT(*)::int AS count
@@ -390,17 +434,17 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
     `;
     expect(pausedRunTickCountAfter[0]?.count).toBe(pausedRunTickCount[0]?.count);
 
-    await page.getByLabel("Pair").selectOption(noPositionPair);
+    await page.getByLabel("Pair").selectOption(noPositionSellPair);
     await expect(page).toHaveURL(
-      new RegExp(`/dashboard\\?pair=${noPositionPair.replace("-", "\\-")}(?:&txStatus=all)?$`),
+      new RegExp(`/dashboard\\?pair=${noPositionSellPair.replace("-", "\\-")}(?:&txStatus=all)?$`),
     );
     await expect(
-      page.getByRole("heading", { name: `${slashPair(noPositionPair)} Trading Bot` }),
+      page.getByRole("heading", { name: `${slashPair(noPositionSellPair)} Trading Bot` }),
     ).toBeVisible();
     await expect(page.getByText("No position yet")).toBeVisible();
     await page.getByRole("button", { name: "Sell All" }).click();
     await expect(
-      page.getByText(`Simulate selling your entire ${slashPair(noPositionPair)} position?`),
+      page.getByText(`Simulate selling your entire ${slashPair(noPositionSellPair)} position?`),
     ).toBeVisible();
     await page.getByRole("button", { name: "Confirm" }).click();
     await expect(page.getByText("No position to sell.")).toBeVisible();
@@ -409,8 +453,8 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
     await expect(page).toHaveURL(/\/dashboard\?pair=FAKE-USD$/);
     await expect(page.getByRole("heading", { name: "FAKE/USD Trading Bot" })).toBeVisible();
     await expect(page.getByText("TOTAL INVESTED")).toBeVisible();
-    await expect(page.getByText("$30.00")).toBeVisible();
-    await expect(page.getByText("2 buys this session")).toBeVisible();
+    await expect(page.getByText("$25.00").first()).toBeVisible();
+    await expect(page.getByText("1 buy this session")).toBeVisible();
     await expect(page.getByText("CURRENT VALUE")).toBeVisible();
     await expect(page.getByText("P&L unavailable")).toBeVisible();
     await expect(page.getByText("FAKE HELD")).toBeVisible();
