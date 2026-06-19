@@ -13,6 +13,9 @@ function sqlMock(strings: TemplateStringsArray, ..._v: unknown[]) {
   return Promise.resolve([]);
 }
 vi.mock("@/lib/db/client", () => ({ db: () => sqlMock }));
+// CB-6.7: these tests exercise the REAL-fills path (LIVE_MODE=true); the
+// paper-mode path is covered by cockpit-position-paper.test.ts.
+vi.mock("@/lib/env", () => ({ env: () => ({ LIVE_MODE: true }) }));
 
 const getAccountTradeHistory = vi.fn();
 vi.mock("@/lib/coinbase/accounts", () => ({

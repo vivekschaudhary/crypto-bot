@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS orders (
     source text NOT NULL CHECK (source IN ('manual', 'bot')),
     side text NOT NULL CHECK (side IN ('buy', 'sell')),
     amount numeric NOT NULL,
+    base_quantity numeric,                        -- CB-6.7: qty bought/sold (nullable; powers the paper position while dark)
     status text NOT NULL,
     coinbase_order_id text,
     error_detail text,

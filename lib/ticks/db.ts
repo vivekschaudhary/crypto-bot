@@ -52,6 +52,8 @@ export interface OrderRowInsert {
   assetIdentifier: string;
   side: "buy" | "sell";
   amount: number;
+  /** CB-6.7: base qty bought/sold (from buildLimitOrder) — powers the paper position. */
+  baseQuantity: number;
   status: "dry_run" | "submitted" | "failed";
   coinbaseOrderId: string | null;
   errorDetail: string | null;
@@ -166,6 +168,7 @@ export async function insertManualOrder(o: {
   assetIdentifier: string;
   side: "buy" | "sell";
   amount: number;
+  baseQuantity: number;
   status: "dry_run" | "submitted" | "failed";
   coinbaseOrderId: string | null;
   errorDetail: string | null;
@@ -174,7 +177,7 @@ export async function insertManualOrder(o: {
   const sql = db();
   await sql.begin(async (tx) => {
     await tx`
-      INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, status, coinbase_order_id, error_detail)
+      INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, base_quantity, status, coinbase_order_id, error_detail)
       VALUES (
         ${o.id},
         ${o.assetIdentifier},
@@ -182,6 +185,7 @@ export async function insertManualOrder(o: {
         'manual',
         ${o.side},
         ${o.amount},
+        ${o.baseQuantity},
         ${o.status},
         ${o.coinbaseOrderId},
         ${o.errorDetail}
@@ -234,7 +238,7 @@ export async function insertTickWithDecisions(tick: TickInsert): Promise<void> {
     // as the tick — bot_ticks + signals + orders are atomic per tick.
     for (const o of tick.orders ?? []) {
       await tx`
-        INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, status, coinbase_order_id, error_detail)
+        INSERT INTO orders (id, asset_identifier, session_id, source, side, amount, base_quantity, status, coinbase_order_id, error_detail)
         VALUES (
           ${o.id},
           ${o.assetIdentifier},
@@ -242,6 +246,7 @@ export async function insertTickWithDecisions(tick: TickInsert): Promise<void> {
           'bot',
           ${o.side},
           ${o.amount},
+          ${o.baseQuantity},
           ${o.status},
           ${o.coinbaseOrderId},
           ${o.errorDetail}

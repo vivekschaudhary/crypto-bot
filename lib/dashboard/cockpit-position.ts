@@ -11,7 +11,9 @@
 
 import { getAccountTradeHistory } from "@/lib/coinbase/accounts";
 import { getProduct } from "@/lib/coinbase/market";
+import { synthesizePaperFills } from "@/lib/dashboard/paper-fills";
 import { db } from "@/lib/db/client";
+import { env } from "@/lib/env";
 import { aggregatePosition } from "@/lib/ticks/cost-basis";
 
 export interface CockpitPosition {
@@ -22,6 +24,8 @@ export interface CockpitPosition {
   livePrice: number | null;
   /** null = no signal recorded for this pair yet. */
   rsi: number | null;
+  /** CB-6.7: true while LIVE_MODE=false → the position is PAPER (from the dry_run ledger). */
+  paper: boolean;
 }
 
 const FILLS_PAGE_LIMIT = 250;
@@ -41,13 +45,21 @@ export function resolveViewedPair(
 }
 
 export async function loadCockpitPosition(pair: string): Promise<CockpitPosition> {
-  // Held qty + avg cost — best-effort (degrade on Coinbase failure).
+  const liveMode = env().LIVE_MODE;
+
+  // Held qty + avg cost. CB-6.7: dark → PAPER position from the dry_run ledger
+  // (DB read; consistent with the Profit/Loss card); live → REAL Coinbase fills
+  // (best-effort degrade on a Coinbase failure, CB-6.1 behaviour).
   let position: { quantity: number; avgCostUsd: number } | null = null;
-  try {
-    const { fills } = await getAccountTradeHistory({ productIds: [pair], limit: FILLS_PAGE_LIMIT });
-    position = aggregatePosition(fills);
-  } catch {
-    position = null;
+  if (!liveMode) {
+    position = aggregatePosition(await synthesizePaperFills(pair));
+  } else {
+    try {
+      const { fills } = await getAccountTradeHistory({ productIds: [pair], limit: FILLS_PAGE_LIMIT });
+      position = aggregatePosition(fills);
+    } catch {
+      position = null;
+    }
   }
 
   // Live price — best-effort.
@@ -72,5 +84,5 @@ export async function loadCockpitPosition(pair: string): Promise<CockpitPosition
   `;
   const rsi = rows[0]?.rsi ?? null;
 
-  return { pair, position, livePrice, rsi };
+  return { pair, position, livePrice, rsi, paper: !liveMode };
 }

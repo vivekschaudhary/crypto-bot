@@ -11,11 +11,17 @@ function data(over: Partial<CockpitPosition> = {}): CockpitPosition {
     position: { quantity: 0.069004, avgCostUsd: 2173.78 },
     livePrice: 1792.39,
     rsi: 50,
+    paper: false,
     ...over,
   };
 }
 
 describe("CurrentPositionCard", () => {
+  it("paper=true → shows the Paper badge; paper=false → does not (CB-6.7)", () => {
+    expect(JSON.stringify(CurrentPositionCard({ data: data({ paper: true }) }))).toContain("Paper");
+    expect(JSON.stringify(CurrentPositionCard({ data: data({ paper: false }) }))).not.toContain("Paper");
+  });
+
   it("renders held qty + avg cost + live price + RSI", () => {
     const json = JSON.stringify(CurrentPositionCard({ data: data() }));
     expect(json).toContain("ETH HELD");

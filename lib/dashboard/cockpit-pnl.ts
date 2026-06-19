@@ -3,22 +3,29 @@
 // only (read-only invariant — no write helpers, never reaches
 // lib/coinbase/orders).
 //
-// SCOPING (resolved CB-6.1 issue):
-//   * invested + buys  = SESSION-scoped (current bot_session, this pair, bot
-//     buys, status <> 'failed' incl. dry_run — mirrors loadSessionActivity).
-//   * currentValue + unrealized + realized = the REAL (all-time) position via
-//     computeAssetPnl over Coinbase fills (fills aren't session_id-tagged).
+// CB-6.7 — PAPER-AWARE (mode-switched position source), so invested ↔ value ↔
+// P&L are consistent in BOTH modes:
+//   * LIVE_MODE=false (dark): position = the PAPER position synthesized from the
+//     session's dry_run orders ledger (synthesizePaperFills); invested = the
+//     session's dry_run buys. Both paper → consistent.
+//   * LIVE_MODE=true (post-flip): position = the REAL all-time position via
+//     Coinbase fills (CB-6.2 behaviour, unchanged); invested = real submitted buys.
+// The fix for the operator's "$400 invested / $0 value": the value no longer
+// reflects a REAL position while invested counted PAPER buys.
 //
-// FAIL-LOUD (the PR #73 BLOCKER lesson, mirroring lib/dashboard/ledger:loadPnl):
-// the Coinbase READS sit in the try → a network failure degrades the P&L
-// fields to null (invested/buys, a pure DB read, still render). computeAssetPnl
-// runs OUTSIDE the catch — a malformed-fill throw (Coinbase contract drift)
-// MUST propagate (fail loud), not be swallowed as "unavailable".
+// FAIL-LOUD (the PR #73 BLOCKER lesson): the Coinbase READS (getProduct, + live
+// fills) sit in the try → a network failure degrades the P&L fields to null
+// (invested/buys, a pure DB read, still render). computeAssetPnl runs OUTSIDE
+// the catch — a malformed-fill throw MUST propagate. Paper fills are a DB read
+// (well-formed), fetched OUTSIDE the Coinbase try so a DB error propagates too.
 
 import { getAccountTradeHistory } from "@/lib/coinbase/accounts";
+import type { Fill } from "@/lib/coinbase/account-schemas";
 import { getProduct } from "@/lib/coinbase/market";
 import { computeAssetPnl } from "@/lib/dashboard/pnl";
+import { synthesizePaperFills } from "@/lib/dashboard/paper-fills";
 import { db } from "@/lib/db/client";
+import { env } from "@/lib/env";
 
 export interface CockpitPnl {
   pair: string;
@@ -30,6 +37,8 @@ export interface CockpitPnl {
   unrealizedPnlUsd: number | null;
   realizedPnlUsd: number | null;
   unrealizedPct: number | null;
+  /** CB-6.7: true while LIVE_MODE=false → the figures are PAPER (dry_run). */
+  paper: boolean;
 }
 
 const FILLS_PAGE_LIMIT = 250;
@@ -47,41 +56,47 @@ export async function loadCockpitPnl(pair: string): Promise<CockpitPnl | null> {
   // no-session treatment (Bot Status) covers it. (Don't fetch Coinbase either.)
   if (sessionId === null) return null;
 
-  // Session-scoped invested + buy count for the pair (DB-only; mirrors
-  // live-state:loadSessionActivity, scoped to asset_identifier).
+  const liveMode = env().LIVE_MODE;
+
+  // Session-scoped invested + buy count for the pair — MODE-AWARE so it matches
+  // the position basis: dark → dry_run (paper) buys; live → real submitted buys.
   const rows = await sql<{ buy_count: number; invested: number }[]>`
     SELECT COUNT(*)::int AS buy_count,
            COALESCE(SUM(amount), 0)::float8 AS invested
       FROM orders
      WHERE session_id = ${sessionId}
        AND asset_identifier = ${pair}
-       AND source = 'bot'
+       AND source IN ('bot', 'manual')
        AND side = 'buy'
-       AND status <> 'failed'
+       AND ( (${liveMode} AND status NOT IN ('failed', 'dry_run'))
+          OR (${!liveMode} AND status = 'dry_run') )
   `;
   const buys = rows[0]?.buy_count ?? 0;
   const invested = rows[0]?.invested ?? 0;
 
+  // Paper fills are a DB read — OUTSIDE the Coinbase try (a DB error propagates).
+  const paperFills: Fill[] | null = liveMode ? null : await synthesizePaperFills(pair);
+
   // Position P&L — Coinbase READS only inside the try (degrade on failure).
-  let raw:
-    | { fills: Awaited<ReturnType<typeof getAccountTradeHistory>>["fills"]; currentPrice: number | null }
-    | null;
+  // Dark: only the current price (getProduct). Live: live fills + price.
+  let raw: { fills: Fill[]; currentPrice: number | null } | null;
   try {
-    const [{ fills }, product] = await Promise.all([
-      getAccountTradeHistory({ productIds: [pair], limit: FILLS_PAGE_LIMIT }),
-      getProduct(pair),
-    ]);
+    const product = await getProduct(pair);
     const priceNum = product.price !== undefined ? Number(product.price) : Number.NaN;
-    raw = { fills, currentPrice: Number.isFinite(priceNum) ? priceNum : null };
+    const currentPrice = Number.isFinite(priceNum) ? priceNum : null;
+    const fills = liveMode
+      ? (await getAccountTradeHistory({ productIds: [pair], limit: FILLS_PAGE_LIMIT })).fills
+      : (paperFills as Fill[]);
+    raw = { fills, currentPrice };
   } catch {
     raw = null; // Coinbase read failure → degrade the P&L fields (AC 4/5)
   }
 
   if (raw === null) {
-    return { pair, invested, buys, currentValue: null, unrealizedPnlUsd: null, realizedPnlUsd: null, unrealizedPct: null };
+    return { pair, invested, buys, currentValue: null, unrealizedPnlUsd: null, realizedPnlUsd: null, unrealizedPct: null, paper: !liveMode };
   }
 
-  // OUTSIDE the catch — a malformed fill throws here and propagates (PR #73).
+  // OUTSIDE the catch — a malformed (live) fill throws here and propagates (PR #73).
   const pnl = computeAssetPnl(raw.fills, raw.currentPrice);
   const currentValue = raw.currentPrice !== null ? pnl.quantity * raw.currentPrice : null;
   const costBasis = pnl.avgCostUsd * pnl.quantity;
@@ -96,5 +111,6 @@ export async function loadCockpitPnl(pair: string): Promise<CockpitPnl | null> {
     unrealizedPnlUsd: pnl.unrealizedPnlUsd,
     realizedPnlUsd: pnl.realizedPnlUsd,
     unrealizedPct,
+    paper: !liveMode,
   };
 }

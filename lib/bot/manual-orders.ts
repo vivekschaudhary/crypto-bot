@@ -88,6 +88,7 @@ async function placeAndRecord(args: {
   kind: ManualOrderKind;
   config: import("@/lib/coinbase/order-schemas").OrderConfiguration;
   amountUsd: number;
+  baseQuantity: number;
   idempotencyKey: string;
 }): Promise<ManualOrderOutcome> {
   const orderId = ulid();
@@ -101,6 +102,7 @@ async function placeAndRecord(args: {
       assetIdentifier: args.asset,
       side: args.side,
       amount: args.amountUsd,
+      baseQuantity: args.baseQuantity,
       status: "dry_run",
       coinbaseOrderId: null,
       errorDetail: null,
@@ -139,6 +141,7 @@ async function placeAndRecord(args: {
     assetIdentifier: args.asset,
     side: args.side,
     amount: args.amountUsd,
+    baseQuantity: args.baseQuantity,
     status,
     coinbaseOrderId,
     errorDetail,
@@ -197,6 +200,7 @@ export async function forceBuy(asset: string, idempotencyKey: string): Promise<M
     kind: "force_buy",
     config: built.config,
     amountUsd: built.amountUsd,
+    baseQuantity: built.baseQuantity,
     idempotencyKey,
   });
 }
@@ -250,6 +254,7 @@ export async function sellFraction(
     kind,
     config: built.config,
     amountUsd: built.amountUsd,
+    baseQuantity: built.baseQuantity,
     idempotencyKey,
   });
 }
