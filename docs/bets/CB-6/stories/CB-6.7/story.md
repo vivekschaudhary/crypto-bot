@@ -2,7 +2,7 @@
 id: CB-6.7
 bet: CB-6
 type: story
-status: ready
+status: shipped
 priority: P1
 created: 2026-06-18
 author: PM
@@ -87,4 +87,4 @@ _Unit/component co-located; e2e by Codex; Security glance (order write-path touc
 - [2026-06-18] [Operator] **Reported on the live cockpit:** TOTAL INVESTED $400 vs CURRENT VALUE $0 (paper invested vs real position). This story resolves it. Other "few errors" mentioned by the operator are triaged separately. — severity: medium — owner: PM.
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **POST-SHIP FIX — paper-aware cockpit P&L; reopens CB-6 for one follow-up story.**_
+_Story closed: 2026-06-18 (SHIPPED via PR #100; Codex-clean + Security glance + Codex e2e; local e2e EXECUTION deferred under #80). ⚠️ **Migration 0008 must be applied to prod** (like 0005/0006/0007); then **Reset Session** so fresh dry_run buys carry base_quantity. brief: docs/bets/CB-6/brief.md. **POST-SHIP FIX — paper-aware cockpit P&L. CB-6 BET RE-SHIPPED (8 stories: 6.0–6.7).**_
