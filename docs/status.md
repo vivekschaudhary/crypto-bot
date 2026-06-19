@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-19 (**CB-8 brief + architecture APPROVED; CB-8.0 `ready`** — responsive left-sidebar dashboard nav. CB-8.0 (FIRST story): the project's first global CSS layer (`app/globals.css` + `@media`) + viewport meta + `[sidebar|content]` flex shell + functional left-sidebar nav (6 items, active highlight, footer device-label + single Sign out) replacing the top 3-tab strip; mobile-safe (stacked, no horizontal scroll). Adaptive re-forecast: 8.1 desktop collapse+persist · 8.2 mobile drawer · 8.3 per-page width pass. Next: `/build CB-8.0`. CB-6 done. Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7; #80.)_
+_Last updated: 2026-06-19 (**CB-8.0 SHIPPED** (PR #105) — responsive left-sidebar dashboard nav. The project's first global CSS layer (`app/globals.css` + `@media`) + viewport meta + `[sidebar|content]` flex shell + sidebar nav (6 items, active highlight, footer device-label + single Sign out) replacing the top 3-tab strip; mobile-safe (stacked). Codex-clean + e2e. **1 of ~4 CB-8 stories.** Next: `/create-story CB-8` → 8.1 desktop collapse+persist · 8.2 mobile drawer · 8.3 per-page width pass. CB-6 done. Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7; #80.)_
 
 ## In flight
 

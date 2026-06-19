@@ -2,7 +2,7 @@
 id: CB-8.0
 bet: CB-8
 type: story
-status: ready
+status: shipped
 priority: P2
 created: 2026-06-19
 author: PM
@@ -86,4 +86,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; the CB-6 
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-8/brief.md. **FIRST CB-8 STORY — responsive shell + left-sidebar nav; the styling-layer foundation.**_
+_Story closed: 2026-06-19 (SHIPPED via PR #105; Codex-clean + Codex e2e committed/CI-typechecked — local e2e exec via the e2e/README external-mode recipe / #80), brief: docs/bets/CB-8/brief.md. **FIRST CB-8 STORY — responsive shell + left-sidebar nav; the styling-layer foundation.** Next: 8.1 desktop collapse+persist · 8.2 mobile drawer · 8.3 per-page width pass._
