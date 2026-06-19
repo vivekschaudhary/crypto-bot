@@ -12,7 +12,6 @@ import { type AssetPnlRow, type LedgerRow, loadLedger } from "@/lib/dashboard/le
 import { env } from "@/lib/env";
 
 import { LiveModeBanner } from "../live-mode-banner";
-import { SignOutClient } from "../sign-out-client";
 
 export const dynamic = "force-dynamic";
 
@@ -144,7 +143,6 @@ export default async function LedgerPage(): Promise<JSX.Element> {
     <main style={pageStyle}>
       <div style={chromeStyle}>
         <div style={titleStyle}>crypto-bot</div>
-        <SignOutClient />
       </div>
       <LiveModeBanner liveMode={liveMode} />
       <div style={headerRowStyle}>

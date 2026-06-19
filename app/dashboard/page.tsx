@@ -29,7 +29,6 @@ import { PairSelector } from "./pair-selector-client";
 import { ProfitLossCard } from "./profit-loss-card";
 import { ManualOverridesCard } from "./manual-overrides-card";
 import { SignalsCard } from "./signals-card";
-import { SignOutClient } from "./sign-out-client";
 import { TradeLogCard } from "./trade-log-card";
 
 const pageStyle: React.CSSProperties = {
@@ -37,12 +36,6 @@ const pageStyle: React.CSSProperties = {
   padding: "0 2rem 2rem",
   maxWidth: 960,
   margin: "0 auto",
-};
-const chromeStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "flex-end",
-  alignItems: "center",
-  marginBottom: "1rem",
 };
 const eyebrowStyle: React.CSSProperties = {
   fontSize: "0.75rem",
@@ -129,9 +122,6 @@ export default async function DashboardPage(
 
   return (
     <main style={pageStyle}>
-      <div style={chromeStyle}>
-        <SignOutClient />
-      </div>
 
       <div style={eyebrowStyle}>DCA + SIGNAL EXIT · COINBASE</div>
       <h1 style={titleStyle}>{title}</h1>

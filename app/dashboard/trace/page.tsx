@@ -13,7 +13,6 @@ import { type Decision, loadDecisionTrace } from "@/lib/dashboard/decision-trace
 import { env } from "@/lib/env";
 
 import { LiveModeBanner } from "../live-mode-banner";
-import { SignOutClient } from "../sign-out-client";
 
 // SSR per load (AC 2 / brief PM Decision #2). Without this the route reads
 // no headers()/cookies() and Next would statically prerender it — baking a
@@ -75,7 +74,6 @@ export default async function DecisionTracePage(): Promise<JSX.Element> {
     <main style={pageStyle}>
       <div style={chromeStyle}>
         <div style={titleStyle}>crypto-bot</div>
-        <SignOutClient />
       </div>
       <LiveModeBanner liveMode={liveMode} />
       <div style={headerRowStyle}>

@@ -1,32 +1,46 @@
-// CB-6.0 — dashboard shell. Renders the multi-asset 3-tab nav (Mutual Funds /
-// Equity / Crypto) above every /dashboard/** route (Crypto cockpit, Equity +
-// Mutual Funds placeholders, and the existing trace/ledger/strategy routes,
-// which remain reachable). Server Component; the tabs themselves are a Client
-// Component (usePathname). Thin wrapper — pages keep their own containers, so
-// no change to the trace/ledger/strategy pages in this story.
+// CB-8.0 — dashboard shell: a responsive [sidebar | content] layout (replaces
+// the CB-6.0 top 3-tab strip). The responsive CSS lives in app/globals.css
+// (`.dashboard-shell` / `.dashboard-sidebar` / `.dashboard-content`). Server
+// Component; fetches the operator's device label (same x-session-user-id → DB
+// read as the cockpit, CB-1.4 Decision #5 — convenience header, not an auth
+// claim) and passes it to the sidebar footer. Read-only (SELECT); the dashboard
+// read-only invariant holds.
 
+import { headers } from "next/headers";
 import type { JSX } from "react";
 
-import { DashboardTabs } from "./dashboard-tabs";
+import { db } from "@/lib/db/client";
 
-const shellStyle: React.CSSProperties = {
-  fontFamily: "system-ui, sans-serif",
-  padding: "1rem 2rem 0",
-  maxWidth: 960,
-  margin: "0 auto",
-};
+import { DashboardSidebar } from "./dashboard-sidebar";
 
-export default function DashboardLayout({
+type CredRow = { device_label: string | null };
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
-}): JSX.Element {
+}): Promise<JSX.Element> {
+  const h = await headers();
+  const userId = h.get("x-session-user-id");
+
+  let deviceLabel: string | null = null;
+  if (userId) {
+    try {
+      const sql = db();
+      const rows = await sql<CredRow[]>`
+        SELECT device_label FROM auth_credentials WHERE user_id = ${userId} LIMIT 1
+      `;
+      deviceLabel = rows[0]?.device_label ?? null;
+    } catch {
+      deviceLabel = null;
+    }
+  }
+  const connectedDevice = deviceLabel && deviceLabel.length > 0 ? deviceLabel : "this device";
+
   return (
-    <>
-      <div style={shellStyle}>
-        <DashboardTabs />
-      </div>
-      {children}
-    </>
+    <div className="dashboard-shell">
+      <DashboardSidebar connectedDevice={connectedDevice} />
+      <main className="dashboard-content">{children}</main>
+    </div>
   );
 }

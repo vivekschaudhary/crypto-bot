@@ -1,0 +1,51 @@
+/* CB-8.0 — the project's FIRST global stylesheet. Scoped to the responsive
+   dashboard SHELL only (per the CB-8 architecture); component internals stay
+   inline React.CSSProperties. Keep this file shell + breakpoints only — no
+   component visuals (EA watch-item: avoid CSS sprawl). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+:root {
+  --sidebar-width: 240px;
+}
+
+/* Dashboard shell: [sidebar | content] on docked widths (≥768). */
+.dashboard-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.dashboard-sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid #eee;
+  padding: 1rem;
+}
+
+.dashboard-content {
+  flex: 1;
+  min-width: 0; /* let content shrink instead of forcing horizontal scroll */
+}
+
+/* Mobile (<768): stack — sidebar block on top, content below. No horizontal scroll.
+   (The off-canvas drawer is CB-8.2.) */
+@media (max-width: 767px) {
+  .dashboard-shell {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  .dashboard-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #eee;
+  }
+}
