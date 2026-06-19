@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-18 (**CB-6 BET SHIPPED** (PR #98 closed it) — all 7 cockpit stories (6.0–6.6) done; the single-screen multi-asset crypto cockpit is complete (status · P&L · position · signals · trade log · run-now · real-money overrides, paper-while-dark). Next: operator-side — the LIVE_MODE flip ceremony (≥60-dry-run guardrail); CB-7 (equity/Zerodha); issue #80 (local e2e). MVP [CB-1..CB-5] + CB-6 complete.)_
+_Last updated: 2026-06-18 (**CB-6 REOPENED for CB-6.7** — post-ship fix: paper-aware cockpit P&L. The operator hit a money-display bug on the live cockpit (TOTAL INVESTED $400 vs CURRENT VALUE $0 — paper `dry_run` invested compared against the real Coinbase position). CB-6.7 `ready`: mode-switched position (paper-while-dark via the dry_run ledger / real post-flip), migration 0008 (orders.base_quantity), reuses computeAssetPnl. 6.0–6.6 shipped; 6.7 in flight. Then operator-side: LIVE_MODE flip ceremony; CB-7; #80.)_
 
 ## In flight
 
