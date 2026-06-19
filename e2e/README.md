@@ -14,7 +14,10 @@ start. The suite has effectively been non-runnable on Next 16. **Deferred fix
 two `next start` instances (no dev lock — and it would run e2e against the real
 prod build, catching prod-only bugs like the PR #77 RSC-500 that dev masked), or
 split into two sequential single-server runs. Until then, what IS shipped is the
-**safety** posture below (fail-closed DB + no prod-server reuse).
+**safety** posture below (fail-closed DB + no prod-server reuse) — and the suite
+IS runnable today via the single-server external-mode recipe (see
+[Runnable today](#-runnable-today-single-server-external-mode-80-workaround)),
+which sidesteps the two-instance lock by running ONE server you start yourself.
 
 ## ⚠️ e2e is FAIL-CLOSED against production (read first)
 
@@ -60,6 +63,52 @@ additionally requires `PLAYWRIGHT_EXTERNAL_DB_OK=1` — an explicit confirmation
 that you started the server against the test DB (`DATABASE_URL=$TEST_DATABASE_URL
 pnpm dev`). Without it, e2e refuses to run. **Never** point e2e at a server
 backed by the production database — its specs `TRUNCATE` and its app writes.
+
+## ✅ Runnable today: single-server external mode (#80 workaround)
+
+`pnpm e2e` is blocked by the two-`next dev` lock above, but you can run any spec
+**now** by starting ONE server yourself and pointing Playwright at it. This was
+exercised end-to-end on 2026-06-19 (the full CB-6 cockpit spec, green) and prod
+was verified untouched. Works for every non-`*.live.spec.ts` spec (the
+`chromium` project; the LIVE-banner spec still needs the deferred two-server fix).
+
+```bash
+TEST="postgresql://postgres:postgres@localhost:5433/postgres"   # = TEST_DATABASE_URL
+
+# 1. Test DB up (one-time setup above) + schema current (re-run after any migration):
+docker start crypto-e2e-db
+DATABASE_URL="$TEST" MIGRATE_DESTINATION=production pnpm db:migrate
+
+# 2. Cold caches — getCredentialCount() is unstable_cache and PERSISTS in
+#    .next/cache across dev restarts; a stale non-zero count makes the landing
+#    page show "Sign in" instead of "Set up your passkey" and the setup journey
+#    hangs. A raw TRUNCATE does NOT invalidate it. Clear it before each run:
+rm -rf .next/cache
+
+# 3. Start ONE dev server on the TEST DB (your explicit DATABASE_URL wins over
+#    .env.local — Next does not override an already-set process.env var):
+DATABASE_URL="$TEST" APP_ORIGIN="http://localhost:3200" LIVE_MODE=false \
+  pnpm dev --port 3200 &
+#    Wait for readiness by probing a STATIC asset, NOT "/" (probing "/" renders
+#    the landing page and caches the credential count before your test truncates):
+curl --retry 60 --retry-delay 2 --retry-connrefused -so /dev/null http://localhost:3200/favicon.ico
+
+# 4. Run the spec. node --env-file loads .env.local into the SPEC process (it
+#    needs COINBASE_*/SESSION_SIGNING_SECRET for the real-Coinbase fixtures);
+#    invoke the JS CLI directly (node_modules/.bin/playwright is a shell wrapper,
+#    not runnable via `node`). TEST_DATABASE_URL from .env.local keeps DB ops
+#    fail-closed on the test DB regardless of the loaded prod DATABASE_URL.
+PLAYWRIGHT_SKIP_WEB_SERVER=1 PLAYWRIGHT_EXTERNAL_DB_OK=1 \
+  node --env-file-if-exists=.env.local node_modules/@playwright/test/cli.js \
+  test e2e/dashboard/cockpit.spec.ts --project=chromium --timeout=90000
+```
+
+Gotchas this recipe encodes (each cost a failed run): (a) the spec process needs
+the full `.env.local`, not just `TEST_DATABASE_URL`; (b) `.next/cache` must be
+cold or the cached credential count breaks the setup journey; (c) probe a static
+asset for readiness, never `/`; (d) call `@playwright/test/cli.js`, not the
+`.bin` wrapper. The proper fix (two `next start` instances) remains tracked in
+issue #80.
 
 ## First test to land
 
