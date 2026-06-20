@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-20 (**CB-8.0 SHIPPED (PR #105); CB-8.1 SHIPPED (PR #107)** — left-sidebar dashboard nav. CB-8.1: desktop collapse/expand (the "minimize the left bar" ask) → icon-only rail reclaiming content width. Persistence is a **cookie**, server-rendered onto `.dashboard-shell` (Codex BLOCKER ×2: localStorage + pre-paint `<html>` script could not satisfy "no hydration mismatch" — the architecture was corrected to a server-readable cookie; genuinely no flash/mismatch). Adds icons to all 6 nav items. Docked (≥768) affordance. Next: 8.2 mobile drawer · 8.3 per-page width pass. CB-6 done. Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7; #80.)_
+_Last updated: 2026-06-20 (**CB-8.0 SHIPPED (PR #105); CB-8.1 SHIPPED (PR #107); CB-8.2 `ready`** — left-sidebar dashboard nav. CB-8.2 (THIRD story): mobile off-canvas drawer + hamburger (<768) replacing the CB-8.0 stacked-block placeholder — slim top bar + ☰ opens the sidebar over content with a scrim; closes via ✕ / scrim / Esc / nav-link (close-on-navigate). Ephemeral client open-state (always closed on load → no hydration mismatch; NOT persisted, unlike the 8.1 collapse cookie); CSS-driven via `.dashboard-shell[data-drawer-open]`. Desktop docked + 8.1 collapse untouched. UI story (design.md + copy.md; e2e: true). Next: `/build CB-8.2`, then 8.3 per-page content-width pass. CB-6 done. Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7; #80.)_
 
 ## In flight
 
