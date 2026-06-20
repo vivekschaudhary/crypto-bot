@@ -2,7 +2,7 @@
 id: CB-8.2
 bet: CB-8
 type: story
-status: ready
+status: in-review
 priority: P2
 created: 2026-06-20
 author: PM
@@ -60,7 +60,7 @@ UI story — load-bearing.
 - Per-page content-width pass (CB-8.3 — relax 960/640 `maxWidth`). No nav-item/route change. No swipe-to-open gesture (tap-only). Desktop collapse (CB-8.1) untouched.
 
 ## PRs
-_Auto-populated._
+- #108 — mobile off-canvas drawer + hamburger. Open 2026-06-20; awaiting Codex review + Phase-3 e2e.
 
 ## Tests
 _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-mode recipe / #80)._
