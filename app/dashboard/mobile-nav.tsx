@@ -100,15 +100,28 @@ export function MobileNav({ children }: { children: ReactNode }): JSX.Element {
     document.querySelector<HTMLElement>(".drawer-hamburger")?.focus();
   }, []);
 
-  // Reflect open → shell attr (CSS hook) + body scroll-lock; while open, manage
-  // focus (move-in), Esc, and the focus trap.
+  // Close-on-resize: when the viewport crosses to desktop (≥768), the drawer
+  // chrome is CSS-hidden — close the drawer so its open-state (and the
+  // scroll-lock / shell attr) can't outlive the visible overlay. AC 5.
   useEffect(() => {
-    const shell = document.querySelector(".dashboard-shell");
-    if (open) shell?.setAttribute("data-drawer-open", "");
-    else shell?.removeAttribute("data-drawer-open");
-    document.body.style.overflow = open ? "hidden" : "";
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = (): void => {
+      if (mq.matches) setOpen(false);
+    };
+    onChange(); // defensive: don't start "open" on a desktop viewport
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
+  // While open: set the shell CSS hook + lock body scroll + manage focus (move-
+  // in), Esc, and the focus trap. The cleanup ALWAYS restores both the attr and
+  // the scroll-lock — so a close, a resize-to-desktop, OR an unmount-while-open
+  // can never leave the page scroll-locked or the shell flagged open. AC 5/6.
+  useEffect(() => {
     if (!open) return;
+    const shell = document.querySelector(".dashboard-shell");
+    shell?.setAttribute("data-drawer-open", "");
+    document.body.style.overflow = "hidden";
 
     // Move focus into the drawer (the ✕, or the first focusable).
     const closeBtn = document.querySelector<HTMLElement>(".dashboard-sidebar [data-drawer-close]");
@@ -130,6 +143,8 @@ export function MobileNav({ children }: { children: ReactNode }): JSX.Element {
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      shell?.removeAttribute("data-drawer-open");
+      document.body.style.overflow = "";
     };
   }, [open, close]);
 

@@ -98,7 +98,7 @@ export function DashboardSidebar({
   const pathname = usePathname() ?? "/dashboard";
   const active = activeNavKey(pathname);
   return (
-    <aside id="dashboard-drawer" className="dashboard-sidebar" style={innerStyle}>
+    <aside id="dashboard-drawer" aria-label="Sidebar" className="dashboard-sidebar" style={innerStyle}>
       <div style={headerStyle}>
         <span className="sidebar-title" style={titleStyle}>
           crypto-bot
