@@ -2,21 +2,18 @@
 
 // CB-8.1 — the desktop collapse/expand toggle. Extracted from DashboardSidebar
 // so the sidebar stays render-testable (this component owns the hooks). The
-// VISUAL is CSS-driven via `data-sidebar-collapsed` on <html> (set pre-paint by
-// the root-layout no-flash script + here on click) — so collapse works before
-// hydration and there's no flash. React state drives only aria-expanded /
-// aria-label, synced from the attr on mount (server + first client render both
-// render expanded → no hydration mismatch). The ◀/▶ glyph is `.sidebar-toggle`
-// CSS in app/globals.css. aria-labels VERBATIM (copy.md).
+// VISUAL is CSS-driven via `data-sidebar-collapsed` on `.dashboard-shell`. The
+// server renders that attribute from the COOKIE (see sidebar-state.ts), so the
+// collapsed state is correct on first paint with NO flash and NO hydration
+// mismatch. This component receives the server's value as `initialCollapsed`
+// (server + first client render agree → button aria matches too), and on click
+// it (a) flips the attribute on `.dashboard-shell` for instant feedback and
+// (b) writes the cookie so the next server render persists the choice. The ◀/▶
+// glyph is `.sidebar-toggle` CSS in app/globals.css. aria-labels VERBATIM (copy.md).
 
-import { useEffect, useState, type JSX } from "react";
+import { useState, type JSX } from "react";
 
-const STORAGE_KEY = "sidebar-collapsed";
-
-/** Pure: parse the persisted collapse flag. "1" → collapsed; anything else → expanded. */
-export function parseCollapsed(raw: string | null): boolean {
-  return raw === "1";
-}
+import { COLLAPSE_COOKIE } from "./sidebar-state";
 
 const toggleStyle: React.CSSProperties = {
   border: "1px solid #ddd",
@@ -28,24 +25,23 @@ const toggleStyle: React.CSSProperties = {
   lineHeight: 1,
 };
 
-export function SidebarToggle(): JSX.Element {
-  // Default expanded; sync from the pre-paint <html> attr on mount. Server +
-  // first client render both render expanded → no hydration mismatch.
-  const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => {
-    setCollapsed(document.documentElement.hasAttribute("data-sidebar-collapsed"));
-  }, []);
+// 1 year — a durable per-browser UI preference.
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+export function SidebarToggle({ initialCollapsed = false }: { initialCollapsed?: boolean }): JSX.Element {
+  // Seeded from the server's cookie-derived value → SSR and first client render
+  // agree (no hydration mismatch on aria-expanded / aria-label).
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
 
   function toggle(): void {
-    const el = document.documentElement;
-    const next = !el.hasAttribute("data-sidebar-collapsed");
-    if (next) el.setAttribute("data-sidebar-collapsed", "");
-    else el.removeAttribute("data-sidebar-collapsed");
-    try {
-      localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
-    } catch {
-      // storage disabled (private mode) — the attr still drives this session.
-    }
+    const next = !collapsed;
+    // The `.dashboard-shell` attribute is the visual source of truth; flip it for
+    // instant feedback (it also survives soft navigation — the layout stays mounted).
+    const shell = document.querySelector<HTMLElement>(".dashboard-shell");
+    if (next) shell?.setAttribute("data-sidebar-collapsed", "");
+    else shell?.removeAttribute("data-sidebar-collapsed");
+    // Persist server-side: the next hard render reads this and renders the attr.
+    document.cookie = `${COLLAPSE_COOKIE}=${next ? "1" : "0"}; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax`;
     setCollapsed(next);
   }
 

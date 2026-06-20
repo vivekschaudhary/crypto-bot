@@ -81,8 +81,10 @@ test("CB-8.0/8.1 Phase 3: sidebar nav + collapse/expand + mobile behavior", asyn
     await expect(collapsedToggle).toHaveAttribute("aria-expanded", "false");
     await expect(sidebar.locator(".sidebar-title")).not.toBeVisible();
     await expect(sidebar.locator(".sidebar-device")).not.toBeVisible();
-    await expect(page.locator('html')).toHaveAttribute("data-sidebar-collapsed", "");
-    await expect.poll(async () => page.evaluate(() => localStorage.getItem("sidebar-collapsed"))).toBe("1");
+    await expect(page.locator(".dashboard-shell")).toHaveAttribute("data-sidebar-collapsed", "");
+    await expect
+      .poll(async () => page.evaluate(() => document.cookie))
+      .toContain("sidebar-collapsed=1");
 
     const collapsed = await page.evaluate(() => {
       const sidebarEl = document.querySelector<HTMLElement>(".dashboard-sidebar");
@@ -118,7 +120,7 @@ test("CB-8.0/8.1 Phase 3: sidebar nav + collapse/expand + mobile behavior", asyn
     }
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("html")).toHaveAttribute("data-sidebar-collapsed", "");
+    await expect(page.locator(".dashboard-shell")).toHaveAttribute("data-sidebar-collapsed", "");
     await expect(page.getByRole("complementary").getByRole("button", { name: "Expand sidebar" })).toBeVisible();
     const reloadedCollapsed = await page.evaluate(() => {
       const sidebarEl = document.querySelector<HTMLElement>(".dashboard-sidebar");
@@ -137,8 +139,10 @@ test("CB-8.0/8.1 Phase 3: sidebar nav + collapse/expand + mobile behavior", asyn
       "aria-expanded",
       "true",
     );
-    await expect(page.locator("html")).not.toHaveAttribute("data-sidebar-collapsed", "");
-    await expect.poll(async () => page.evaluate(() => localStorage.getItem("sidebar-collapsed"))).toBe("0");
+    await expect(page.locator(".dashboard-shell")).not.toHaveAttribute("data-sidebar-collapsed", "");
+    await expect
+      .poll(async () => page.evaluate(() => document.cookie))
+      .toContain("sidebar-collapsed=0");
 
     const expandedAgain = await page.evaluate(() => {
       const sidebarEl = document.querySelector<HTMLElement>(".dashboard-sidebar");

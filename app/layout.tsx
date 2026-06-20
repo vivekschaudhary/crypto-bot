@@ -14,26 +14,13 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// CB-8.1 — apply the persisted sidebar-collapse state BEFORE paint (the dark-mode
-// no-flash pattern): set the <html> data attr that app/globals.css reads, so a
-// collapsed sidebar never flashes expanded on reload and there's no hydration
-// mismatch (the visual is CSS/attr-driven, not React state).
-const NO_FLASH_SIDEBAR = `try{if(localStorage.getItem('sidebar-collapsed')==='1')document.documentElement.setAttribute('data-sidebar-collapsed','')}catch(e){}`;
-
+// CB-8.1 — the sidebar-collapse state is a COOKIE rendered server-side onto
+// `.dashboard-shell` by app/dashboard/layout.tsx (server-readable source → no
+// flash, no hydration mismatch). No pre-paint <html> script is needed.
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    // suppressHydrationWarning: the NO_FLASH_SIDEBAR script intentionally adds
-    // `data-sidebar-collapsed` to <html> BEFORE hydration (localStorage is
-    // client-only — the server can't know it). React would otherwise warn that
-    // the server <html> lacks the attr. This is the sanctioned no-flash pattern
-    // (next-themes etc.); it scopes to <html>'s own attributes ONLY (one level —
-    // child mismatches still surface). CB-8.1 BLOCKER closure.
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        {/* Tiny first-paint state script (no user input) — sets the collapse attr before paint. */}
-        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SIDEBAR }} />
-        {children}
-      </body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   );
 }

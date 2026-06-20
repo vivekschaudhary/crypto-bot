@@ -87,7 +87,13 @@ const footerStyle: React.CSSProperties = {
 };
 const deviceStyle: React.CSSProperties = { color: "#777", fontSize: "0.8125rem", marginBottom: "0.5rem" };
 
-export function DashboardSidebar({ connectedDevice }: { connectedDevice: string }): JSX.Element {
+export function DashboardSidebar({
+  connectedDevice,
+  collapsed = false,
+}: {
+  connectedDevice: string;
+  collapsed?: boolean;
+}): JSX.Element {
   const pathname = usePathname() ?? "/dashboard";
   const active = activeNavKey(pathname);
   return (
@@ -96,7 +102,7 @@ export function DashboardSidebar({ connectedDevice }: { connectedDevice: string 
         <span className="sidebar-title" style={titleStyle}>
           crypto-bot
         </span>
-        <SidebarToggle />
+        <SidebarToggle initialCollapsed={collapsed} />
       </div>
       <nav aria-label="Primary" style={navStyle}>
         {NAV.map((item) => {

@@ -55,28 +55,29 @@ body {
   }
 }
 
-/* CB-8.1 — desktop collapse/expand. State = `data-sidebar-collapsed` on <html>
-   (set pre-paint by the root-layout no-flash script + the toggle). The collapsed
+/* CB-8.1 — desktop collapse/expand. State = `data-sidebar-collapsed` on the
+   `.dashboard-shell`, rendered SERVER-SIDE from the cookie (no flash, no
+   hydration mismatch) and flipped client-side by the toggle. The collapsed
    rules apply ONLY on docked widths (≥768) so mobile is unaffected. */
 .sidebar-toggle::after {
   content: "◀"; /* "collapse" */
 }
-html[data-sidebar-collapsed] .sidebar-toggle::after {
+.dashboard-shell[data-sidebar-collapsed] .sidebar-toggle::after {
   content: "▶"; /* "expand" */
 }
 
 @media (min-width: 768px) {
-  html[data-sidebar-collapsed] {
+  .dashboard-shell[data-sidebar-collapsed] {
     --sidebar-width: 56px; /* icon rail — reclaims content width */
   }
   /* Title + device line: hidden in the rail. */
-  html[data-sidebar-collapsed] .sidebar-title,
-  html[data-sidebar-collapsed] .sidebar-device {
+  .dashboard-shell[data-sidebar-collapsed] .sidebar-title,
+  .dashboard-shell[data-sidebar-collapsed] .sidebar-device {
     display: none;
   }
   /* Nav labels: VISUALLY hidden (kept in the a11y tree as the link's accessible
      name) so the icon rail stays screen-reader-navigable. */
-  html[data-sidebar-collapsed] .nav-label {
+  .dashboard-shell[data-sidebar-collapsed] .nav-label {
     position: absolute;
     width: 1px;
     height: 1px;
