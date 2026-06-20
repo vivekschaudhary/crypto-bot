@@ -22,7 +22,13 @@ const NO_FLASH_SIDEBAR = `try{if(localStorage.getItem('sidebar-collapsed')==='1'
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the NO_FLASH_SIDEBAR script intentionally adds
+    // `data-sidebar-collapsed` to <html> BEFORE hydration (localStorage is
+    // client-only — the server can't know it). React would otherwise warn that
+    // the server <html> lacks the attr. This is the sanctioned no-flash pattern
+    // (next-themes etc.); it scopes to <html>'s own attributes ONLY (one level —
+    // child mismatches still surface). CB-8.1 BLOCKER closure.
+    <html lang="en" suppressHydrationWarning>
       <body>
         {/* Tiny first-paint state script (no user input) — sets the collapse attr before paint. */}
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SIDEBAR }} />
