@@ -14,6 +14,9 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// CB-8.1 — the sidebar-collapse state is a COOKIE rendered server-side onto
+// `.dashboard-shell` by app/dashboard/layout.tsx (server-readable source → no
+// flash, no hydration mismatch). No pre-paint <html> script is needed.
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">

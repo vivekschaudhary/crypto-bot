@@ -12,7 +12,7 @@ brief: docs/bets/CB-8/brief.md
 
 ## Decision
 
-Restructure the dashboard shell (`app/dashboard/layout.tsx`) into a **flex `[sidebar | content]`** layout, and introduce the project's **first global stylesheet** — `app/globals.css`, imported in `app/layout.tsx` — to carry **`@media` breakpoints** + the sidebar/collapse/drawer classes. Add a **viewport meta** (`export const viewport` in `app/layout.tsx`). Two layout modes by one breakpoint (`768px`): **mobile (<768) → off-canvas drawer + hamburger**; **docked (≥768) → fixed sidebar with a user collapse/expand toggle** (icon-only rail when collapsed). Collapse state persists in `localStorage`, applied **before paint** via a tiny blocking script on `<html>` (the no-flash, no-hydration-mismatch pattern). Component-internal styling stays inline `React.CSSProperties`; only the **responsive shell** uses CSS.
+Restructure the dashboard shell (`app/dashboard/layout.tsx`) into a **flex `[sidebar | content]`** layout, and introduce the project's **first global stylesheet** — `app/globals.css`, imported in `app/layout.tsx` — to carry **`@media` breakpoints** + the sidebar/collapse/drawer classes. Add a **viewport meta** (`export const viewport` in `app/layout.tsx`). Two layout modes by one breakpoint (`768px`): **mobile (<768) → off-canvas drawer + hamburger**; **docked (≥768) → fixed sidebar with a user collapse/expand toggle** (icon-only rail when collapsed). Collapse state persists in a **cookie** (server-readable), which the dashboard layout renders as `data-sidebar-collapsed` on `.dashboard-shell` — so the server markup matches the persisted state with **no flash and no hydration mismatch** (the toggle writes the cookie + flips the attribute client-side for instant feedback). Component-internal styling stays inline `React.CSSProperties`; only the **responsive shell** uses CSS.
 
 ## Context
 
@@ -23,8 +23,9 @@ Restructure the dashboard shell (`app/dashboard/layout.tsx`) into a **flex `[sid
 
 ## Approach (files / modules / data flow)
 
-- **`app/layout.tsx`** — add `import "./globals.css";` + `export const viewport: Viewport = { width: "device-width", initialScale: 1 }` + the no-flash inline script (`<script>` reading `localStorage` → sets `data-sidebar-collapsed` on `<html>`).
-- **`app/globals.css`** (NEW) — the styling layer: CSS custom properties (sidebar width expanded/collapsed), the `@media (max-width: 767px)` drawer rules, the `[data-sidebar-collapsed]` rail rules, and the content-area container (`max-width` + auto-margins + padding). Box-sizing + a minimal reset.
+- **`app/layout.tsx`** — add `import "./globals.css";` + `export const viewport: Viewport = { width: "device-width", initialScale: 1 }`. (No collapse script — the state is server-rendered from the cookie by the dashboard layout; CB-8.1 BLOCKER closure.)
+- **`app/dashboard/sidebar-state.ts`** (NEW, CB-8.1) — the shared collapse-state contract: the cookie name + the pure `parseCollapsed(raw)`. A plain module (no `"use client"`) so the Server-Component layout reads/parses the cookie without pulling client code server-side.
+- **`app/globals.css`** (NEW) — the styling layer: CSS custom properties (sidebar width expanded/collapsed), the `@media (max-width: 767px)` drawer rules, the `.dashboard-shell[data-sidebar-collapsed]` rail rules, and the content-area container (`max-width` + auto-margins + padding). Box-sizing + a minimal reset.
 - **`app/dashboard/layout.tsx`** — becomes `<div class="dashboard-shell"> <DashboardSidebar/> <main class="dashboard-content">{children}</main> </div>`. Server Component; fetches the `device_label` (same `x-session-user-id` → DB read the cockpit uses) and passes it to the sidebar footer.
 - **`app/dashboard/dashboard-sidebar.tsx`** (NEW; replaces `dashboard-tabs.tsx`) — Client Component: app title (header), nav list (Crypto · Equity · Mutual Funds · Strategy · Decision trace · Ledger) with active-route highlight (reuse the `usePathname` logic), the collapse toggle (≥768) + the mobile hamburger/drawer toggle, and the footer (device label + `SignOutClient`). Pure helpers (`activeNavKey(pathname)`, `parseCollapsed(raw)`) extracted for unit tests.
 - **Per-route pages** — drop fixed `maxWidth`/`margin:auto`; the `.dashboard-content` container owns width + centering. A per-page pass (CB-8.4) relaxes the 960/640 assumptions. Cockpit content components are untouched.
@@ -57,12 +58,12 @@ Restructure the dashboard shell (`app/dashboard/layout.tsx`) into a **flex `[sid
 ## Consequences
 
 - **Positive:** responsive on all four breakpoints; scalable left-nav; first reusable styling layer; no new deps; reversible (medium — can revert to inline + top-tabs).
-- **Negative:** introduces a styling convention to maintain; a per-page content-width pass is required; a small no-flash script in the root layout.
+- **Negative:** introduces a styling convention to maintain; a per-page content-width pass is required; the collapse pref is a cookie sent on dashboard requests (the dashboard layout is already dynamic, so no added render-mode penalty).
 - **Reversibility:** medium (revert the shell + remove globals.css; pages keep working with their own widths).
 
 ## Test strategy
 
-- **Unit:** pure helpers — `activeNavKey(pathname)`, `parseCollapsed(localStorage value)`.
+- **Unit:** pure helpers — `activeNavKey(pathname)`, `parseCollapsed(cookie value)`.
 - **Component:** `DashboardSidebar` render (nav items + active highlight; collapsed vs expanded variants; footer device label + Sign out) via the JSON.stringify/pure-view pattern (mock `next/navigation`, per CB-6.5/6.6 precedent).
 - **e2e (Codex):** Playwright `viewport` at ~375 / 768 / 1280 / 1920 — no horizontal scroll; mobile drawer opens/closes; desktop collapse toggles + **persists across navigation** (reload); every route reachable from the sidebar; cockpit content intact.
 - **Invariants:** the dashboard read-only + `/api/bot/**` tests stay green (unaffected); `/dashboard` stays `ƒ` dynamic; `pnpm typecheck && lint && test && build` clean.
@@ -77,7 +78,8 @@ Restructure the dashboard shell (`app/dashboard/layout.tsx`) into a **flex `[sid
 
 - [2026-06-19] [Architect] **Global `app/globals.css` + `@media` + viewport meta** as the responsive layer (not CSS modules / not JS matchMedia / not Tailwind). Native Next, server-rendered, no hydration risk, no new dependency. — area: styling-architecture — reversibility: medium.
 - [2026-06-19] [Architect] **One breakpoint (768px), two modes** — mobile drawer (<768) + docked sidebar with a user collapse toggle (≥768). Covers mobile/iPad/laptop/desktop with minimal complexity; collapse is a user affordance, not breakpoint-driven. — area: ux/layout — reversibility: easy.
-- [2026-06-19] [Architect] **Collapse persisted in `localStorage`, applied pre-paint via a blocking `<html>` script** (the dark-mode no-flash pattern) → no SSR flash, no hydration mismatch. — area: client-state — reversibility: easy.
+- [2026-06-19] [Architect] ~~**Collapse persisted in `localStorage`, applied pre-paint via a blocking `<html>` script** (the dark-mode no-flash pattern) → no SSR flash, no hydration mismatch.~~ — **SUPERSEDED 2026-06-20** (see next). The claim was unsound: `localStorage` is client-only, so the server can never render `data-sidebar-collapsed` to match → a pre-paint script produces a real hydration diff (`suppressHydrationWarning` only hides the warning, it doesn't eliminate the mismatch). Codex caught this on CB-8.1.
+- [2026-06-20] [Architect] **Collapse persisted in a COOKIE (server-readable), rendered as `data-sidebar-collapsed` on `.dashboard-shell` by the dashboard layout** — the server markup matches the persisted state, so there's GENUINELY no flash and no hydration mismatch (not merely suppressed). The toggle writes the cookie + flips the shell attribute client-side for instant feedback + seeds `aria-expanded` from the server value. Replaces the `<html>` + `localStorage` + pre-paint-script approach. The dashboard layout is already dynamic (reads the session header), so the cookie read adds no render-mode penalty; no `<html>` mutation → the root layout needs no `suppressHydrationWarning`. Operator-approved 2026-06-20 (Codex BLOCKER, twice). — area: client-state — reversibility: easy.
 - [2026-06-19] [Architect] **New `dashboard-sidebar.tsx` replaces `dashboard-tabs.tsx`**; the dashboard `layout.tsx` (server) fetches `device_label` + passes it to the sidebar footer (reuses the cockpit's `x-session-user-id`→DB read). — area: components — reversibility: easy.
 - [2026-06-19] [Enterprise Architect] **No foundational-stack amend** — native CSS is within the Next stack; this sets the styling convention (global CSS for shell/responsive, inline for component internals) without a new Stack-table row. — area: standards — reversibility: medium.
 
@@ -86,7 +88,7 @@ Restructure the dashboard shell (`app/dashboard/layout.tsx`) into a **flex `[sid
 - [2026-06-19] [Enterprise Architect] **CSS sprawl** — the first stylesheet could grow ad-hoc — likelihood: medium — impact: medium — mitigation: keep `globals.css` scoped to shell + breakpoints; component visuals stay inline pending a deliberate design-system bet — area: maintainability.
 - [2026-06-19] [Architect] **Per-page `maxWidth` (960/640) assumptions** break under the content container — likelihood: high — impact: medium — mitigation: the `.dashboard-content` container owns width; CB-8.4 per-page pass — area: ui.
 - [2026-06-19] [Architect] **Shell change touches all routes at once** (8.0) — likelihood: high — impact: medium — mitigation: pages are width-agnostic; e2e covers every route at every breakpoint; instant git revert — area: regression.
-- [2026-06-19] [Architect] **No-flash script correctness** (inline script reading localStorage) — likelihood: low — impact: low — mitigation: standard pattern; component test on `parseCollapsed`; e2e asserts no flash via the persisted state — area: client-state.
+- [2026-06-20] [Architect] **Collapse-state correctness** (cookie → server-rendered shell attribute) — likelihood: low — impact: low — mitigation: server renders the attribute to match the cookie (no flash/mismatch by construction); unit test on `parseCollapsed`; e2e asserts persistence across reload + the cookie value — area: client-state. _(Replaces the earlier localStorage no-flash-script risk.)_
 
 ### Issues
 

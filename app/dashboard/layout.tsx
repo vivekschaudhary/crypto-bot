@@ -6,12 +6,13 @@
 // claim) and passes it to the sidebar footer. Read-only (SELECT); the dashboard
 // read-only invariant holds.
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { JSX } from "react";
 
 import { db } from "@/lib/db/client";
 
 import { DashboardSidebar } from "./dashboard-sidebar";
+import { COLLAPSE_COOKIE, parseCollapsed } from "./sidebar-state";
 
 type CredRow = { device_label: string | null };
 
@@ -37,9 +38,16 @@ export default async function DashboardLayout({
   }
   const connectedDevice = deviceLabel && deviceLabel.length > 0 ? deviceLabel : "this device";
 
+  // Collapse pref is a cookie (server-readable) → render the shell attribute to
+  // match the persisted choice: no flash, no hydration mismatch (CB-8.1). The
+  // layout is already dynamic (it reads the session header above), so reading a
+  // cookie adds no new render-mode penalty.
+  const cookieStore = await cookies();
+  const collapsed = parseCollapsed(cookieStore.get(COLLAPSE_COOKIE)?.value);
+
   return (
-    <div className="dashboard-shell">
-      <DashboardSidebar connectedDevice={connectedDevice} />
+    <div className="dashboard-shell" data-sidebar-collapsed={collapsed ? "" : undefined}>
+      <DashboardSidebar connectedDevice={connectedDevice} collapsed={collapsed} />
       <main className="dashboard-content">{children}</main>
     </div>
   );

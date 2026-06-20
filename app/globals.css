@@ -48,4 +48,44 @@ body {
     border-right: none;
     border-bottom: 1px solid #eee;
   }
+
+  /* Collapse is a docked (≥768) affordance; the mobile drawer is CB-8.2. */
+  .sidebar-toggle {
+    display: none;
+  }
+}
+
+/* CB-8.1 — desktop collapse/expand. State = `data-sidebar-collapsed` on the
+   `.dashboard-shell`, rendered SERVER-SIDE from the cookie (no flash, no
+   hydration mismatch) and flipped client-side by the toggle. The collapsed
+   rules apply ONLY on docked widths (≥768) so mobile is unaffected. */
+.sidebar-toggle::after {
+  content: "◀"; /* "collapse" */
+}
+.dashboard-shell[data-sidebar-collapsed] .sidebar-toggle::after {
+  content: "▶"; /* "expand" */
+}
+
+@media (min-width: 768px) {
+  .dashboard-shell[data-sidebar-collapsed] {
+    --sidebar-width: 56px; /* icon rail — reclaims content width */
+  }
+  /* Title + device line: hidden in the rail. */
+  .dashboard-shell[data-sidebar-collapsed] .sidebar-title,
+  .dashboard-shell[data-sidebar-collapsed] .sidebar-device {
+    display: none;
+  }
+  /* Nav labels: VISUALLY hidden (kept in the a11y tree as the link's accessible
+     name) so the icon rail stays screen-reader-navigable. */
+  .dashboard-shell[data-sidebar-collapsed] .nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
