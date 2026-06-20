@@ -1,15 +1,17 @@
-// CB-8.0 — unit + render tests for the left-sidebar nav (replaces the CB-6.0
-// dashboard-tabs test). `activeNavKey` is pure; the sidebar render is verified
-// via JSON.stringify (mock next/navigation; Link/SignOutClient are referenced
-// as element types, not invoked). Full responsive render is the Codex e2e.
+// CB-8.0/8.1 — unit + render tests for the left-sidebar nav. `activeNavKey` is
+// pure; the sidebar render is verified via JSON.stringify (mock next/navigation;
+// next/link, SignOutClient, and SidebarToggle are referenced as element types,
+// not invoked — SidebarToggle is mocked since it has hooks). The interactive
+// collapse + full responsive render are the Codex e2e.
 
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
-// next/link's Link is a forwardRef object (circular module refs) → mock to a
-// plain passthrough so JSON.stringify of the element tree doesn't loop.
+// next/link's Link is a forwardRef object → mock to a plain passthrough so
+// JSON.stringify of the element tree doesn't loop.
 vi.mock("next/link", () => ({ default: (props: { children?: unknown }) => props.children }));
 vi.mock("@/app/dashboard/sign-out-client", () => ({ SignOutClient: () => null }));
+vi.mock("@/app/dashboard/sidebar-toggle", () => ({ SidebarToggle: () => null }));
 
 import { activeNavKey, DashboardSidebar } from "@/app/dashboard/dashboard-sidebar";
 
@@ -22,8 +24,7 @@ describe("activeNavKey — six-key route → nav mapping", () => {
     expect(activeNavKey("/dashboard/trace")).toBe("trace");
     expect(activeNavKey("/dashboard/ledger")).toBe("ledger");
   });
-  it("strategy/trace/ledger are now distinct (not folded into crypto)", () => {
-    // Regression vs CB-6.0 activeTab, which returned "crypto" for these.
+  it("strategy/trace/ledger are distinct (not folded into crypto)", () => {
     expect(activeNavKey("/dashboard/trace")).not.toBe("crypto");
     expect(activeNavKey("/dashboard/ledger")).not.toBe("crypto");
     expect(activeNavKey("/dashboard/strategy")).not.toBe("crypto");
@@ -34,21 +35,22 @@ describe("activeNavKey — six-key route → nav mapping", () => {
 });
 
 describe("DashboardSidebar render", () => {
-  it("renders the title, six nav items (+ hrefs), and the footer", () => {
+  it("renders the title, six items (icon + label + href), and the footer", () => {
     const json = JSON.stringify(DashboardSidebar({ connectedDevice: "Vivek's Mac" }));
     expect(json).toContain("crypto-bot"); // app title
-    expect(json).toContain("🤖 Crypto");
-    expect(json).toContain("📈 Equity");
-    expect(json).toContain("📊 Mutual Funds");
-    expect(json).toContain("Strategy");
-    expect(json).toContain("Decision trace");
-    expect(json).toContain("Ledger");
+    // labels (split from icons in CB-8.1; kept as the accessible name when collapsed)
+    for (const label of ["Crypto", "Equity", "Mutual Funds", "Strategy", "Decision trace", "Ledger"]) {
+      expect(json).toContain(label);
+    }
+    // icons on ALL six (so the collapsed rail stays navigable)
+    for (const icon of ["🤖", "📈", "📊", "⚙️", "🧭", "📒"]) {
+      expect(json).toContain(icon);
+    }
     expect(json).toContain('"href":"/dashboard"');
     expect(json).toContain('"href":"/dashboard/ledger"');
     expect(json).toContain("Connected device: Vivek's Mac"); // footer device label
   });
   it("marks the active route (pathname=/dashboard → Crypto)", () => {
-    const json = JSON.stringify(DashboardSidebar({ connectedDevice: "x" }));
-    expect(json).toContain('"aria-current":"page"'); // exactly the active item
+    expect(JSON.stringify(DashboardSidebar({ connectedDevice: "x" }))).toContain('"aria-current":"page"');
   });
 });
