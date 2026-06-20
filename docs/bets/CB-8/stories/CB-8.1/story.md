@@ -2,7 +2,7 @@
 id: CB-8.1
 bet: CB-8
 type: story
-status: ready
+status: shipped
 priority: P2
 created: 2026-06-20
 author: PM
@@ -59,7 +59,7 @@ UI story — load-bearing.
 - Mobile off-canvas drawer + hamburger (CB-8.2). Per-page content-width pass (CB-8.3). Any route/content change beyond the three added nav icons.
 
 ## PRs
-_Auto-populated._
+- #107 — desktop sidebar collapse/expand (cookie-based, server-rendered shell state). Merged 2026-06-20. Codex clean (after the localStorage→cookie BLOCKER resolution).
 
 ## Tests
 _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-mode recipe / #80)._
@@ -84,4 +84,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-8/brief.md. **SECOND CB-8 STORY — desktop collapse/expand (the "minimize the left bar" ask). Next: 8.2 mobile drawer · 8.3 per-page width pass.**_
+_Story closed: 2026-06-20 (PR #107, shipped), brief: docs/bets/CB-8/brief.md. **SECOND CB-8 STORY — desktop collapse/expand (the "minimize the left bar" ask), shipped. Next: 8.2 mobile drawer · 8.3 per-page width pass.**_

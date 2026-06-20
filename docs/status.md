@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-20 (**CB-8.0 SHIPPED (PR #105); CB-8.1 `ready`** — left-sidebar dashboard nav. CB-8.1 (SECOND story): desktop collapse/expand (the "minimize the left bar" ask) → icon-only rail reclaiming content width, persisted in localStorage + applied pre-paint via a no-flash `<html>` script (per architecture); adds icons to all 6 nav items. Docked (≥768) affordance. Next: `/build CB-8.1`, then 8.2 mobile drawer · 8.3 per-page width pass. CB-6 done. Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7; #80.)_
+_Last updated: 2026-06-20 (**CB-8.0 SHIPPED (PR #105); CB-8.1 SHIPPED (PR #107)** — left-sidebar dashboard nav. CB-8.1: desktop collapse/expand (the "minimize the left bar" ask) → icon-only rail reclaiming content width. Persistence is a **cookie**, server-rendered onto `.dashboard-shell` (Codex BLOCKER ×2: localStorage + pre-paint `<html>` script could not satisfy "no hydration mismatch" — the architecture was corrected to a server-readable cookie; genuinely no flash/mismatch). Adds icons to all 6 nav items. Docked (≥768) affordance. Next: 8.2 mobile drawer · 8.3 per-page width pass. CB-6 done. Operator-side: LIVE_MODE flip; /scan CB-6 Production-Ready; CB-7; #80.)_
 
 ## In flight
 
