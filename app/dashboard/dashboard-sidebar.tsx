@@ -11,6 +11,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { JSX } from "react";
 
+import { DrawerCloseButton } from "./mobile-nav";
 import { SidebarToggle } from "./sidebar-toggle";
 import { SignOutClient } from "./sign-out-client";
 
@@ -97,11 +98,13 @@ export function DashboardSidebar({
   const pathname = usePathname() ?? "/dashboard";
   const active = activeNavKey(pathname);
   return (
-    <aside className="dashboard-sidebar" style={innerStyle}>
+    <aside id="dashboard-drawer" className="dashboard-sidebar" style={innerStyle}>
       <div style={headerStyle}>
         <span className="sidebar-title" style={titleStyle}>
           crypto-bot
         </span>
+        {/* ✕ mobile-only (drawer); collapse toggle desktop-only — both CSS-gated. */}
+        <DrawerCloseButton />
         <SidebarToggle initialCollapsed={collapsed} />
       </div>
       <nav aria-label="Primary" style={navStyle}>

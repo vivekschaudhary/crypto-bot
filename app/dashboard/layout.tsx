@@ -12,6 +12,7 @@ import type { JSX } from "react";
 import { db } from "@/lib/db/client";
 
 import { DashboardSidebar } from "./dashboard-sidebar";
+import { MobileNav } from "./mobile-nav";
 import { COLLAPSE_COOKIE, parseCollapsed } from "./sidebar-state";
 
 type CredRow = { device_label: string | null };
@@ -47,8 +48,13 @@ export default async function DashboardLayout({
 
   return (
     <div className="dashboard-shell" data-sidebar-collapsed={collapsed ? "" : undefined}>
-      <DashboardSidebar connectedDevice={connectedDevice} collapsed={collapsed} />
-      <main className="dashboard-content">{children}</main>
+      {/* MobileNav (client) renders the mobile top bar + scrim around the shell
+          content and owns the off-canvas drawer open-state (<768). It returns a
+          fragment, so the sidebar + main stay direct flex children of the shell. */}
+      <MobileNav>
+        <DashboardSidebar connectedDevice={connectedDevice} collapsed={collapsed} />
+        <main className="dashboard-content">{children}</main>
+      </MobileNav>
     </div>
   );
 }
