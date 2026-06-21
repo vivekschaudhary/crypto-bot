@@ -229,9 +229,9 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
       page.getByRole("heading", { name: `${slashPair(held.pair)} Trading Bot` }),
     ).toBeVisible();
     await expect(page.getByLabel("Pair")).toHaveValue(held.pair);
-    await expect(page.getByRole("link", { name: "📊 Mutual Funds" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "📈 Equity" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "🤖 Crypto" })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "Mutual Funds" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Equity" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Crypto" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -466,12 +466,12 @@ test("cockpit loads, run-now/filters/status flows work, unevaluated pair degrade
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "View decision trace →" })).toBeVisible();
 
-    await page.getByRole("link", { name: "📈 Equity" }).click();
+    await page.getByRole("link", { name: "Equity" }).click();
     await expect(page).toHaveURL(/\/dashboard\/equity$/);
     await expect(page.getByText("Equity trading is coming soon.")).toBeVisible();
     await expect(page.getByRole("link", { name: "← Back to Crypto" })).toBeVisible();
 
-    await page.getByRole("link", { name: "📊 Mutual Funds" }).click();
+    await page.getByRole("link", { name: "Mutual Funds" }).click();
     await expect(page).toHaveURL(/\/dashboard\/mutual-funds$/);
     await expect(page.getByText("Mutual funds are coming soon.")).toBeVisible();
     await expect(page.getByRole("link", { name: "← Back to Crypto" })).toBeVisible();
