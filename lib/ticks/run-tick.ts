@@ -50,6 +50,7 @@ import {
   emitTickTrace,
   sanitizeErrorDetail,
 } from "@/lib/ticks/trace";
+import { formatOrderFailureAlert, formatTickErrorAlert, sendAlert } from "@/lib/ops/alert";
 
 // CB-4.0 Decisions #2/#3: ONE_HOUR granularity; 65-bar look-back.
 const LOOKBACK_BARS = 65;
@@ -271,6 +272,23 @@ export async function runBotTick({ source }: { source: RunTickSource }): Promise
       liveMode,
     });
 
+    // CB-6.8 — alert the operator on any FAILED live order (dry-run rows are
+    // status "dry_run", never "failed", so this never fires while dark). Placement
+    // already happened inside buildOrderRows; sendAlert is env-gated + never throws.
+    for (const r of orderRows) {
+      if (r.status === "failed") {
+        await sendAlert(
+          formatOrderFailureAlert({
+            source: source === "manual" ? "run-now" : "bot",
+            asset: r.assetIdentifier,
+            side: r.side,
+            amountUsd: r.amount,
+            reason: r.errorDetail,
+          }),
+        );
+      }
+    }
+
     const tickId = ulid();
     const signalRows: SignalRowInsert[] = decisions.map((d) => {
       const s = perAssetSignals.get(d.asset.identifier);
@@ -350,6 +368,9 @@ export async function runBotTick({ source }: { source: RunTickSource }): Promise
       });
     }
     emitTickTrace({ liveMode, durationMs: Date.now() - startedMs, error: message });
+    // CB-6.8 — alert on a top-level tick failure (per-asset placement failures
+    // are already alerted above). Env-gated + never throws.
+    await sendAlert(formatTickErrorAlert(message));
     return { kind: "error", message, liveMode };
   }
 }

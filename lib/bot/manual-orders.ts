@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { ulid } from "ulidx";
 
 import { getAccountTradeHistory } from "@/lib/coinbase/accounts";
+import { formatOrderFailureAlert, sendAlert } from "@/lib/ops/alert";
 import { getProduct } from "@/lib/coinbase/market";
 import { placeOrder } from "@/lib/coinbase/orders";
 import { db } from "@/lib/db/client";
@@ -151,6 +152,16 @@ async function placeAndRecord(args: {
   if (status === "submitted") {
     return { ok: true, status, side: args.side, amountUsd: args.amountUsd };
   }
+  // CB-6.8 — alert the operator on a failed live manual order (env-gated; never throws).
+  await sendAlert(
+    formatOrderFailureAlert({
+      source: "manual",
+      asset: args.asset,
+      side: args.side,
+      amountUsd: args.amountUsd,
+      reason: errorDetail,
+    }),
+  );
   return { ok: false, reason: "placement-failed" };
 }
 
