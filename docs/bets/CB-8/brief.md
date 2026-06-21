@@ -107,6 +107,16 @@ Plus: the breakpoint set (mobile/tablet/laptop/desktop), the collapse-state mech
 - [2026-06-19] [PM] **Identity = device label, not email.** The app does not store user email; the sidebar footer reuses the existing `device_label`. — area: scope — alternatives: add email storage (rejected for now) — reversibility: easy.
 - [2026-06-19] [PM] **CB-8 (not CB-7).** CB-7 stays reserved for equity/Zerodha. — area: planning — reversibility: easy.
 
+#### Scan suppressions (2026-06-21 — operator risk-acceptance; HITL-approved)
+
+Triage of the first `/scan CB-8` (Production-Ready). The substantive Build finding (unexecuted e2e) was **resolved, not suppressed** — `e2e/dashboard/sidebar-shell.spec.ts` ran green on the test DB 2026-06-21 (prod verified untouched: `auth_credentials=1`). The four Production-Ready Criticals + on-call are **suppressed** below; the shared rationale is that **CB-8 is pure presentation chrome** — no backend, endpoint, migration, data store, money path, or new vendor dependency — so it has **no independent operational surface to runbook / SLO / monitor / roll back**. Genuine operability for the dashboard lives on **CB-6** (the cockpit + real-money surface) and is authored there as part of the `LIVE_MODE` flip ceremony.
+
+- [2026-06-21] [Operator] **SUPPRESS PROD_READY-01 (runbook missing) — Critical.** CB-8 adds no operational controls (collapse/drawer/width are self-evident UI with no order/data failure mode). Risk accepted; any responsive-shell operability note rolls into the CB-6 runbook. — area: production-readiness — reversibility: easy (re-fires on next scan if not addressed).
+- [2026-06-21] [Operator] **SUPPRESS PROD_READY-02 (SLO undefined) — Critical.** CB-8 has no independent SLI; its availability == dashboard SSR availability, covered by the CB-6 cockpit SLO. Risk accepted. — area: production-readiness — reversibility: easy.
+- [2026-06-21] [Operator] **SUPPRESS PROD_READY-03 (monitoring not wired) — Critical.** CB-8 introduces no new server surface/endpoint/error class; responsive correctness is guarded by the per-breakpoint e2e (now executed green). Risk accepted. — area: production-readiness — reversibility: easy.
+- [2026-06-21] [Operator] **SUPPRESS PROD_READY-04 (rollback untested) — Critical.** CB-8 is purely additive frontend — no migration/schema/data change; rollback = redeploy the prior build, no data orphaning (a stale `sidebar-collapsed` cookie is harmless + ignored by the old build). Risk accepted. — area: production-readiness — reversibility: easy.
+- [2026-06-21] [Operator] **SUPPRESS PROD_READY-05 (on-call unprepared) — High.** Single-operator; CB-8 has no alerting surface or operational procedure to ack; on-call readiness is the CB-6 cockpit runbook ack. Risk accepted. — area: production-readiness — reversibility: easy.
+
 ### Risks
 
 - [2026-06-19] [PM] **New styling convention** in a pure-inline-styles codebase — sets precedent — likelihood: low (with arch review) — impact: high — mitigation: the architecture phase pins the approach (global CSS recommended) — area: architecture.
@@ -117,6 +127,7 @@ Plus: the breakpoint set (mobile/tablet/laptop/desktop), the collapse-state mech
 ### Issues
 
 - [2026-06-21] [Scanner] **Production-Ready scan — 6 open findings (4 Critical / 2 High).** First `/scan CB-8` at the Build→Production-Ready boundary. Critical: runbook / SLO / monitoring / rollback absent (PROD_READY-01/02/03/04). High: e2e authored-but-unexecuted (#80, BUILD-03); on-call ack absent (PROD_READY-05). **All four Production-Ready Criticals are owner-suppression candidates** — CB-8 is pure frontend chrome (no backend / migration / data store / money path / new vendor dep), so it has no independent operational surface; operability rolls into the CB-6 cockpit runbook/SLO. The one substantive finding is the unexecuted e2e (shared with CB-6 under #80). Full report: [scan-report.md](scan-report.md). — severity: critical (findings) — owner: PM/operator (triage: suppress-with-rationale vs. resolve) — area: production-readiness.
+  - **[2026-06-21] RESOLVED/TRIAGED.** e2e executed green (BUILD-03 resolved — `sidebar-shell.spec.ts`, 1 passed/15.4s, prod untouched); the 4 Production-Ready Criticals + on-call suppressed (operator risk-acceptance Decisions above). Net open findings: **0**. `blocking_advance: false`.
 
 ## Research findings
 

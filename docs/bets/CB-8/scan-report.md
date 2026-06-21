@@ -7,12 +7,12 @@ current_phase: Production Ready
 scanned_at: 2026-06-21 18:22 UTC
 scanner_version: 1
 open_findings:
-  critical: 4
-  high: 2
+  critical: 0
+  high: 0
   medium: 0
   low: 0
-suppressed_findings: 0
-blocking_advance: true
+suppressed_findings: 5
+blocking_advance: false
 ---
 
 # Scan Report — CB-8 (Responsive left-sidebar dashboard navigation)
@@ -23,10 +23,11 @@ blocking_advance: true
 
 ## Summary
 
-- **Open findings:** 6 total (4 critical · 2 high · 0 medium · 0 low)
-- **Suppressed:** 0
-- **Blocking phase advance:** **yes** — strict mode + open Criticals in the Production Ready phase. (Informational: phase transitions are operator status-flips; nothing auto-blocks. The flag signals "production-readiness ops artifacts are absent.")
-- **Top pattern:** the bet shipped cleanly through Product → Architecture → Build (4 stories, full Codex review on every PR, 3 Codex BLOCKER rounds all closed, Codex-authored e2e per story), but **no Production-Ready ops artifacts exist** (no runbook, SLO, wired monitoring, or rollback-test record) and the **committed e2e suite has never been executed** (issue #80). **Crucially, CB-8 is pure frontend chrome** — no backend, no migration, no new data store, no money path, no new vendor dependency — so every Production-Ready Critical here is a **strong owner-suppression candidate** (the bet has no independent runtime/operational surface; it rides the dashboard the cockpit bet CB-6 owns). The substantive production-readiness work belongs to **CB-6** (the real-money surface) — see `docs/bets/CB-6/scan-report.md`.
+- **Open findings:** 0 (all triaged 2026-06-21 — see below)
+- **Suppressed:** 5 (4 Production-Ready Criticals + on-call; operator risk-acceptance, recorded in `brief.md` DRI)
+- **Resolved:** 1 — the unexecuted-e2e Build finding (BUILD-03): `e2e/dashboard/sidebar-shell.spec.ts` ran **green** on the test DB 2026-06-21 (prod verified untouched).
+- **Blocking phase advance:** no (the only Criticals were the four operational-artifact absences, suppressed with rationale).
+- **Top pattern:** the bet shipped cleanly through Product → Architecture → Build (4 stories, full Codex review on every PR, 3 Codex BLOCKER rounds all closed, Codex-authored e2e per story, now **executed green**). **CB-8 is pure frontend chrome** — no backend, no migration, no new data store, no money path, no new vendor dependency — so every Production-Ready Critical was a **valid owner-suppression** (the bet has no independent runtime/operational surface; it rides the dashboard the cockpit bet CB-6 owns). The substantive production-readiness work belongs to **CB-6** (the real-money surface) — see `docs/bets/CB-6/scan-report.md`.
 
 ## Findings by phase
 
@@ -42,16 +43,16 @@ _No open findings._ `architecture.md` is `approved` with a clear decision (globa
 
 ### Build
 
-#### [HIGH] E2E authored but never executed (coverage unverified)
+#### [RESOLVED] E2E authored but never executed (coverage now verified)
 
 - **Phase:** Build
-- **Severity:** High
+- **Severity:** High → **RESOLVED 2026-06-21**
 - **Confidence:** High
-- **Location:** `e2e/dashboard/sidebar-shell.spec.ts`; issue #80; CB-8.0–8.3 story close-lines ("local e2e EXECUTION deferred under #80")
-- **Reason:** Codex authored + committed the shell/nav/collapse/drawer/width-pass e2e for every CB-8 story (and CI **typechecks + lints** it), but CI does **not** run Playwright and the suite has **never been executed** against the test DB (issue #80: the Next-16 two-`next dev` lock). So the AC user-flows have authored-but-**unverified** e2e coverage. → High confidence (documented in #80 + the story close-lines; CI config confirms e2e is not in the pipeline). Lower *consequence* than CB-6's equivalent finding — CB-8 is non-money UI chrome, and the width/collapse/drawer assertions are computed-style/geometry checks unlikely to silently rot.
-- **Fix:** Run `sidebar-shell.spec.ts` once via the documented external-server recipe (`PLAYWRIGHT_SKIP_WEB_SERVER=1 PLAYWRIGHT_EXTERNAL_DB_OK=1` + one `next dev` on the test DB on :5433 — see `e2e/README.md`). Then resolve #80 so the full suite runs in CI.
+- **Location:** `e2e/dashboard/sidebar-shell.spec.ts`
+- **Reason (original):** Codex authored + committed the shell/nav/collapse/drawer/width-pass e2e for every CB-8 story (CI typechecks + lints it), but CI does not run Playwright and the suite had **never been executed** (issue #80: the Next-16 two-`next dev` lock).
+- **Resolution:** Ran `sidebar-shell.spec.ts` via the documented external-server recipe (`PLAYWRIGHT_SKIP_WEB_SERVER=1 PLAYWRIGHT_EXTERNAL_DB_OK=1` + one `next dev` on the test DB :5433) on **2026-06-21 — 1 passed (15.4s)**. Covers all 6 routes × 320/375/768/1280 (no h-scroll + padding + width caps + centering), collapse-reclaim, mobile drawer, and the close-paths/focus/regression suite. Prod verified untouched (`auth_credentials=1`). The broader #80 fix (two `next start` in CI) remains tracked separately — this finding is about CB-8 coverage being *verified*, which it now is.
 - **Applies to bet types:** feature
-- **Suppressible:** Yes (DRI justification required).
+- **Suppressible:** n/a (resolved).
 
 _Other Build checks pass:_ BUILD-01/02 (every story shipped with unit + component tests; **925** in the suite; pure render-test seams preserved per the SidebarToggle/MobileTopBar pattern) · BUILD-04 (no open PRs / zero open review BLOCKERs — 3 Codex BLOCKER rounds across 8.1/8.2 all closed) · BUILD-06 (Codex architect-compliance on every PR; the 8.1 hydration BLOCKER drove an architecture correction) · BUILD-07 (no perf budget defined → n/a). **BUILD-05 (security review) NOT triggered:** CB-8 adds no auth/PII/payments/secrets/external-input surface. It reads the pre-existing `x-session-user-id` convenience header (unchanged CB-1.4 pattern) and sets a **non-sensitive UI-preference cookie** (`sidebar-collapsed`, values `0`/`1`, `samesite=lax`, not an auth/session token). No new security surface → security review correctly not required.
 
@@ -126,15 +127,23 @@ _Phase not yet active._ CB-8 is `shipped` and live in prod (it deployed on each 
 
 ## Suppressed findings
 
-_No suppressions._
+All suppressions are operator risk-acceptances (HITL-approved 2026-06-21), recorded as Decisions in `docs/bets/CB-8/brief.md#DRI`. Shared rationale: CB-8 is pure presentation chrome with no independent operational surface; operability lives on CB-6.
+
+| Finding | Severity | Suppressed by | Date | Rationale | DRI link |
+|---------|----------|---------------|------|-----------|----------|
+| PROD_READY-01 Runbook missing | Critical | Operator | 2026-06-21 | No operational controls (collapse/drawer/width are self-evident UI); operability rolls into CB-6 runbook | `docs/bets/CB-8/brief.md#DRI` |
+| PROD_READY-02 SLO undefined | Critical | Operator | 2026-06-21 | No independent SLI; availability == dashboard SSR, covered by CB-6 SLO | `docs/bets/CB-8/brief.md#DRI` |
+| PROD_READY-03 Monitoring not wired | Critical | Operator | 2026-06-21 | No new server surface/endpoint; responsive correctness guarded by the per-breakpoint e2e (now green) | `docs/bets/CB-8/brief.md#DRI` |
+| PROD_READY-04 Rollback untested | Critical | Operator | 2026-06-21 | Additive frontend, no migration/data change; rollback = redeploy prior build, no orphaning | `docs/bets/CB-8/brief.md#DRI` |
+| PROD_READY-05 On-call unprepared | High | Operator | 2026-06-21 | Single-operator; no CB-8 alerting/procedure surface; on-call == CB-6 runbook ack | `docs/bets/CB-8/brief.md#DRI` |
 
 ## Owner actions
 
 Choose one (and reflect the decision in the bet's DRI):
 
 - [ ] **Resolve all open findings before advancing** (heavy for a UI-chrome bet)
-- [ ] **Suppress the 4 Production-Ready Criticals + on-call as "UI-chrome, no independent operational surface"** (recommended — requires HITL approval + a one-time risk-acceptance DRI entry on the brief; the rationale is in each finding's Fix)
-- [ ] **Close the one substantive finding (unexecuted e2e) + suppress the rest** (recommended-plus — run `sidebar-shell.spec.ts` once via the external-server recipe, then suppress the ops Criticals)
+- [ ] **Suppress the 4 Production-Ready Criticals + on-call as "UI-chrome, no independent operational surface"**
+- [x] **Close the one substantive finding (unexecuted e2e) + suppress the rest** ✅ **CHOSEN 2026-06-21** — ran `sidebar-shell.spec.ts` green (BUILD-03 resolved); suppressed the 4 ops Criticals + on-call with operator risk-acceptance (DRI Decisions in `brief.md`).
 
 **Scanner's note (informational, not a decision):** unlike CB-6, none of CB-8's Production-Ready Criticals gate real money — CB-8 ships no money path. The only finding with real signal is the **unexecuted e2e** (shared with CB-6 under issue #80); the four ops Criticals are artifact-absence findings on a bet that has no independent operational surface to document. The clean path is to **suppress them with the per-finding rationale** and roll any genuinely-needed operability note into the **CB-6 runbook/SLO** when those are authored as part of the `LIVE_MODE` flip ceremony.
 
@@ -143,6 +152,7 @@ Choose one (and reflect the decision in the bet's DRI):
 | Date | Version | Open (C / H / M / L) | Suppressed | Blocking | Triggered by |
 |------|---------|----------------------|------------|----------|--------------|
 | 2026-06-21 18:22 | 1 | 4 / 2 / 0 / 0 | 0 | yes | `/scan CB-8` |
+| 2026-06-21 18:40 | 1 (triaged) | 0 / 0 / 0 / 0 | 5 | no | operator triage (e2e run green → BUILD-03 resolved; 4 PR Criticals + on-call suppressed) |
 
 ---
 
