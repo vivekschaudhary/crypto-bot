@@ -137,6 +137,7 @@ _Populated automatically by `/measure` cron._
 ### Issues
 
 - [2026-06-16] [PM] **Per-pair vs portfolio model + real-money-overrides-in-scope + STOPPED semantics** — severity: medium — owner: operator — status: **RESOLVED 2026-06-16** (per-pair view; real-money built paper-while-dark; Stop=alias for paused — see Decisions) — area: scope/architecture.
+- [2026-06-21] [Scanner] **Production-Ready re-scan v2 — 7 open findings (4 Critical / 2 High / 1 Medium); blocking.** 4 Criticals (runbook/SLO/monitoring/rollback absent) are **real money-surface gates** for the `LIVE_MODE` flip ceremony (NOT suppression candidates, unlike CB-8). **NEW this scan:** the **cockpit e2e is RED on `main`** — a fresh 2026-06-21 run failed because CB-8's sidebar nav made the icons `aria-hidden`, so the links' accessible names are now `Crypto`/`Equity`/`Mutual Funds`, breaking the cockpit spec's stale `🤖 Crypto`/`📈 Equity`/`📊 Mutual Funds` assertions ([cockpit.spec.ts:232-234](../../../e2e/dashboard/cockpit.spec.ts)). Cross-bet drift, undetected because the spec isn't in CI (#80). Cockpit itself renders fine; 3-string fix (Codex-owned). Runs are also fragile (credential-count `unstable_cache`). Full report: [scan-report.md](scan-report.md). — severity: critical (findings) — owner: PM/operator (resolve as flip ceremony) + Codex (fix the e2e nav names) — area: production-readiness.
 
 ---
 
