@@ -32,9 +32,50 @@ const NAV_ITEMS = [
   { label: "Ledger", href: "/dashboard/ledger", heading: "Transaction ledger" },
 ] as const;
 
+const WIDTH_PASS_ROUTES = [
+  { href: "/dashboard", maxWidth: 960 },
+  { href: "/dashboard/equity", maxWidth: 960 },
+  { href: "/dashboard/mutual-funds", maxWidth: 960 },
+  { href: "/dashboard/strategy", maxWidth: 640 },
+  { href: "/dashboard/trace", maxWidth: 960 },
+  { href: "/dashboard/ledger", maxWidth: 960 },
+] as const;
+
+const WIDTH_PASS_VIEWPORTS = [
+  { width: 320, expectedPadding: 16 },
+  { width: 375, expectedPadding: 16 },
+  { width: 768, expectedPadding: 32 },
+  { width: 1280, expectedPadding: 32 },
+] as const;
+
+async function measureWidthPassLayout(page: Parameters<typeof addVirtualAuthenticator>[0]) {
+  return page.evaluate(() => {
+    const root = document.documentElement;
+    const content = document.querySelector<HTMLElement>(".dashboard-content");
+    const pageRoot = content?.firstElementChild;
+    if (!content || !(pageRoot instanceof HTMLElement)) throw new Error("dashboard content shell missing");
+
+    const contentRect = content.getBoundingClientRect();
+    const pageRect = pageRoot.getBoundingClientRect();
+    const contentStyles = window.getComputedStyle(content);
+    return {
+      clientWidth: root.clientWidth,
+      scrollWidth: root.scrollWidth,
+      contentWidth: Math.round(contentRect.width),
+      pageWidth: Math.round(pageRect.width),
+      pageLeftGap: Math.round(pageRect.left - contentRect.left),
+      pageRightGap: Math.round(contentRect.right - pageRect.right),
+      paddingLeft: parseFloat(contentStyles.paddingLeft),
+      paddingRight: parseFloat(contentStyles.paddingRight),
+      paddingTop: parseFloat(contentStyles.paddingTop),
+    };
+  });
+}
+
 test("CB-8.0/8.1/8.2 Phase 3: sidebar nav + collapse/expand + mobile drawer behavior", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   const auth = await onboard(page);
 
   try {
@@ -217,6 +258,46 @@ test("CB-8.0/8.1/8.2 Phase 3: sidebar nav + collapse/expand + mobile drawer beha
     await expect(page.locator(".drawer-scrim")).toBeHidden();
     await expect(page.getByRole("complementary").getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
 
+    for (const viewport of WIDTH_PASS_VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: 900 });
+
+      for (const route of WIDTH_PASS_ROUTES) {
+        await page.goto(route.href, { waitUntil: "domcontentloaded" });
+        const layout = await measureWidthPassLayout(page);
+
+        expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
+        expect(layout.paddingLeft).toBe(viewport.expectedPadding);
+        expect(layout.paddingRight).toBe(viewport.expectedPadding);
+        expect(layout.paddingTop).toBe(viewport.expectedPadding);
+        expect(layout.pageWidth).toBeLessThanOrEqual(route.maxWidth);
+        expect(layout.pageWidth).toBeLessThanOrEqual(
+          layout.contentWidth - viewport.expectedPadding * 2,
+        );
+
+        const spareWidth = layout.contentWidth - layout.pageWidth;
+        if (spareWidth > 8) {
+          expect(Math.abs(layout.pageLeftGap - layout.pageRightGap)).toBeLessThanOrEqual(2);
+        }
+      }
+    }
+
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const widthPassExpanded = await measureWidthPassLayout(page);
+    await page.getByRole("complementary").getByRole("button", { name: "Collapse sidebar" }).click();
+    const widthPassCollapsed = await measureWidthPassLayout(page);
+    expect(widthPassCollapsed.contentWidth).toBeGreaterThan(widthPassExpanded.contentWidth);
+    expect(Math.abs(widthPassCollapsed.pageLeftGap - widthPassCollapsed.pageRightGap)).toBeLessThanOrEqual(2);
+
+    await page.goto("/dashboard/strategy", { waitUntil: "domcontentloaded" });
+    await page.setViewportSize({ width: 375, height: 900 });
+    await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
+    const widthPassMobile = await measureWidthPassLayout(page);
+    expect(widthPassMobile.scrollWidth).toBeLessThanOrEqual(widthPassMobile.clientWidth);
+    expect(widthPassMobile.paddingLeft).toBe(16);
+
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await page.setViewportSize({ width: 1280, height: 900 });
     await sidebar.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
     await expect(page.getByRole("link", { name: "Set up your passkey" })).toBeVisible();
