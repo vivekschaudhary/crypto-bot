@@ -1,7 +1,7 @@
 ---
 id: CB-8
 type: feature
-status: approved
+status: shipped
 priority: P2
 parent: FOUNDATION-PRODUCT
 portfolio_stub: false
@@ -89,14 +89,14 @@ Plus: the breakpoint set (mobile/tablet/laptop/desktop), the collapse-state mech
 - Whether trace/ledger become top-level sidebar items (changes `dashboard-tabs.tsx:activeTab()` logic).
 - Per-page `maxWidth` (960/640) pass under a sidebar — which pages need width adjustment.
 
-## Stories (forecast — decomposed one at a time via `/create-story CB-8` after architecture)
+## Stories (actual — adaptive; the forecast renumbered as slices merged)
 
-- **CB-8.0** styling layer (global CSS + breakpoints) + viewport meta + shell scaffold (flex `[sidebar | content]`).
-- **CB-8.1** sidebar nav + active-route highlight (replaces the top tabs).
-- **CB-8.2** desktop collapse/expand + persistence.
-- **CB-8.3** mobile drawer + hamburger.
-- **CB-8.4** per-page content-width pass (relax the 960/640 assumptions).
-  _Forecast only._
+- **CB-8.0** ✅ SHIPPED (PR #105) — styling layer (global CSS + breakpoints) + viewport meta + shell scaffold (flex `[sidebar | content]`) **+ sidebar nav + active-route highlight** (folded the forecast's 8.1 in).
+- **CB-8.1** ✅ SHIPPED (PR #107) — desktop collapse/expand + persistence (cookie, server-rendered shell state after a Codex hydration BLOCKER → architecture corrected localStorage→cookie).
+- **CB-8.2** ✅ SHIPPED (PR #108) — mobile off-canvas drawer + hamburger.
+- **CB-8.3** ✅ SHIPPED (PR #109) — per-page content-width pass (shell owns padding; pages keep 960/640 widths).
+
+**CB-8 BET COMPLETE 2026-06-21 — all 4 stories shipped.** Responsive left-sidebar dashboard nav across mobile/iPad/laptop/desktop, with desktop collapse + mobile drawer. Next: `/scan CB-8` (Build → Production-Ready).
 
 ## DRI Log
 

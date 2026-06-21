@@ -2,7 +2,7 @@
 id: CB-8.3
 bet: CB-8
 type: story
-status: in-review
+status: shipped
 priority: P2
 created: 2026-06-20
 author: PM
@@ -58,7 +58,7 @@ Layout-only story (no new UI/copy/flows).
 - The public landing (`app/page.tsx`). Any card/data/logic/copy change. A shared `<Card>`/`<Page>` primitive / design-system refactor (possible later bet). New routes.
 
 ## PRs
-- #109 — per-page content-width pass. Open 2026-06-20; awaiting Codex review + Phase-3 e2e.
+- #109 — per-page content-width pass (+ Codex width-pass e2e: all 6 routes × 320/375/768/1280). Merged 2026-06-21. Codex clean (after the 1-BLOCKER round: missing width-pass e2e → Codex authored it).
 
 ## Tests
 _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-mode recipe / #80)._
@@ -78,4 +78,4 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-
 _None at story creation._
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-8/brief.md. **FINAL CB-8 STORY — per-page content-width pass. On ship: CB-8 BET COMPLETE → `/scan CB-8` (Build → Production-Ready).**_
+_Story closed: 2026-06-21 (PR #109, shipped), brief: docs/bets/CB-8/brief.md. **FINAL CB-8 STORY — per-page content-width pass, shipped → CB-8 BET COMPLETE. Next: `/scan CB-8` (Build → Production-Ready).**_
