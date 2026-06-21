@@ -7,7 +7,7 @@ current_phase: Production Ready
 scanned_at: 2026-06-21 19:30 UTC
 scanner_version: 1
 open_findings:
-  critical: 4
+  critical: 2
   high: 1
   medium: 1
   low: 0
@@ -23,8 +23,9 @@ blocking_advance: true
 
 ## Summary
 
-- **Open findings:** 6 total (4 critical · 1 high · 1 medium · 0 low)
-- **Resolved this scan:** the cockpit e2e (BUILD-03) — Codex fixed the stale nav-name assertions for CB-8; **re-ran green 2026-06-21 (1 passed/13.0s)**, prod untouched. The 4 Production-Ready Criticals + on-call + cost remain open (the flip-ceremony work).
+- **Open findings:** 4 total (2 critical · 1 high · 1 medium · 0 low)
+- **Resolved this scan:** (a) cockpit e2e (BUILD-03) — Codex fixed the stale nav-name assertions for CB-8; re-ran green 2026-06-21 (1 passed/13.0s). (b) **PROD_READY-01 (runbook)** — authored `docs/bets/CB-6/runbook.md` (cockpit map, controls, diagnostics, emergency halt, flip ceremony, rollback). (c) **PROD_READY-02 (SLO)** — authored `docs/bets/CB-6/slo.md` (7 SLIs + targets + error budgets + alert thresholds).
+- **Remaining (flip-ceremony):** 2 Critical — **monitoring not wired** (the SLO defines the alert set; the wiring is pending) + **rollback untested** (procedure documented in the runbook §8; a test run + DRI log is pending). Plus High **on-call** (now unblocked — runbook exists; awaiting the operator's ack-date DRI entry) + Medium **cost**.
 - **Suppressed:** 0
 - **Blocking phase advance:** **yes** — strict mode + open Criticals in the Production Ready phase. (Informational: phase transitions are operator status-flips; nothing auto-blocks. The flag signals "production-readiness ops artifacts are absent.")
 - **Changed since v1 (2026-06-18):** (a) **CB-6.7 shipped** (PR #100) — paper-aware cockpit P&L + Current Position, adding **migration 0008** (`orders.base_quantity`, additive/nullable; applied to prod 2026-06-19 + Reset Session done). (b) **The cockpit e2e was freshly executed 2026-06-21 and is now RED on `main`** — CB-8's sidebar nav redesign (icons `aria-hidden`) changed the nav links' accessible names, breaking the cockpit spec's stale `"📈 Equity"`/`"🤖 Crypto"`/`"📊 Mutual Funds"` assertions (it expects the old top-tab combined names). **This is a real cross-bet regression in the e2e, undetected because the spec isn't in CI (#80).** See BUILD-03 below.
@@ -63,23 +64,27 @@ _Other Build checks pass:_ BUILD-01/02 (every story incl. CB-6.7 shipped with un
 
 > **These are real gates, not artifact-absence noise.** CB-6 owns the operator's real-money controls (Run Now + Manual Overrides Buy/Sell). Post-`LIVE_MODE`-flip they place real Coinbase orders. The four Criticals below are the production-readiness work of the **flip ceremony** — recommend authoring (not suppressing) before going live.
 
-#### [CRITICAL] Runbook missing
+#### [RESOLVED] Runbook missing
+
+> **RESOLVED 2026-06-21** — authored `docs/bets/CB-6/runbook.md`: cockpit map, controls reference, cron tick, 3 diagnostic flows (failed order / stuck bot / wrong P&L), emergency halt, the `LIVE_MODE` flip ceremony (with the KR-1 guardrail checklist), and the rollback procedure. Operator review pending.
 
 - **Phase:** Production Ready
-- **Severity:** Critical
+- **Severity:** Critical → **RESOLVED**
 - **Confidence:** High
-- **Location:** `docs/bets/CB-6/runbook.md` (absent)
+- **Location:** `docs/bets/CB-6/runbook.md` (authored)
 - **Reason:** No runbook for the cockpit operator surface — the highest-consequence controls (real-money Manual Overrides, Run Now) place real orders post-flip, and there's no documented procedure for reading the cockpit, responding to a failed/stuck order, the `LIVE_MODE` flip steps, or halting (Pause/Stop) a misbehaving override. → High confidence (file absent).
 - **Fix:** Author `docs/bets/CB-6/runbook.md`: cockpit section meanings; how to use Start/Pause/Stop/Run Now + Manual Overrides; how to read a `failed` order in the Trade Log; the `LIVE_MODE` flip procedure (the ≥60-dry-run guardrail); the paper-vs-real P&L modes (CB-6.7); emergency-halt steps.
 - **Applies to bet types:** all except continuous-improvement
 - **Suppressible:** Yes (DRI) — not recommended (money surface).
 
-#### [CRITICAL] SLO undefined
+#### [RESOLVED] SLO undefined
+
+> **RESOLVED 2026-06-21** — authored `docs/bets/CB-6/slo.md`: 7 SLIs (cockpit availability · tick reliability · run-now success · safe-override success · real-money order placement · order-intent fidelity / KR-1 flip gate · Coinbase rate-limit headroom) each with target, 30-day error budget, and alert threshold. Operator review pending.
 
 - **Phase:** Production Ready
-- **Severity:** Critical
+- **Severity:** Critical → **RESOLVED**
 - **Confidence:** High
-- **Location:** `docs/bets/CB-6/slo.md` (absent)
+- **Location:** `docs/bets/CB-6/slo.md` (authored)
 - **Reason:** No SLO for the cockpit (SSR availability) or the authenticated mutation endpoints (`/api/run-now`, the real-money `/api/bot/override` kinds) — no SLI / target / error budget / alert thresholds. CB-4's ≥99% tick-reliability metric doesn't cover the cockpit or override/run-now success rates. → High confidence (file absent).
 - **Fix:** Define `docs/bets/CB-6/slo.md`: cockpit availability; override/run-now success rate + latency; (post-flip) real-order placement success SLI; error-budget + alert thresholds.
 - **Applies to bet types:** all except continuous-improvement
@@ -160,6 +165,7 @@ Choose one (and reflect the decision in the bet's DRI):
 | 2026-06-18 22:31 | 1 | 4 / 2 / 1 / 0 | 0 | yes | `/scan CB-6` |
 | 2026-06-21 19:30 | 2 | 4 / 2 / 1 / 0 | 0 | yes | `/scan CB-6` (CB-6.7+0008 noted; cockpit e2e found RED on main — CB-8 nav drift) |
 | 2026-06-21 19:45 | 2 (updated) | 4 / 1 / 1 / 0 | 0 | yes | cockpit e2e fixed (Codex, `e6e5109`) + re-run green → BUILD-03 resolved |
+| 2026-06-21 20:05 | 2 (updated) | 2 / 1 / 1 / 0 | 0 | yes | runbook.md + slo.md authored → PROD_READY-01/02 resolved; remaining: monitoring-wiring + rollback-test (Crit), on-call ack (High), cost (Med) |
 
 ---
 
