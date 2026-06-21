@@ -8,7 +8,7 @@ scanned_at: 2026-06-21 19:30 UTC
 scanner_version: 1
 open_findings:
   critical: 4
-  high: 2
+  high: 1
   medium: 1
   low: 0
 suppressed_findings: 0
@@ -23,7 +23,8 @@ blocking_advance: true
 
 ## Summary
 
-- **Open findings:** 7 total (4 critical · 2 high · 1 medium · 0 low)
+- **Open findings:** 6 total (4 critical · 1 high · 1 medium · 0 low)
+- **Resolved this scan:** the cockpit e2e (BUILD-03) — Codex fixed the stale nav-name assertions for CB-8; **re-ran green 2026-06-21 (1 passed/13.0s)**, prod untouched. The 4 Production-Ready Criticals + on-call + cost remain open (the flip-ceremony work).
 - **Suppressed:** 0
 - **Blocking phase advance:** **yes** — strict mode + open Criticals in the Production Ready phase. (Informational: phase transitions are operator status-flips; nothing auto-blocks. The flag signals "production-readiness ops artifacts are absent.")
 - **Changed since v1 (2026-06-18):** (a) **CB-6.7 shipped** (PR #100) — paper-aware cockpit P&L + Current Position, adding **migration 0008** (`orders.base_quantity`, additive/nullable; applied to prod 2026-06-19 + Reset Session done). (b) **The cockpit e2e was freshly executed 2026-06-21 and is now RED on `main`** — CB-8's sidebar nav redesign (icons `aria-hidden`) changed the nav links' accessible names, breaking the cockpit spec's stale `"📈 Equity"`/`"🤖 Crypto"`/`"📊 Mutual Funds"` assertions (it expects the old top-tab combined names). **This is a real cross-bet regression in the e2e, undetected because the spec isn't in CI (#80).** See BUILD-03 below.
@@ -43,11 +44,13 @@ _No open findings._ `architecture_required: auto` was resolved to story-level ar
 
 ### Build
 
-#### [HIGH] Cockpit e2e RED on main (CB-8 nav drift) + fragile to run (was: never executed)
+#### [RESOLVED] Cockpit e2e RED on main (CB-8 nav drift) — fixed + re-run green
+
+> **RESOLVED 2026-06-21.** Codex updated the 3 stale nav-name assertions to the CB-8 accessible names (`Crypto`/`Equity`/`Mutual Funds`, dropping the emoji — the icons are now `aria-hidden`). Re-ran the cockpit spec via the external-server recipe on a clean test DB → **1 passed / 13.0s**; prod verified untouched (`auth_credentials=1`). Committed `e6e5109` (`test:` prefix). _Residual (not blocking): runs remain fragile via the credential-count `unstable_cache` — needs a pre-truncate or a cache-invalidation fix; folded into the #80 follow-up. The two-`next start` CI wiring (#80) is still open so this won't auto-catch the next cross-bet drift._
 
 - **Phase:** Build
-- **Severity:** High
-- **Confidence:** High (reproduced 2026-06-21)
+- **Severity:** High → **RESOLVED**
+- **Confidence:** High (reproduced RED, then GREEN after fix, 2026-06-21)
 - **Location:** `e2e/dashboard/cockpit.spec.ts:232-234`; `app/dashboard/dashboard-sidebar.tsx:120` (`nav-icon aria-hidden`); issue #80
 - **Reason:** The cockpit spec was documented green on 2026-06-19, but a **fresh run on 2026-06-21 fails**: CB-8's sidebar nav makes the emoji icons `aria-hidden="true"`, so the nav links' accessible names are now `"Crypto"`/`"Equity"`/`"Mutual Funds"` — the spec still asserts the **old top-tab combined names** `"🤖 Crypto"`/`"📈 Equity"`/`"📊 Mutual Funds"` (`getByRole("link", { name: "📈 Equity" })`). The cockpit itself renders fine (setup journey + per-pair heading + pair selector all passed); only the stale nav-name assertions fail. **The drift was invisible because the cockpit spec isn't in CI** (#80: the two-`next dev` lock). Separately, runs are **fragile**: a first attempt failed at the setup-journey landing page (the `unstable_cache` credential-count gotcha — a stale non-zero count from a prior spec run in the same session; fixed only by pre-truncating the test DB before server start). → High confidence (both failures reproduced this scan).
 - **Fix:** (1) Update the 3 stale nav-name assertions in `cockpit.spec.ts` to the CB-8 accessible names (drop the emoji: `"Equity"`, `"Crypto"`, `"Mutual Funds"`) — Codex-owned e2e. (2) Resolve #80 (two `next start` in CI) so cross-bet nav/chrome drift is caught automatically. (3) Harden the recipe against the credential-count cache (invalidate `getCredentialCount`'s `unstable_cache` on `resetAllTables`, or document the pre-truncate step). Re-run the **real-money override + Run Now flows green before the `LIVE_MODE` flip.**
@@ -156,6 +159,7 @@ Choose one (and reflect the decision in the bet's DRI):
 |------|---------|----------------------|------------|----------|--------------|
 | 2026-06-18 22:31 | 1 | 4 / 2 / 1 / 0 | 0 | yes | `/scan CB-6` |
 | 2026-06-21 19:30 | 2 | 4 / 2 / 1 / 0 | 0 | yes | `/scan CB-6` (CB-6.7+0008 noted; cockpit e2e found RED on main — CB-8 nav drift) |
+| 2026-06-21 19:45 | 2 (updated) | 4 / 1 / 1 / 0 | 0 | yes | cockpit e2e fixed (Codex, `e6e5109`) + re-run green → BUILD-03 resolved |
 
 ---
 
