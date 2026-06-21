@@ -116,7 +116,7 @@ Plus: the breakpoint set (mobile/tablet/laptop/desktop), the collapse-state mech
 
 ### Issues
 
-_None at brief creation._
+- [2026-06-21] [Scanner] **Production-Ready scan — 6 open findings (4 Critical / 2 High).** First `/scan CB-8` at the Build→Production-Ready boundary. Critical: runbook / SLO / monitoring / rollback absent (PROD_READY-01/02/03/04). High: e2e authored-but-unexecuted (#80, BUILD-03); on-call ack absent (PROD_READY-05). **All four Production-Ready Criticals are owner-suppression candidates** — CB-8 is pure frontend chrome (no backend / migration / data store / money path / new vendor dep), so it has no independent operational surface; operability rolls into the CB-6 cockpit runbook/SLO. The one substantive finding is the unexecuted e2e (shared with CB-6 under #80). Full report: [scan-report.md](scan-report.md). — severity: critical (findings) — owner: PM/operator (triage: suppress-with-rationale vs. resolve) — area: production-readiness.
 
 ## Research findings
 
