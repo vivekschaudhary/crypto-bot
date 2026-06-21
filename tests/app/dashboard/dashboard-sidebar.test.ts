@@ -12,6 +12,9 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
 vi.mock("next/link", () => ({ default: (props: { children?: unknown }) => props.children }));
 vi.mock("@/app/dashboard/sign-out-client", () => ({ SignOutClient: () => null }));
 vi.mock("@/app/dashboard/sidebar-toggle", () => ({ SidebarToggle: () => null }));
+// CB-8.2 — DrawerCloseButton uses useContext (hooks) → mock it so the sidebar
+// stays render-testable (same treatment as SidebarToggle/SignOutClient).
+vi.mock("@/app/dashboard/mobile-nav", () => ({ DrawerCloseButton: () => null }));
 
 import { activeNavKey, DashboardSidebar } from "@/app/dashboard/dashboard-sidebar";
 
@@ -49,6 +52,8 @@ describe("DashboardSidebar render", () => {
     expect(json).toContain('"href":"/dashboard"');
     expect(json).toContain('"href":"/dashboard/ledger"');
     expect(json).toContain("Connected device: Vivek's Mac"); // footer device label
+    expect(json).toContain('"id":"dashboard-drawer"'); // CB-8.2 — aria-controls target for the hamburger
+    expect(json).toContain('"aria-label":"Sidebar"'); // CB-8.2 — labeled region (drawer accessible identity)
   });
   it("marks the active route (pathname=/dashboard → Crypto)", () => {
     expect(JSON.stringify(DashboardSidebar({ connectedDevice: "x" }))).toContain('"aria-current":"page"');

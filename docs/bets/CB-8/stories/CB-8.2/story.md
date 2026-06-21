@@ -2,7 +2,7 @@
 id: CB-8.2
 bet: CB-8
 type: story
-status: ready
+status: in-review
 priority: P2
 created: 2026-06-20
 author: PM
@@ -60,7 +60,7 @@ UI story — load-bearing.
 - Per-page content-width pass (CB-8.3 — relax 960/640 `maxWidth`). No nav-item/route change. No swipe-to-open gesture (tap-only). Desktop collapse (CB-8.1) untouched.
 
 ## PRs
-_Auto-populated._
+- #108 — mobile off-canvas drawer + hamburger. Open 2026-06-20; awaiting Codex review + Phase-3 e2e.
 
 ## Tests
 _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-mode recipe / #80)._
@@ -78,6 +78,8 @@ _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-
 - [2026-06-20] [Engineer] **Focus trap / scroll-lock correctness** (accessible drawer is fiddly) — likelihood: medium — impact: medium — mitigation: standard dialog pattern; e2e asserts focus move-in/return + Esc; keep the controller small + tested — area: a11y.
 - [2026-06-20] [Engineer] **Drawer state stranded on resize** (open on mobile → resize to desktop) — likelihood: low — impact: low — mitigation: `data-drawer-open` is inert `≥768` (desktop rules win); e2e covers the desktop viewport — area: correctness.
 - [2026-06-20] [Engineer] **Breaking DashboardSidebar render-testability** by adding hooks — likelihood: medium — impact: low — mitigation: extract the drawer hooks into a client controller (SidebarToggle precedent); the no-hooks invariant is an AC-8 check — area: testability.
+
+- [2026-06-20] [Engineer] **Codex BLOCKER ×2 closed (PR #108).** (1) **Drawer accessible identity (AC 6):** the `<aside id="dashboard-drawer">` had no accessible name → added `aria-label="Sidebar"` (a labeled complementary region — Codex's endorsed "labeled region" option; static so it stays correct in both docked + drawer modes without coupling the render-testable sidebar to state). (2) **Scroll-lock / shell-attr leak (AC 5/6):** the open-effect set `body.overflow:hidden` + `data-drawer-open` but its cleanup only removed the keydown listener → a resize-to-desktop or unmount-while-open could leave the page scroll-locked. Fixed: the effect now early-returns when closed and its cleanup ALWAYS restores both the attr and `body.overflow` (covers close, resize, AND unmount); added a `matchMedia("(min-width: 768px)")` listener that closes the drawer when crossing to desktop. — area: a11y/correctness — reversibility: easy.
 
 ### Issues
 _None at story creation._

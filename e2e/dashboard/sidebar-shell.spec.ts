@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   { label: "Ledger", href: "/dashboard/ledger", heading: "Transaction ledger" },
 ] as const;
 
-test("CB-8.0/8.1 Phase 3: sidebar nav + collapse/expand + mobile behavior", async ({
+test("CB-8.0/8.1/8.2 Phase 3: sidebar nav + collapse/expand + mobile drawer behavior", async ({
   page,
 }) => {
   const auth = await onboard(page);
@@ -44,7 +44,7 @@ test("CB-8.0/8.1 Phase 3: sidebar nav + collapse/expand + mobile behavior", asyn
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await expect(nav).toBeVisible();
-    await expect(page.getByText("crypto-bot")).toBeVisible();
+    await expect(sidebar.locator(".sidebar-title")).toBeVisible();
     await expect(sidebar.getByText(/^Connected device:/)).toBeVisible();
     await expect(sidebar.getByRole("button", { name: "Sign out" })).toBeVisible();
     await expect(toggle).toBeVisible();
@@ -157,9 +157,16 @@ test("CB-8.0/8.1 Phase 3: sidebar nav + collapse/expand + mobile behavior", asyn
     expect(expandedAgain.contentWidth).toBeLessThan(collapsed.contentWidth);
 
     await page.setViewportSize({ width: 375, height: 900 });
-    await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
-    await expect(page.getByRole("complementary").getByRole("button", { name: "Collapse sidebar" })).toBeHidden();
-    const overflow = await page.evaluate(() => {
+    const mobileSidebar = page.getByRole("complementary");
+    const hamburger = page.getByRole("button", { name: "Open menu" });
+    const closeButton = page.getByRole("button", { name: "Close menu" });
+
+    await expect(page.locator(".dashboard-topbar .topbar-title")).toBeVisible();
+    await expect(hamburger).toBeVisible();
+    await expect(hamburger).toHaveAttribute("aria-expanded", "false");
+    await expect(mobileSidebar.getByRole("button", { name: "Collapse sidebar" })).toBeHidden();
+
+    const overflowClosed = await page.evaluate(() => {
       const root = document.documentElement;
       const sidebarEl = document.querySelector<HTMLElement>(".dashboard-sidebar");
       if (!sidebarEl) throw new Error("mobile sidebar missing");
@@ -169,8 +176,46 @@ test("CB-8.0/8.1 Phase 3: sidebar nav + collapse/expand + mobile behavior", asyn
         sidebarWidth: Math.round(sidebarEl.getBoundingClientRect().width),
       };
     });
-    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
-    expect(overflow.sidebarWidth).toBeGreaterThan(200);
+    expect(overflowClosed.scrollWidth).toBeLessThanOrEqual(overflowClosed.clientWidth);
+    expect(overflowClosed.sidebarWidth).toBeGreaterThan(200);
+
+    await hamburger.click();
+    await expect(page.locator(".dashboard-shell")).toHaveAttribute("data-drawer-open", "");
+    await expect(hamburger).toHaveAttribute("aria-expanded", "true");
+    await expect(closeButton).toBeFocused();
+    await expect.poll(async () => page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".dashboard-shell")).not.toHaveAttribute("data-drawer-open", "");
+    await expect(hamburger).toHaveAttribute("aria-expanded", "false");
+    await expect(hamburger).toBeFocused();
+    await expect.poll(async () => page.evaluate(() => document.body.style.overflow)).toBe("");
+
+    await hamburger.click();
+    await expect(page.locator(".dashboard-shell")).toHaveAttribute("data-drawer-open", "");
+    await expect(closeButton).toBeFocused();
+    await closeButton.click();
+    await expect(page.locator(".dashboard-shell")).not.toHaveAttribute("data-drawer-open", "");
+    await expect(hamburger).toBeFocused();
+
+    await hamburger.click();
+    await expect(page.locator(".dashboard-shell")).toHaveAttribute("data-drawer-open", "");
+    await page.locator(".drawer-scrim").click();
+    await expect(page.locator(".dashboard-shell")).not.toHaveAttribute("data-drawer-open", "");
+    await expect(hamburger).toBeFocused();
+
+    await hamburger.click();
+    await expect(page.locator(".dashboard-shell")).toHaveAttribute("data-drawer-open", "");
+    await mobileSidebar.getByRole("link", { name: "Decision trace" }).click();
+    await expect(page).toHaveURL("/dashboard/trace");
+    await expect(page.locator(".dashboard-shell")).not.toHaveAttribute("data-drawer-open", "");
+    await expect(hamburger).toHaveAttribute("aria-expanded", "false");
+
+    await page.goto("/dashboard");
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(hamburger).toBeHidden();
+    await expect(page.locator(".drawer-scrim")).toBeHidden();
+    await expect(page.getByRole("complementary").getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
 
     await sidebar.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });

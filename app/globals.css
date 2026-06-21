@@ -35,23 +35,103 @@ body {
   min-width: 0; /* let content shrink instead of forcing horizontal scroll */
 }
 
-/* Mobile (<768): stack — sidebar block on top, content below. No horizontal scroll.
-   (The off-canvas drawer is CB-8.2.) */
+/* CB-8.2 — drawer chrome (mobile top bar, ✕, scrim) is mobile-only: hidden by
+   default (docked ≥768), revealed inside the <768 media query below. */
+.dashboard-topbar,
+.drawer-scrim,
+.drawer-close {
+  display: none;
+}
+
+.drawer-hamburger {
+  border: 1px solid #ddd;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0.25rem 0.6rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+.topbar-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #222;
+}
+
+/* Mobile (<768): off-canvas drawer + hamburger (CB-8.2). The sidebar leaves the
+   flow (position: fixed) and slides in over the content when the shell carries
+   `data-drawer-open` (set by MobileNav); a scrim dims the content behind. No
+   horizontal scroll in either state. */
 @media (max-width: 767px) {
   .dashboard-shell {
     flex-direction: column;
     min-height: auto;
   }
 
-  .dashboard-sidebar {
-    width: 100%;
-    border-right: none;
+  /* Top bar: hamburger + app title — the only nav affordance while closed. */
+  .dashboard-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
     border-bottom: 1px solid #eee;
   }
 
-  /* Collapse is a docked (≥768) affordance; the mobile drawer is CB-8.2. */
+  /* Sidebar → off-canvas drawer. Fixed (out of flow) + translated off-screen. */
+  .dashboard-sidebar {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    width: 80vw;
+    max-width: 320px;
+    border-right: 1px solid #eee;
+    border-bottom: none;
+    background: #fff;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 50;
+    overflow-y: auto;
+  }
+  .dashboard-shell[data-drawer-open] .dashboard-sidebar {
+    transform: translateX(0);
+  }
+
+  /* Scrim behind the open drawer (click closes; Esc for keyboard). */
+  .drawer-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 40;
+  }
+  .dashboard-shell[data-drawer-open] .drawer-scrim {
+    display: block;
+  }
+
+  /* ✕ close button, in the drawer header. */
+  .drawer-close {
+    display: inline-block;
+    border: 1px solid #ddd;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1;
+  }
+  .drawer-close::after {
+    content: "✕";
+  }
+
+  /* Collapse is a docked (≥768) affordance — hidden on mobile. */
   .sidebar-toggle {
     display: none;
+  }
+}
+
+/* Reduced motion: no slide. */
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-sidebar {
+    transition: none;
   }
 }
 
