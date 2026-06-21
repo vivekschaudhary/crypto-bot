@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 const pageStyle: React.CSSProperties = {
   fontFamily: "system-ui, sans-serif",
-  padding: "2rem",
+  // CB-8.3 — padding now owned by .dashboard-content (shell); width + centering stay per page.
   maxWidth: 960,
   margin: "0 auto",
 };

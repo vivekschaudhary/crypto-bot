@@ -33,6 +33,7 @@ body {
 .dashboard-content {
   flex: 1;
   min-width: 0; /* let content shrink instead of forcing horizontal scroll */
+  padding: 2rem; /* CB-8.3 — shell owns page padding (was duplicated per page); 1rem on mobile below */
 }
 
 /* CB-8.2 — drawer chrome (mobile top bar, ✕, scrim) is mobile-only: hidden by
@@ -66,6 +67,11 @@ body {
   .dashboard-shell {
     flex-direction: column;
     min-height: auto;
+  }
+
+  /* CB-8.3 — lighter padding on phones (reclaims width). */
+  .dashboard-content {
+    padding: 1rem;
   }
 
   /* Top bar: hamburger + app title — the only nav affordance while closed. */

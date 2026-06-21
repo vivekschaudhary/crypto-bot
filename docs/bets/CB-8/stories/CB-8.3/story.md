@@ -2,7 +2,7 @@
 id: CB-8.3
 bet: CB-8
 type: story
-status: ready
+status: in-review
 priority: P2
 created: 2026-06-20
 author: PM
@@ -58,7 +58,7 @@ Layout-only story (no new UI/copy/flows).
 - The public landing (`app/page.tsx`). Any card/data/logic/copy change. A shared `<Card>`/`<Page>` primitive / design-system refactor (possible later bet). New routes.
 
 ## PRs
-_Auto-populated._
+- #109 — per-page content-width pass. Open 2026-06-20; awaiting Codex review + Phase-3 e2e.
 
 ## Tests
 _Unit/component co-located; e2e by Codex in `e2e/dashboard/` (test DB; external-mode recipe / #80)._

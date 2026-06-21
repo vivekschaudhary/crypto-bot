@@ -100,7 +100,7 @@ const COINBASE_ASSET_CLASS = "crypto-coinbase";
 
 const pageStyle: React.CSSProperties = {
   fontFamily: "system-ui, sans-serif",
-  padding: "2rem",
+  // CB-8.3 — padding now owned by .dashboard-content (shell); narrower form width stays per page.
   maxWidth: 640,
   margin: "0 auto",
 };
