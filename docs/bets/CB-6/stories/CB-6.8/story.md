@@ -2,7 +2,7 @@
 id: CB-6.8
 bet: CB-6
 type: story
-status: ready
+status: in-review
 priority: P1
 created: 2026-06-21
 author: PM
@@ -56,7 +56,7 @@ Backend/observability story — no UI surface.
 - Tick-gap (missed-cron) detection — the app can't self-detect a cron that didn't fire; that's an external dead-man's-switch / Vercel cron monitor (documented in `slo.md`, operator infra). 5xx-endpoint alerts (the failed-order + tick-error alerts cover the money path; route 5xx is a later add). No success/"order submitted" confirmations (failures only, minimal scope). No UI.
 
 ## PRs
-_Auto-populated._
+- #110 — operator alerting via Telegram. Open 2026-06-21; awaiting Codex code + security review.
 
 ## Tests
 _Unit co-located; no e2e (outbound alert; covered by unit + the existing cockpit e2e for order paths)._
