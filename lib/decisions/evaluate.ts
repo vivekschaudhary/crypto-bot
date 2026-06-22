@@ -81,16 +81,30 @@ import type {
 export const MIN_SELLABLE_POSITION_USD = 1;
 
 /**
+ * Markers that uniquely identify EVERY `hold` reason `evaluateExit()` emits — i.e.
+ * a position was OPEN at decision time. Enumerated here, co-located with the
+ * reasons in evaluateExit below; the test "isOpenPositionHold — covers every
+ * evaluateExit hold path" pins exhaustiveness (drives each path through
+ * evaluate() and asserts classification), so a new exit hold reason that forgets
+ * to extend this list fails CI. Note: `"position open"` does NOT false-match the
+ * FLAT reason "...but no open position..." (word order differs).
+ */
+const OPEN_POSITION_HOLD_MARKERS = [
+  "position open", // rsi<=exit (no exit signal) + rsi>exit-but-profit<min
+  "cost basis is zero", // avgCostUsd === 0 (position likely closed concurrently)
+  "profit computation produced NaN", // non-finite profit
+  "unexpected null currentPosition", // defensive narrow in evaluateExit
+] as const;
+
+/**
  * True when a `hold` reason was produced for an OPEN (real) position — vs a flat
  * / dust / no-buy-signal hold. The cockpit uses this to choose HOLDING vs
  * WAITING TO BUY from the PERSISTED signal alone (DB-only; NO Coinbase re-read),
  * so the display stays consistent with the engine's signal-time decision and is
  * never rewritten by a transient account-fetch failure (CB-6.3 DB-only contract).
- * Must stay in sync with evaluateExit's open-position hold reasons below
- * (prefix `hold: position open`).
  */
 export function isOpenPositionHold(reason: string): boolean {
-  return reason.startsWith("hold: position open");
+  return OPEN_POSITION_HOLD_MARKERS.some((marker) => reason.includes(marker));
 }
 
 /**
