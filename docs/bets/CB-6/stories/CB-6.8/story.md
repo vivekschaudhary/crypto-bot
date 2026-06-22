@@ -73,7 +73,7 @@ _Unit co-located; no e2e (outbound alert; covered by unit + the existing cockpit
 - [2026-06-21] [Security] **Secret/PII egress to Telegram** — likelihood: low — impact: high — mitigation: send only sanitized order metadata (asset/side/amount/reason via `sanitizeErrorDetail`); token never logged; mandatory Security Reviewer (AC 8) — area: security.
 
 ### Issues
-_None at story creation._
+- [2026-06-21] [Engineer] **Codex BLOCKER closed — hook-site tests added (AC 6).** Round-1 shipped only the `alert.ts` unit tests (formatters + `sendAlert` gating/payload/swallow); AC 6 also required proving the bot + manual failure branches actually call `sendAlert` and dry-run stays silent. Added: `run-tick.test.ts` (+4 — a DECLINING candle series produces a buy → LIVE placement failure fires `sendAlert`; dark dry_run + LIVE submitted do NOT; top-level tick error fires the tick-error alert) and `manual-orders.test.ts` (+3 — LIVE failed manual order fires; dry_run + submitted do not). 940 tests green. — severity: high (closed) — owner: Engineer — area: testing.
 
 ---
 _Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **POST-SHIP — closes scan PROD_READY-03 (monitoring) for the LIVE_MODE flip ceremony. Reopens CB-6.**_

@@ -38,6 +38,14 @@ vi.mock("@/lib/coinbase/orders", () => ({ placeOrder: (a: unknown) => placeOrder
 let liveModeMock = false;
 vi.mock("@/lib/env", () => ({ env: () => ({ CRON_SECRET: "test-secret", LIVE_MODE: liveModeMock }) }));
 
+// CB-6.8 — alerting hook. Spy on sendAlert; formatters are passthroughs.
+const sendAlert = vi.fn();
+vi.mock("@/lib/ops/alert", () => ({
+  sendAlert: (t: unknown) => sendAlert(t),
+  formatOrderFailureAlert: () => "ORDER_ALERT",
+  formatTickErrorAlert: () => "TICK_ALERT",
+}));
+
 import { runBotTick } from "@/lib/ticks/run-tick";
 
 const BTC = { assetClass: "crypto-coinbase", identifier: "BTC-USD" };
@@ -72,6 +80,8 @@ function makeCandles(closesOldestFirst: number[]): Candle[] {
 }
 
 const FLAT_30 = Array(30).fill(100) as number[]; // RSI=50 → hold (no order)
+// Strictly declining → RSI≈0 (< entry threshold 30) → BUY decision (an order is built).
+const DECLINING_30 = Array.from({ length: 30 }, (_, i) => 200 - i * 3) as number[];
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -136,5 +146,42 @@ describe("runBotTick — result kinds", () => {
     // best-effort error row written for the audit trail
     const errorRow = insertTickWithDecisions.mock.calls.at(-1)?.[0] as { reason: string };
     expect(errorRow.reason).toBe("tick_error");
+  });
+});
+
+describe("CB-6.8 — failed-order + tick-error alerting (hook site)", () => {
+  it("LIVE + a placement FAILURE on a buy → sendAlert fires", async () => {
+    liveModeMock = true;
+    getProductCandles.mockResolvedValue(makeCandles(DECLINING_30)); // RSI≈0 → buy
+    placeOrder.mockResolvedValue({ success: false, error_response: { message: "rejected" } });
+    const r = await runBotTick({ source: "cron" });
+    expect(r.kind).toBe("ran");
+    expect(placeOrder).toHaveBeenCalled();
+    expect(sendAlert).toHaveBeenCalled();
+  });
+
+  it("dark (LIVE_MODE=false) dry_run buy → placeOrder + sendAlert NOT called", async () => {
+    liveModeMock = false;
+    getProductCandles.mockResolvedValue(makeCandles(DECLINING_30)); // buy decision, but paper
+    const r = await runBotTick({ source: "cron" });
+    expect(r.kind).toBe("ran");
+    expect(placeOrder).not.toHaveBeenCalled();
+    expect(sendAlert).not.toHaveBeenCalled();
+  });
+
+  it("LIVE + a SUBMITTED (success) buy → sendAlert NOT called (success path)", async () => {
+    liveModeMock = true;
+    getProductCandles.mockResolvedValue(makeCandles(DECLINING_30));
+    placeOrder.mockResolvedValue({ success: true, success_response: { order_id: "cb-1" } });
+    await runBotTick({ source: "cron" });
+    expect(placeOrder).toHaveBeenCalled();
+    expect(sendAlert).not.toHaveBeenCalled();
+  });
+
+  it("top-level tick error → sendAlert fires (tick-error alert, AC 3)", async () => {
+    getStrategyById.mockResolvedValue(null); // FK anomaly → throws → outer catch
+    const r = await runBotTick({ source: "cron" });
+    expect(r.kind).toBe("error");
+    expect(sendAlert).toHaveBeenCalled();
   });
 });
