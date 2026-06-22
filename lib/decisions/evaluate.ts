@@ -69,6 +69,17 @@ import type {
   SessionTotals,
 } from "./types";
 
+// DUST FLOOR (fix 2026-06-22). A residual balance worth less than this is NOT a
+// tradeable position: Coinbase rejects sub-~$1 NOTIONAL orders, so a tiny dust
+// holding made the bot emit an endless loop of FAILED sells once live (observed
+// on an ETH dust balance ≈ $0.00002 — RSI overbought + "profit" met → "sell 90%"
+// → below-minimum order → failed, every tick). Below the floor we treat the
+// position as FLAT: never sell it, and stay eligible to buy (a real dip rebuilds
+// a position). Pure-function constant — the exact per-product Coinbase minimum is
+// not threaded into this pure engine by design; $1 is a safe conservative floor
+// (DCA position sizes are >> $1). Shared with the cockpit Next-Action display.
+export const MIN_SELLABLE_POSITION_USD = 1;
+
 /**
  * Build the operator's decision per asset in `strategy.selected_assets`,
  * given pre-computed per-asset signals + session totals.
@@ -133,10 +144,20 @@ function evaluateAsset(
   }
 
   // Bonus Engineer DRI Decision: `currentPosition.quantity === 0` is
-  // semantically equivalent to "no position" — defends against malformed
-  // caller state. Coalesce here.
-  const hasPosition =
-    signal.currentPosition !== null && signal.currentPosition.quantity > 0;
+  // semantically equivalent to "no position". DUST FIX (2026-06-22): also treat
+  // a sub-$1 (MIN_SELLABLE_POSITION_USD) residual as flat — it is not exitable
+  // (Coinbase rejects the sub-minimum sell → endless failed orders) and the bot
+  // should stay eligible to buy. `isDust` is surfaced in the no-position reason
+  // for audit honesty.
+  const rawPosition = signal.currentPosition;
+  const hasRawPosition = rawPosition !== null && rawPosition.quantity > 0;
+  // Only apply the dust floor when the price is FINITE (so we can value the
+  // position). With a non-finite lastClose we keep the position "real" so
+  // evaluateExit owns the NaN/zero-cost-basis edge paths + their audit reasons.
+  const lastCloseFinite = Number.isFinite(signal.lastClose);
+  const positionValueUsd = hasRawPosition && lastCloseFinite ? rawPosition.quantity * signal.lastClose : 0;
+  const isDust = hasRawPosition && lastCloseFinite && positionValueUsd < MIN_SELLABLE_POSITION_USD;
+  const hasPosition = hasRawPosition && !isDust;
 
   if (hasPosition) {
     // Position exists → evaluate exit rules.
@@ -163,9 +184,12 @@ function evaluateAsset(
   // RSI half was checked).
   const rsi = signal.rsi as number; // non-null per insufficient-data guard above
   if (rsi > strategy.exit_rules.rsiThreshold) {
+    const posNote = isDust
+      ? `position is dust ($${positionValueUsd.toFixed(2)} < $${MIN_SELLABLE_POSITION_USD.toFixed(2)} min sellable, not exitable)`
+      : "no open position";
     return holdResult(
       asset,
-      `hold: exit rsi condition met (rsi=${rsi.toFixed(2)} > exit_threshold=${strategy.exit_rules.rsiThreshold}) but no open position at ${asset.identifier}`,
+      `hold: exit rsi condition met (rsi=${rsi.toFixed(2)} > exit_threshold=${strategy.exit_rules.rsiThreshold}) but ${posNote} at ${asset.identifier}`,
     );
   }
 

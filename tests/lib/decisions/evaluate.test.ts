@@ -654,3 +654,42 @@ describe("evaluate — reason-string contract (AC 9 + Engineer DRI Decision #1)"
     expect(result?.reason).toContain("entry_threshold=30");
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────
+// Dust floor (fix 2026-06-22) — a sub-$1 residual is treated as FLAT.
+// Regression for the live failed-sell loop: an ETH dust balance (~$0.00002)
+// with RSI overbought + "profit" met produced "sell 90%" → sub-minimum order →
+// failed, every tick. Must now → hold (not exitable) + eligible to buy.
+// ──────────────────────────────────────────────────────────────────────────
+describe("evaluate — dust floor (sub-$1 position treated as flat)", () => {
+  const BTC_ID = "BTC-USD";
+
+  it("DUST + overbought + profit → hold (NOT sell); reason names dust", () => {
+    // value = 0.00000001 * 42000 = $0.00042 (< $1 floor)
+    const signals = makeSignals([
+      [BTC_ID, makeSignal({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.00000001, avgCostUsd: 40000 } })],
+    ]);
+    const [r] = evaluate(makeStrategy(), signals, ZERO_TOTALS);
+    expect(r?.decision).toBe("hold"); // load-bearing: NOT a sell
+    expect(r?.reason).toContain("dust");
+    expect(r?.reason).toContain("not exitable");
+    expect(r?.sizing).toBeUndefined(); // no sell sizing emitted
+  });
+
+  it("REAL position (>= $1) + overbought + profit → sell (no regression)", () => {
+    // value = 0.01 * 42000 = $420 (>= $1); profit (42000 vs 40000) = 5% >= 1.5
+    const signals = makeSignals([
+      [BTC_ID, makeSignal({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.01, avgCostUsd: 40000 } })],
+    ]);
+    const [r] = evaluate(makeStrategy(), signals, ZERO_TOTALS);
+    expect(r?.decision).toBe("sell");
+  });
+
+  it("DUST + oversold (rsi < entry) → BUY (dust is flat → eligible to enter)", () => {
+    const signals = makeSignals([
+      [BTC_ID, makeSignal({ rsi: 25, ma: 42000, lastClose: 41800, currentPosition: { quantity: 0.00000001, avgCostUsd: 40000 } })],
+    ]);
+    const [r] = evaluate(makeStrategy(), signals, ZERO_TOTALS);
+    expect(r?.decision).toBe("buy");
+  });
+});

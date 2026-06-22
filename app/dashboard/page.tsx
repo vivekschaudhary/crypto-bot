@@ -14,6 +14,7 @@ import { headers } from "next/headers";
 import type { JSX } from "react";
 
 import { loadCockpitPnl } from "@/lib/dashboard/cockpit-pnl";
+import { MIN_SELLABLE_POSITION_USD } from "@/lib/decisions/evaluate";
 import { loadCockpitPosition, resolveViewedPair } from "@/lib/dashboard/cockpit-position";
 import { loadCockpitSignals } from "@/lib/dashboard/cockpit-signals";
 import { loadCockpitTradeLog, parseTradeLogStatus } from "@/lib/dashboard/cockpit-trade-log";
@@ -159,6 +160,10 @@ export default async function DashboardPage(
         <div style={{ ...statusCardStyle, marginTop: "1rem" }}>
           <SignalsCard
             signal={cockpitSignals}
+            hasRealPosition={
+              (cockpitPosition?.position?.quantity ?? 0) * (cockpitSignals.lastClose ?? 0) >=
+              MIN_SELLABLE_POSITION_USD
+            }
             entryRsiThreshold={strategy.entry_rules.rsiThreshold}
             exitRsiThreshold={strategy.exit_rules.rsiThreshold}
             maPeriod={strategy.entry_rules.maPeriod}

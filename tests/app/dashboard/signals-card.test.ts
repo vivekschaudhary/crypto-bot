@@ -20,9 +20,15 @@ function sig(over: Partial<CockpitSignal> = {}): CockpitSignal {
     ...over,
   };
 }
-function render(signal: CockpitSignal, entry = 30, exit = 70, maPeriod = 20): string {
+function render(
+  signal: CockpitSignal,
+  entry = 30,
+  exit = 70,
+  maPeriod = 20,
+  hasRealPosition = true,
+): string {
   return JSON.stringify(
-    SignalsCard({ signal, entryRsiThreshold: entry, exitRsiThreshold: exit, maPeriod }),
+    SignalsCard({ signal, hasRealPosition, entryRsiThreshold: entry, exitRsiThreshold: exit, maPeriod }),
   );
 }
 
@@ -72,5 +78,43 @@ describe("SignalsCard", () => {
 
   it("buy decision → BUY badge", () => {
     expect(render(sig({ decision: "buy", reason: "buy $25 ETH-USD" }))).toContain("BUY");
+  });
+});
+
+// Next Action derivation (fix 2026-06-22): when FLAT (no real position) the
+// card never shows SELL — it shows a forward-looking buy-watch. A stale dust
+// sell decision is treated as flat too.
+describe("SignalsCard — Next Action when flat (no real position)", () => {
+  it("hold + flat → WAITING TO BUY with the entry condition + live RSI", () => {
+    const json = render(sig({ rsi: 71.5, decision: "hold", reason: "irrelevant raw reason" }), 30, 70, 20, false);
+    expect(json).toContain("WAITING TO BUY");
+    expect(json).toContain("Enters when RSI < 30");
+    expect(json).toContain("71.5");
+    expect(json).toContain("Overbought");
+    expect(json).not.toContain("SELL");
+  });
+
+  it("stale SELL decision + flat (dust/closed) → WAITING TO BUY, not SELL", () => {
+    const json = render(
+      sig({ rsi: 71.5, decision: "sell", reason: "sell: rsi=71.48 > exit_threshold=70 ...; sell 90%" }),
+      30,
+      70,
+      20,
+      false,
+    );
+    expect(json).toContain("WAITING TO BUY");
+    expect(json).not.toContain("sell 90%");
+  });
+
+  it("sell + REAL position → SELL (unchanged)", () => {
+    const json = render(sig({ rsi: 72, decision: "sell", reason: "sell 90% of position" }), 30, 70, 20, true);
+    expect(json).toContain("SELL");
+    expect(json).toContain("sell 90% of position");
+  });
+
+  it("hold + REAL position → HOLDING (reason verbatim)", () => {
+    const json = render(sig({ decision: "hold", reason: "position open + no exit signal" }), 30, 70, 20, true);
+    expect(json).toContain("HOLDING");
+    expect(json).toContain("position open + no exit signal");
   });
 });

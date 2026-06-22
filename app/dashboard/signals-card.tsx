@@ -61,17 +61,55 @@ function priceVsMa(lastClose: number, ma: number): { glyph: string; word: string
   return { glyph: "=", word: "At" };
 }
 
+/**
+ * Derive the operator-facing NEXT ACTION from the decision + whether a REAL
+ * (non-dust) position is held. Fix 2026-06-22: when flat (no real position),
+ * never show SELL — show a forward-looking buy-watch ("WAITING TO BUY · enters
+ * when RSI < entry"). A stored `sell` against a dust/closed position (no real
+ * holding) is treated as flat too, so a stale dust-sell renders correctly even
+ * before the next tick. `tone` picks the badge color. Pure — unit-tested.
+ */
+export function nextAction(
+  signal: Pick<CockpitSignal, "decision" | "rsi" | "reason">,
+  hasRealPosition: boolean,
+  entryRsiThreshold: number,
+  exitRsiThreshold: number,
+): { label: string; detail: string; tone: Decision } {
+  if (signal.decision === "buy") return { label: "BUY", detail: signal.reason, tone: "buy" };
+  if (signal.decision === "sell" && hasRealPosition) {
+    return { label: "SELL", detail: signal.reason, tone: "sell" };
+  }
+  // hold, or a sell with no real position (dust/stale):
+  if (hasRealPosition) {
+    // Real position, not selling → holding toward take-profit.
+    return { label: "HOLDING", detail: signal.reason, tone: "hold" };
+  }
+  // Flat (no position / dust) → buy-watch.
+  const zone =
+    signal.rsi === null
+      ? ""
+      : ` (currently ${signal.rsi.toFixed(1)}, ${rsiZone(signal.rsi, entryRsiThreshold, exitRsiThreshold)})`;
+  return {
+    label: "WAITING TO BUY",
+    detail: `Enters when RSI < ${entryRsiThreshold}${zone}`,
+    tone: "buy",
+  };
+}
+
 export function SignalsCard({
   signal,
+  hasRealPosition,
   entryRsiThreshold,
   exitRsiThreshold,
   maPeriod,
 }: {
   signal: CockpitSignal;
+  hasRealPosition: boolean;
   entryRsiThreshold: number;
   exitRsiThreshold: number;
   maPeriod: number;
 }): JSX.Element {
+  const action = nextAction(signal, hasRealPosition, entryRsiThreshold, exitRsiThreshold);
   const rsiCell =
     signal.rsi === null
       ? "—"
@@ -99,10 +137,8 @@ export function SignalsCard({
 
       <div style={{ marginTop: "0.75rem" }}>
         <div style={rowLabelStyle}>{COPY.nextAction}</div>
-        <span style={{ ...badgeStyle, color: decisionColor[signal.decision] }}>
-          {signal.decision.toUpperCase()}
-        </span>
-        <p style={reasonStyle}>{signal.reason}</p>
+        <span style={{ ...badgeStyle, color: decisionColor[action.tone] }}>{action.label}</span>
+        <p style={reasonStyle}>{action.detail}</p>
       </div>
     </section>
   );
