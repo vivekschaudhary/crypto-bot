@@ -127,6 +127,14 @@ _Populated automatically by `/measure` cron._
 - [2026-06-16] [PM] **Stop = alias for `paused` (operator-resolved); NO migration.** — rationale: avoids a `bot_sessions.status` schema change; the Start/Pause/Stop UI distinction is presentational/audit — area: data-model/ux — alternatives: distinct `stopped` state + migration (rejected by operator) — reversibility: easy.
 - [2026-06-16] [PM] **product.md amendment required (deferred to CB-7 promotion).** — rationale: the foundational bet is "Coinbase crypto DCA bot"; Crypto + Equity + Mutual Funds expands it to multi-asset/multi-market. CB-6 introduces only the shell (placeholders); the full vision amendment lands with CB-7 — area: product/foundation — reversibility: medium.
 
+#### Production-readiness — flip ceremony (2026-06-21)
+
+Closing the remaining `/scan CB-6` Production-Ready findings before the `LIVE_MODE` flip.
+
+- [2026-06-21] [Engineer/Ops] **Rollback TESTED — additive-safe (closes PROD_READY-04).** The only CB-6 schema change is migration 0008 (`orders.base_quantity`). Verified on the test DB: `base_quantity` is `nullable=YES`; a **pre-0008-shape `INSERT`** (full NOT-NULL column set — id/source/side/amount/status/asset_identifier — **without** `base_quantity`) **succeeded** (defaulted NULL); the pre-0008 `lib/ticks/db.ts` has **0** `base_quantity` references. ⇒ Rollback = redeploy the prior build; **no down-migration, no data orphaning** (a NULL `base_quantity` is invisible to the old build; manual orders persist as audit rows). Test method: SQL compat check against the 0008 schema (the precise rollback risk), 2026-06-21. — area: ops/rollback — reversibility: n/a (this IS the rollback verification).
+- [2026-06-21] [Operator] **On-call ack (closes PROD_READY-05).** Single-operator = on-call. Operator has read `docs/bets/CB-6/runbook.md` (cockpit map, controls, diagnostics, emergency halt, flip ceremony, rollback) and acks readiness to operate the real-money surface post-flip. _(Drafted for operator confirmation.)_ — area: ops/on-call — reversibility: easy.
+- [2026-06-21] [Engineer] **Monitoring (PROD_READY-03) — in progress via CB-6.8** (Telegram failed-order + tick-error alerts, PR #110). Tick-gap detection remains an external dead-man's-switch (operator infra; documented in `slo.md`). — area: observability — reversibility: easy.
+
 ### Risks
 
 - [2026-06-16] [PM] **Real-money override buttons now exist in the UI** (Buy/Sell 50%/Sell All) — likelihood: low — impact: HIGH (unintended real-money trade) — mitigation: dry-run while `LIVE_MODE=false`; operator-auth route (CB-1.5 pattern); reuse CB-4's LIVE_MODE gate (no bypass); Security Reviewer engagement; the always-visible live/paper state guardrail — area: security/real-money.

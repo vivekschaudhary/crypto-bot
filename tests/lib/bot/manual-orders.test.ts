@@ -40,6 +40,13 @@ vi.mock("@/lib/ticks/cost-basis", () => ({ aggregatePosition: (f: unknown) => ag
 let liveModeMock = false;
 vi.mock("@/lib/env", () => ({ env: () => ({ LIVE_MODE: liveModeMock }) }));
 
+// CB-6.8 — alerting hook. Spy on sendAlert; the formatter is a passthrough.
+const sendAlert = vi.fn();
+vi.mock("@/lib/ops/alert", () => ({
+  sendAlert: (t: unknown) => sendAlert(t),
+  formatOrderFailureAlert: (a: unknown) => `ALERT:${JSON.stringify(a)}`,
+}));
+
 import { forceBuy, sellFraction } from "@/lib/bot/manual-orders";
 
 const KEY = "idem-action-1";
@@ -149,6 +156,28 @@ describe("sellFraction — held-qty + gate", () => {
     const r = await sellFraction("BTC-USD", 1, "sell_all", KEY);
     expect(placeOrder).toHaveBeenCalledTimes(1);
     expect(r).toMatchObject({ ok: true, status: "submitted", side: "sell" });
+  });
+});
+
+describe("CB-6.8 — failed-order alerting (hook site)", () => {
+  it("LIVE_MODE=true + placement fails → sendAlert fires once", async () => {
+    liveModeMock = true;
+    placeOrder.mockResolvedValue({ success: false, error_response: { message: "insufficient balance" } });
+    const r = await forceBuy("BTC-USD", KEY);
+    expect(r).toEqual({ ok: false, reason: "placement-failed" });
+    expect(sendAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("LIVE_MODE=false (dry_run, dark) → sendAlert does NOT fire", async () => {
+    liveModeMock = false;
+    await forceBuy("BTC-USD", KEY);
+    expect(sendAlert).not.toHaveBeenCalled();
+  });
+
+  it("LIVE_MODE=true + submitted (success) → sendAlert does NOT fire", async () => {
+    liveModeMock = true; // placeOrder default mock = success
+    await forceBuy("BTC-USD", KEY);
+    expect(sendAlert).not.toHaveBeenCalled();
   });
 });
 

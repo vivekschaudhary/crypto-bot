@@ -34,6 +34,11 @@ const EnvSchema = z.object({
   // Origin (for WebAuthn relying-party + CSRF)
   APP_ORIGIN: z.string().url().optional(),
 
+  // CB-6.8 — operator alerting via Telegram (optional). Both unset → alerting
+  // disabled (sendAlert is a no-op). Set in Vercel before the LIVE_MODE flip.
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_CHAT_ID: z.string().optional(),
+
   // Node environment
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 

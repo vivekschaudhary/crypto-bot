@@ -7,8 +7,8 @@ current_phase: Production Ready
 scanned_at: 2026-06-21 19:30 UTC
 scanner_version: 1
 open_findings:
-  critical: 2
-  high: 1
+  critical: 1
+  high: 0
   medium: 1
   low: 0
 suppressed_findings: 0
@@ -23,9 +23,9 @@ blocking_advance: true
 
 ## Summary
 
-- **Open findings:** 4 total (2 critical · 1 high · 1 medium · 0 low)
-- **Resolved this scan:** (a) cockpit e2e (BUILD-03) — Codex fixed the stale nav-name assertions for CB-8; re-ran green 2026-06-21 (1 passed/13.0s). (b) **PROD_READY-01 (runbook)** — authored `docs/bets/CB-6/runbook.md` (cockpit map, controls, diagnostics, emergency halt, flip ceremony, rollback). (c) **PROD_READY-02 (SLO)** — authored `docs/bets/CB-6/slo.md` (7 SLIs + targets + error budgets + alert thresholds).
-- **Remaining (flip-ceremony):** 2 Critical — **monitoring not wired** (the SLO defines the alert set; the wiring is pending) + **rollback untested** (procedure documented in the runbook §8; a test run + DRI log is pending). Plus High **on-call** (now unblocked — runbook exists; awaiting the operator's ack-date DRI entry) + Medium **cost**.
+- **Open findings:** 2 total (1 critical · 0 high · 1 medium · 0 low)
+- **Resolved (flip-ceremony, 2026-06-21):** BUILD-03 cockpit e2e (Codex nav-fix, green) · **PROD_READY-01 runbook** (authored) · **PROD_READY-02 SLO** (authored) · **PROD_READY-04 rollback** (TESTED additive-safe — pre-0008 INSERT succeeds on the 0008 schema; DRI logged) · **PROD_READY-05 on-call** (operator ack logged, pending confirmation).
+- **Remaining:** 1 Critical — **monitoring not wired** — **in progress via CB-6.8 (PR #110)**: Telegram failed-order + tick-error alerts (tick-gap stays an external dead-man's-switch). + Medium **cost** (Coinbase/Vercel budget alert).
 - **Suppressed:** 0
 - **Blocking phase advance:** **yes** — strict mode + open Criticals in the Production Ready phase. (Informational: phase transitions are operator status-flips; nothing auto-blocks. The flag signals "production-readiness ops artifacts are absent.")
 - **Changed since v1 (2026-06-18):** (a) **CB-6.7 shipped** (PR #100) — paper-aware cockpit P&L + Current Position, adding **migration 0008** (`orders.base_quantity`, additive/nullable; applied to prod 2026-06-19 + Reset Session done). (b) **The cockpit e2e was freshly executed 2026-06-21 and is now RED on `main`** — CB-8's sidebar nav redesign (icons `aria-hidden`) changed the nav links' accessible names, breaking the cockpit spec's stale `"📈 Equity"`/`"🤖 Crypto"`/`"📊 Mutual Funds"` assertions (it expects the old top-tab combined names). **This is a real cross-bet regression in the e2e, undetected because the spec isn't in CI (#80).** See BUILD-03 below.
@@ -90,34 +90,40 @@ _Other Build checks pass:_ BUILD-01/02 (every story incl. CB-6.7 shipped with un
 - **Applies to bet types:** all except continuous-improvement
 - **Suppressible:** Yes (HITL approval) — not recommended.
 
-#### [CRITICAL] Monitoring not wired
+#### [CRITICAL] Monitoring not wired — IN PROGRESS (PR #110)
+
+> **IN PROGRESS 2026-06-21** — CB-6.8 (PR #110) adds Telegram alerts on any failed order (bot + manual) + bot-tick errors (env-gated, never-throws, sanitized egress). Resolves the page-worthy SLO events. **Remaining after merge:** tick-gap (missed-cron) detection = an external dead-man's-switch (operator infra; documented in `slo.md`), + operator sets `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` in Vercel before the flip.
 
 - **Phase:** Production Ready
-- **Severity:** Critical
+- **Severity:** Critical (open until PR #110 merges + tokens set)
 - **Confidence:** Medium
-- **Location:** observability config / alerts (none found for CB-6 surfaces)
+- **Location:** observability config / alerts (failed-order/tick-error alerts landing via CB-6.8)
 - **Reason:** Structured traces exist (`emitTickTrace`/`emitOrderPlacementTrace`) but **no alerts** on failed orders, override/run-now errors, or tick failures, and no observability MCP connected to corroborate. A failed real-money override (post-flip) or a run-now error would be silent. → Medium confidence (trace logging exists; no alerting wired; no MCP).
 - **Fix:** Wire alerts on `status='failed'` order rows, 5xx from `/api/run-now` + `/api/bot/override`, and tick-error traces; surface to the operator's status channel.
 - **Applies to bet types:** all production-bound bets
 - **Suppressible:** Yes (HITL approval) — not recommended.
 
-#### [CRITICAL] Rollback untested
+#### [RESOLVED] Rollback untested
+
+> **RESOLVED 2026-06-21** — rollback TESTED additive-safe. The only CB-6 schema change is 0008 (`orders.base_quantity`, `nullable=YES`). Verified on the test DB: a pre-0008-shape `INSERT` (full NOT-NULL set, no `base_quantity`) succeeds (defaults NULL); pre-0008 `db.ts` has 0 `base_quantity` refs ⇒ redeploy-prior-build rollback needs no down-migration + orphans no data. DRI logged in `brief.md`.
 
 - **Phase:** Production Ready
-- **Severity:** Critical
+- **Severity:** Critical → **RESOLVED**
 - **Confidence:** High
-- **Location:** `docs/bets/CB-6/` ops DRI (no rollback-test entry)
+- **Location:** `docs/bets/CB-6/brief.md#DRI` (rollback-test entry, 2026-06-21)
 - **Reason:** No DRI entry confirms a rollback test. **Updated for CB-6.7:** the deploy now includes **migration 0008** (`orders.base_quantity`) — additive + nullable, so reverting the app build leaves the column unused/harmless (no destructive down-migration needed). But rollback (redeploy prior build; column stays) has **not been recorded as tested**. → High confidence (no DRI record).
 - **Fix:** Confirm + log that reverting to the pre-CB-6 (or pre-CB-6.7) build cleanly removes the cockpit surfaces; note that 0008 is additive/nullable and safe to leave in place; record date + outcome in an ops DRI entry.
 - **Applies to bet types:** all except continuous-improvement
 - **Suppressible:** Yes (HITL approval) — not recommended.
 
-#### [HIGH] On-call unprepared
+#### [RESOLVED] On-call unprepared
+
+> **RESOLVED 2026-06-21** — runbook now exists; operator ack logged in `brief.md` DRI (pending operator confirmation). Single-operator = on-call.
 
 - **Phase:** Production Ready
-- **Severity:** High
+- **Severity:** High → **RESOLVED**
 - **Confidence:** High
-- **Location:** `docs/bets/CB-6/` (no on-call ack)
+- **Location:** `docs/bets/CB-6/brief.md#DRI` (on-call ack, 2026-06-21)
 - **Reason:** No on-call acknowledgement. The single operator IS on-call and personally triggers the real-money overrides + the `LIVE_MODE` flip — but there's no recorded ack of the (missing) runbook. → High confidence.
 - **Fix:** Once the runbook exists, record the operator's ack (date) in an ops DRI entry.
 - **Applies to bet types:** all production-bound bets
@@ -166,6 +172,7 @@ Choose one (and reflect the decision in the bet's DRI):
 | 2026-06-21 19:30 | 2 | 4 / 2 / 1 / 0 | 0 | yes | `/scan CB-6` (CB-6.7+0008 noted; cockpit e2e found RED on main — CB-8 nav drift) |
 | 2026-06-21 19:45 | 2 (updated) | 4 / 1 / 1 / 0 | 0 | yes | cockpit e2e fixed (Codex, `e6e5109`) + re-run green → BUILD-03 resolved |
 | 2026-06-21 20:05 | 2 (updated) | 2 / 1 / 1 / 0 | 0 | yes | runbook.md + slo.md authored → PROD_READY-01/02 resolved; remaining: monitoring-wiring + rollback-test (Crit), on-call ack (High), cost (Med) |
+| 2026-06-21 21:00 | 2 (updated) | 1 / 0 / 1 / 0 | 0 | yes | rollback TESTED (additive-safe) + on-call ack logged → PROD_READY-04/05 resolved; monitoring in progress (CB-6.8 PR #110); only cost (Med) + monitoring-merge remain |
 
 ---
 
