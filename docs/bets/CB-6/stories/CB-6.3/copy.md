@@ -9,8 +9,11 @@ _UX Writer artifact. VERBATIM (refusal rule #5). Anchored to `ETH_USD Bot — Co
 - Price-vs-MA row label: `PRICE vs MA<period>` — `<period>` is the strategy's `entry_rules.maPeriod` (e.g. `PRICE vs MA20`).
 - Price-vs-MA words: `Above` · `Below` · `At`
 - Next-action label: `NEXT ACTION`
-- Decision words: `BUY` · `SELL` · `HOLD`
-- Reason: render the signal's `reason` string **verbatim** (it already reads operator-facing, e.g. `hold: rsi=42.10 < entry_threshold=30 BUT price=1792.39 >= ma20=1740.10 ...`). Do not paraphrase or reformat.
+- **Next-action badge — AMENDED 2026-06-22** (dust phantom-sell fix; operator-approved, see [FIX-2026-06-22](../../../fixes/FIX-2026-06-22-dust-position-phantom-sell.md)). Derived from the **persisted** decision + reason (DB-only; no Coinbase):
+  - `BUY` (decision = buy) · `SELL` (decision = sell) — `reason` rendered **verbatim** below.
+  - `HOLDING` (a `hold` for an **open** position) — `reason` rendered **verbatim**.
+  - `WAITING TO BUY` (a `hold` while **flat** — no position / dust / no buy signal) — shown with the forward-looking detail **`Enters when RSI < <entryThreshold> (currently <rsi>, <zone>)`** instead of the raw hold reason.
+  - _Was: a single `BUY · SELL · HOLD` badge + the reason verbatim. That surfaced confusing exit/sell wording when flat — incl. a dust position rendering "sell 90% of position" with nothing to sell. The raw `reason` is still available verbatim in `/dashboard/trace`._
 
 ## Number formatting
 - RSI: 1 decimal (e.g. `42.1`).

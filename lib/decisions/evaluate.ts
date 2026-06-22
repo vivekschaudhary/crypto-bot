@@ -81,6 +81,19 @@ import type {
 export const MIN_SELLABLE_POSITION_USD = 1;
 
 /**
+ * True when a `hold` reason was produced for an OPEN (real) position — vs a flat
+ * / dust / no-buy-signal hold. The cockpit uses this to choose HOLDING vs
+ * WAITING TO BUY from the PERSISTED signal alone (DB-only; NO Coinbase re-read),
+ * so the display stays consistent with the engine's signal-time decision and is
+ * never rewritten by a transient account-fetch failure (CB-6.3 DB-only contract).
+ * Must stay in sync with evaluateExit's open-position hold reasons below
+ * (prefix `hold: position open`).
+ */
+export function isOpenPositionHold(reason: string): boolean {
+  return reason.startsWith("hold: position open");
+}
+
+/**
  * Build the operator's decision per asset in `strategy.selected_assets`,
  * given pre-computed per-asset signals + session totals.
  *

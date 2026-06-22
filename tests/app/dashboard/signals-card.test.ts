@@ -16,19 +16,15 @@ function sig(over: Partial<CockpitSignal> = {}): CockpitSignal {
     maPeriod: 20,
     lastClose: 1792.39,
     decision: "hold",
-    reason: "hold: rsi=42.10 < entry_threshold=30 BUT price>=ma20; no buy at ETH-USD",
+    // open-position hold by default → renders HOLDING with the reason verbatim
+    // (the engine's "hold: position open" prefix; see isOpenPositionHold).
+    reason: "hold: position open + rsi=42.10 <= exit_threshold=70 (no exit signal) at ETH-USD",
     ...over,
   };
 }
-function render(
-  signal: CockpitSignal,
-  entry = 30,
-  exit = 70,
-  maPeriod = 20,
-  hasRealPosition = true,
-): string {
+function render(signal: CockpitSignal, entry = 30, exit = 70, maPeriod = 20): string {
   return JSON.stringify(
-    SignalsCard({ signal, hasRealPosition, entryRsiThreshold: entry, exitRsiThreshold: exit, maPeriod }),
+    SignalsCard({ signal, entryRsiThreshold: entry, exitRsiThreshold: exit, maPeriod }),
   );
 }
 
@@ -41,8 +37,8 @@ describe("SignalsCard", () => {
     expect(json).toContain("PRICE vs MA20");
     expect(json).toContain("Above"); // 1792.39 > 1740.10
     expect(json).toContain("NEXT ACTION");
-    expect(json).toContain("HOLD");
-    expect(json).toContain("hold: rsi=42.10 < entry_threshold=30 BUT price>=ma20; no buy at ETH-USD");
+    expect(json).toContain("HOLDING"); // open-position hold → HOLDING (reason verbatim)
+    expect(json).toContain("hold: position open + rsi=42.10 <= exit_threshold=70 (no exit signal) at ETH-USD");
   });
 
   it("zone is STRATEGY-relative (Oversold above 30 when entry=40, not generic 30/70)", () => {
@@ -81,12 +77,21 @@ describe("SignalsCard", () => {
   });
 });
 
-// Next Action derivation (fix 2026-06-22): when FLAT (no real position) the
-// card never shows SELL — it shows a forward-looking buy-watch. A stale dust
-// sell decision is treated as flat too.
-describe("SignalsCard — Next Action when flat (no real position)", () => {
-  it("hold + flat → WAITING TO BUY with the entry condition + live RSI", () => {
-    const json = render(sig({ rsi: 71.5, decision: "hold", reason: "irrelevant raw reason" }), 30, 70, 20, false);
+// Next Action derivation (fix 2026-06-22) — DB-ONLY, from the persisted signal
+// (decision + the engine's reason). No Coinbase re-read: a flat/dust hold shows
+// a forward-looking buy-watch; an open-position hold shows HOLDING; buy/sell
+// render verbatim. The engine's dust floor ensures dust is decided as a flat
+// hold, so the persisted decision is the source of truth.
+describe("SignalsCard — Next Action derivation (DB-only)", () => {
+  it("hold + FLAT (dust reason, not 'position open') → WAITING TO BUY + condition + live RSI", () => {
+    const json = render(
+      sig({
+        rsi: 71.5,
+        decision: "hold",
+        reason:
+          "hold: exit rsi condition met (rsi=71.50 > exit_threshold=70) but position is dust ($0.00 < $1.00 min sellable, not exitable) at ETH-USD",
+      }),
+    );
     expect(json).toContain("WAITING TO BUY");
     expect(json).toContain("Enters when RSI < 30");
     expect(json).toContain("71.5");
@@ -94,27 +99,23 @@ describe("SignalsCard — Next Action when flat (no real position)", () => {
     expect(json).not.toContain("SELL");
   });
 
-  it("stale SELL decision + flat (dust/closed) → WAITING TO BUY, not SELL", () => {
+  it("hold + no-buy-signal (flat) → WAITING TO BUY (not a bare HOLD)", () => {
     const json = render(
-      sig({ rsi: 71.5, decision: "sell", reason: "sell: rsi=71.48 > exit_threshold=70 ...; sell 90%" }),
-      30,
-      70,
-      20,
-      false,
+      sig({ rsi: 50, decision: "hold", reason: "hold: rsi=50.00 >= entry_threshold=30 (no buy signal) at ETH-USD" }),
     );
     expect(json).toContain("WAITING TO BUY");
-    expect(json).not.toContain("sell 90%");
   });
 
-  it("sell + REAL position → SELL (unchanged)", () => {
-    const json = render(sig({ rsi: 72, decision: "sell", reason: "sell 90% of position" }), 30, 70, 20, true);
+  it("hold + OPEN position → HOLDING (reason verbatim, DB-only)", () => {
+    const reason = "hold: position open + rsi=66.00 <= exit_threshold=70 (no exit signal) at ETH-USD";
+    const json = render(sig({ decision: "hold", reason }));
+    expect(json).toContain("HOLDING");
+    expect(json).toContain(reason);
+  });
+
+  it("sell decision → SELL verbatim (engine only sells real >= $1 positions)", () => {
+    const json = render(sig({ decision: "sell", reason: "sell: rsi=72 > exit_threshold=70; sell 90% of position at ETH-USD" }));
     expect(json).toContain("SELL");
     expect(json).toContain("sell 90% of position");
-  });
-
-  it("hold + REAL position → HOLDING (reason verbatim)", () => {
-    const json = render(sig({ decision: "hold", reason: "position open + no exit signal" }), 30, 70, 20, true);
-    expect(json).toContain("HOLDING");
-    expect(json).toContain("position open + no exit signal");
   });
 });

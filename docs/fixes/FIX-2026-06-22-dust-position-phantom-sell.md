@@ -22,15 +22,19 @@ The decision engine reads the **real Coinbase account position** (`aggregatePosi
 ## Fix
 
 1. **Dust floor (logic).** `evaluate()` now treats a position **worth < `MIN_SELLABLE_POSITION_USD` ($1)** as **flat**: never sold (it's not exitable — Coinbase rejects sub-minimum orders) and **eligible to buy** (a real dip rebuilds a position). The floor only applies when `lastClose` is finite (a non-finite price still routes to `evaluateExit` for its NaN/zero-cost-basis audit reasons). The no-position reason is dust-aware for audit honesty.
-2. **Next Action (cockpit).** The Signals card derives a position-aware label: when **flat** (no real / dust position) it shows **`WAITING TO BUY · Enters when RSI < <entry> (currently <rsi>, <zone>)`** instead of a phantom SELL. A stored `sell` against a dust/closed position renders as `WAITING TO BUY` too — so the stale dust-sell is corrected **immediately** (before the next tick). Real position + sell → `SELL` (unchanged); real position + hold → `HOLDING`. The raw `evaluate` reason is preserved for the decision trace (audit contract intact).
+2. **Next Action (cockpit) — DB-only.** The Signals card derives the badge from the **persisted** signal alone (decision + the engine's reason; **no Coinbase re-read**): a `hold` for an **open** position → `HOLDING` (reason verbatim); a `hold` while **flat** (no position / dust / no buy signal) → **`WAITING TO BUY · Enters when RSI < <entry> (currently <rsi>, <zone>)`**; `buy`/`sell` render verbatim. Open-vs-flat is detected via the engine's `isOpenPositionHold(reason)`. Because the engine's dust floor (step 1) already *decides* a dust position as a flat hold, the persisted decision is the source of truth — the display never overrides it.
+   - **Codex BLOCKER (round 1) — reverted:** the first attempt derived `hasRealPosition` from `loadCockpitPosition()`, which degrades to `null` on a Coinbase error → a transient account-fetch failure would rewrite a real SELL/HOLD into WAITING TO BUY, violating CB-6.3's DB-only contract + diverging from the engine's own non-finite-price guard. Replaced with the DB-only derivation above.
+   - Tradeoff: a **stale** pre-fix dust `sell` row shows `SELL` until the next tick overwrites it with the corrected hold (the DB-only contract — the card reflects the latest persisted decision). Resume the bot after deploy → one tick clears it.
 
-The dust threshold (`MIN_SELLABLE_POSITION_USD`) is exported from `evaluate.ts` and shared by the cockpit so the engine + the display agree.
+3. **Artifacts (Codex BLOCKER round 1).** Amended the approved CB-6.3 copy/design/story for the new labels (`HOLDING` / `WAITING TO BUY`) + this DRI, so the UX change is approved + traceable.
+
+The dust threshold (`MIN_SELLABLE_POSITION_USD`) + `isOpenPositionHold` are exported from `evaluate.ts` and shared by the cockpit so the engine + the display agree.
 
 ## Tests
 
 - `evaluate.test.ts` (+3): dust + overbought + profit → **hold, not sell** (reason names dust); real position (≥ $1) + overbought + profit → **sell** (no regression); dust + oversold → **buy** (flat ⇒ eligible to enter).
-- `signals-card.test.ts` (+4): flat → `WAITING TO BUY` + condition + live RSI; stale dust-`sell` → `WAITING TO BUY` (not SELL); real + sell → `SELL`; real + hold → `HOLDING`.
-- Gates: typecheck / lint / 947 tests / build green.
+- `signals-card.test.ts` (+4, DB-only): flat dust-hold → `WAITING TO BUY` + condition + live RSI; no-buy-signal hold → `WAITING TO BUY`; open-position hold → `HOLDING` (reason verbatim); `sell` → `SELL` verbatim.
+- Gates: typecheck / lint / test / build green.
 
 ## Notes / follow-ups
 
