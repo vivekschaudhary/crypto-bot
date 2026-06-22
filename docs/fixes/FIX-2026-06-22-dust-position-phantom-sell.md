@@ -1,13 +1,17 @@
 ---
 id: FIX-2026-06-22-dust-position
 type: fix
-status: in-review
+status: resolved
 severity: high
 bet: CB-6
 reported: 2026-06-22
 reporter: operator
 area: [decisions, cockpit, money-path]
+resolved: 2026-06-22
+pr: 111
 ---
+
+> **RESOLVED 2026-06-22 — PR #111 merged (`ae70a2f`).** Codex-clean after 3 BLOCKER rounds (page-level Coinbase heuristic → DB-only; artifact amendments; exhaustive open-position-hold classifier). Deploys on merge.
 
 # Fix — dust position drives a phantom SELL (live)
 
