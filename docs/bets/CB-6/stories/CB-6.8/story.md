@@ -2,7 +2,7 @@
 id: CB-6.8
 bet: CB-6
 type: story
-status: in-review
+status: shipped
 priority: P1
 created: 2026-06-21
 author: PM
@@ -56,7 +56,7 @@ Backend/observability story — no UI surface.
 - Tick-gap (missed-cron) detection — the app can't self-detect a cron that didn't fire; that's an external dead-man's-switch / Vercel cron monitor (documented in `slo.md`, operator infra). 5xx-endpoint alerts (the failed-order + tick-error alerts cover the money path; route 5xx is a later add). No success/"order submitted" confirmations (failures only, minimal scope). No UI.
 
 ## PRs
-- #110 — operator alerting via Telegram. Open 2026-06-21; awaiting Codex code + security review.
+- #110 — operator alerting via Telegram. Merged 2026-06-21. Codex code + security clean (after the AC-6 hook-site-tests BLOCKER).
 
 ## Tests
 _Unit co-located; no e2e (outbound alert; covered by unit + the existing cockpit e2e for order paths)._
@@ -76,4 +76,4 @@ _Unit co-located; no e2e (outbound alert; covered by unit + the existing cockpit
 - [2026-06-21] [Engineer] **Codex BLOCKER closed — hook-site tests added (AC 6).** Round-1 shipped only the `alert.ts` unit tests (formatters + `sendAlert` gating/payload/swallow); AC 6 also required proving the bot + manual failure branches actually call `sendAlert` and dry-run stays silent. Added: `run-tick.test.ts` (+4 — a DECLINING candle series produces a buy → LIVE placement failure fires `sendAlert`; dark dry_run + LIVE submitted do NOT; top-level tick error fires the tick-error alert) and `manual-orders.test.ts` (+3 — LIVE failed manual order fires; dry_run + submitted do not). 940 tests green. — severity: high (closed) — owner: Engineer — area: testing.
 
 ---
-_Story closed: <pending>, brief: docs/bets/CB-6/brief.md. **POST-SHIP — closes scan PROD_READY-03 (monitoring) for the LIVE_MODE flip ceremony. Reopens CB-6.**_
+_Story closed: 2026-06-21 (PR #110, shipped), brief: docs/bets/CB-6/brief.md. **POST-SHIP — closes scan PROD_READY-03 (monitoring) for the LIVE_MODE flip ceremony. Reopens CB-6.**_

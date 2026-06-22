@@ -7,12 +7,12 @@ current_phase: Production Ready
 scanned_at: 2026-06-21 19:30 UTC
 scanner_version: 1
 open_findings:
-  critical: 1
+  critical: 0
   high: 0
   medium: 1
   low: 0
 suppressed_findings: 0
-blocking_advance: true
+blocking_advance: false
 ---
 
 # Scan Report — CB-6 (Multi-asset shell + crypto cockpit redesign)
@@ -23,10 +23,11 @@ blocking_advance: true
 
 ## Summary
 
-- **Open findings:** 2 total (1 critical · 0 high · 1 medium · 0 low)
-- **Resolved (flip-ceremony, 2026-06-21):** BUILD-03 cockpit e2e (Codex nav-fix, green) · **PROD_READY-01 runbook** (authored) · **PROD_READY-02 SLO** (authored) · **PROD_READY-04 rollback** (TESTED additive-safe — pre-0008 INSERT succeeds on the 0008 schema; DRI logged) · **PROD_READY-05 on-call** (operator ack logged, pending confirmation).
-- **Remaining:** 1 Critical — **monitoring not wired** — **in progress via CB-6.8 (PR #110)**: Telegram failed-order + tick-error alerts (tick-gap stays an external dead-man's-switch). + Medium **cost** (Coinbase/Vercel budget alert).
+- **Open findings:** 1 total (0 critical · 0 high · 1 medium · 0 low) — **no blockers; all Production-Ready Criticals resolved.**
+- **Resolved (flip-ceremony, 2026-06-21):** BUILD-03 cockpit e2e (Codex nav-fix, green) · **PROD_READY-01 runbook** · **PROD_READY-02 SLO** · **PROD_READY-03 monitoring** (CB-6.8 shipped — PR #110 — Telegram failed-order + tick-error alerts; tokens set in Vercel; merge-deploy activates) · **PROD_READY-04 rollback** (TESTED additive-safe) · **PROD_READY-05 on-call** (operator ack logged).
+- **Remaining:** 1 Medium — **cost monitoring** (Coinbase/Vercel budget alert; non-blocking). + the external **tick-gap dead-man's-switch** (documented in `slo.md`; operator infra, not a scan Critical).
 - **Suppressed:** 0
+- **Flip status:** every Production-Ready gate is GREEN. The `LIVE_MODE=true` flip is unblocked (operator ceremony per `runbook.md` §7).
 - **Blocking phase advance:** **yes** — strict mode + open Criticals in the Production Ready phase. (Informational: phase transitions are operator status-flips; nothing auto-blocks. The flag signals "production-readiness ops artifacts are absent.")
 - **Changed since v1 (2026-06-18):** (a) **CB-6.7 shipped** (PR #100) — paper-aware cockpit P&L + Current Position, adding **migration 0008** (`orders.base_quantity`, additive/nullable; applied to prod 2026-06-19 + Reset Session done). (b) **The cockpit e2e was freshly executed 2026-06-21 and is now RED on `main`** — CB-8's sidebar nav redesign (icons `aria-hidden`) changed the nav links' accessible names, breaking the cockpit spec's stale `"📈 Equity"`/`"🤖 Crypto"`/`"📊 Mutual Funds"` assertions (it expects the old top-tab combined names). **This is a real cross-bet regression in the e2e, undetected because the spec isn't in CI (#80).** See BUILD-03 below.
 - **Top pattern (unchanged):** CB-6 shipped cleanly through Product → Build (8 stories incl. CB-6.7, full Codex review on every PR, **mandatory Security Reviewer on the real-money CB-6.6**), but **no Production-Ready ops artifacts exist** (no runbook, SLO, wired monitoring, rollback-test record). **Unlike CB-8 (pure chrome), these are real gates** — CB-6 is the **money surface** (Run Now + real-money Manual Overrides place real orders once `LIVE_MODE=true`). They should be authored as part of the **flip ceremony**, not suppressed.
@@ -90,14 +91,14 @@ _Other Build checks pass:_ BUILD-01/02 (every story incl. CB-6.7 shipped with un
 - **Applies to bet types:** all except continuous-improvement
 - **Suppressible:** Yes (HITL approval) — not recommended.
 
-#### [CRITICAL] Monitoring not wired — IN PROGRESS (PR #110)
+#### [RESOLVED] Monitoring not wired
 
-> **IN PROGRESS 2026-06-21** — CB-6.8 (PR #110) adds Telegram alerts on any failed order (bot + manual) + bot-tick errors (env-gated, never-throws, sanitized egress). Resolves the page-worthy SLO events. **Remaining after merge:** tick-gap (missed-cron) detection = an external dead-man's-switch (operator infra; documented in `slo.md`), + operator sets `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` in Vercel before the flip.
+> **RESOLVED 2026-06-21** — CB-6.8 shipped (PR #110, merged `ccc663a`): Telegram alerts on any failed order (bot + manual) + bot-tick errors — env-gated, never-throws, sanitized egress; hook-site tested. Tokens (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`) set in Vercel by the operator; the merge-deploy activates them. The page-worthy SLO money-path events now reach the operator. _Residual (not a Critical): tick-gap (missed-cron) detection remains an external dead-man's-switch / Vercel cron monitor — documented in `slo.md` as operator infra._
 
 - **Phase:** Production Ready
-- **Severity:** Critical (open until PR #110 merges + tokens set)
-- **Confidence:** Medium
-- **Location:** observability config / alerts (failed-order/tick-error alerts landing via CB-6.8)
+- **Severity:** Critical → **RESOLVED**
+- **Confidence:** High
+- **Location:** `lib/ops/alert.ts` + hooks in `run-tick.ts` / `manual-orders.ts` (CB-6.8)
 - **Reason:** Structured traces exist (`emitTickTrace`/`emitOrderPlacementTrace`) but **no alerts** on failed orders, override/run-now errors, or tick failures, and no observability MCP connected to corroborate. A failed real-money override (post-flip) or a run-now error would be silent. → Medium confidence (trace logging exists; no alerting wired; no MCP).
 - **Fix:** Wire alerts on `status='failed'` order rows, 5xx from `/api/run-now` + `/api/bot/override`, and tick-error traces; surface to the operator's status channel.
 - **Applies to bet types:** all production-bound bets
@@ -173,6 +174,7 @@ Choose one (and reflect the decision in the bet's DRI):
 | 2026-06-21 19:45 | 2 (updated) | 4 / 1 / 1 / 0 | 0 | yes | cockpit e2e fixed (Codex, `e6e5109`) + re-run green → BUILD-03 resolved |
 | 2026-06-21 20:05 | 2 (updated) | 2 / 1 / 1 / 0 | 0 | yes | runbook.md + slo.md authored → PROD_READY-01/02 resolved; remaining: monitoring-wiring + rollback-test (Crit), on-call ack (High), cost (Med) |
 | 2026-06-21 21:00 | 2 (updated) | 1 / 0 / 1 / 0 | 0 | yes | rollback TESTED (additive-safe) + on-call ack logged → PROD_READY-04/05 resolved; monitoring in progress (CB-6.8 PR #110); only cost (Med) + monitoring-merge remain |
+| 2026-06-21 21:40 | 2 (updated) | 0 / 0 / 1 / 0 | 0 | no | CB-6.8 merged (PR #110, ccc663a) → PROD_READY-03 monitoring resolved. ALL Production-Ready Criticals green; flip unblocked. Only Medium cost remains. |
 
 ---
 
