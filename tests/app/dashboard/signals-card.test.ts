@@ -16,7 +16,9 @@ function sig(over: Partial<CockpitSignal> = {}): CockpitSignal {
     maPeriod: 20,
     lastClose: 1792.39,
     decision: "hold",
-    reason: "hold: rsi=42.10 < entry_threshold=30 BUT price>=ma20; no buy at ETH-USD",
+    // open-position hold by default → renders HOLDING with the reason verbatim
+    // (the engine's "hold: position open" prefix; see isOpenPositionHold).
+    reason: "hold: position open + rsi=42.10 <= exit_threshold=70 (no exit signal) at ETH-USD",
     ...over,
   };
 }
@@ -35,8 +37,8 @@ describe("SignalsCard", () => {
     expect(json).toContain("PRICE vs MA20");
     expect(json).toContain("Above"); // 1792.39 > 1740.10
     expect(json).toContain("NEXT ACTION");
-    expect(json).toContain("HOLD");
-    expect(json).toContain("hold: rsi=42.10 < entry_threshold=30 BUT price>=ma20; no buy at ETH-USD");
+    expect(json).toContain("HOLDING"); // open-position hold → HOLDING (reason verbatim)
+    expect(json).toContain("hold: position open + rsi=42.10 <= exit_threshold=70 (no exit signal) at ETH-USD");
   });
 
   it("zone is STRATEGY-relative (Oversold above 30 when entry=40, not generic 30/70)", () => {
@@ -72,5 +74,48 @@ describe("SignalsCard", () => {
 
   it("buy decision → BUY badge", () => {
     expect(render(sig({ decision: "buy", reason: "buy $25 ETH-USD" }))).toContain("BUY");
+  });
+});
+
+// Next Action derivation (fix 2026-06-22) — DB-ONLY, from the persisted signal
+// (decision + the engine's reason). No Coinbase re-read: a flat/dust hold shows
+// a forward-looking buy-watch; an open-position hold shows HOLDING; buy/sell
+// render verbatim. The engine's dust floor ensures dust is decided as a flat
+// hold, so the persisted decision is the source of truth.
+describe("SignalsCard — Next Action derivation (DB-only)", () => {
+  it("hold + FLAT (dust reason, not 'position open') → WAITING TO BUY + condition + live RSI", () => {
+    const json = render(
+      sig({
+        rsi: 71.5,
+        decision: "hold",
+        reason:
+          "hold: exit rsi condition met (rsi=71.50 > exit_threshold=70) but position is dust ($0.00 < $1.00 min sellable, not exitable) at ETH-USD",
+      }),
+    );
+    expect(json).toContain("WAITING TO BUY");
+    expect(json).toContain("Enters when RSI < 30");
+    expect(json).toContain("71.5");
+    expect(json).toContain("Overbought");
+    expect(json).not.toContain("SELL");
+  });
+
+  it("hold + no-buy-signal (flat) → WAITING TO BUY (not a bare HOLD)", () => {
+    const json = render(
+      sig({ rsi: 50, decision: "hold", reason: "hold: rsi=50.00 >= entry_threshold=30 (no buy signal) at ETH-USD" }),
+    );
+    expect(json).toContain("WAITING TO BUY");
+  });
+
+  it("hold + OPEN position → HOLDING (reason verbatim, DB-only)", () => {
+    const reason = "hold: position open + rsi=66.00 <= exit_threshold=70 (no exit signal) at ETH-USD";
+    const json = render(sig({ decision: "hold", reason }));
+    expect(json).toContain("HOLDING");
+    expect(json).toContain(reason);
+  });
+
+  it("sell decision → SELL verbatim (engine only sells real >= $1 positions)", () => {
+    const json = render(sig({ decision: "sell", reason: "sell: rsi=72 > exit_threshold=70; sell 90% of position at ETH-USD" }));
+    expect(json).toContain("SELL");
+    expect(json).toContain("sell 90% of position");
   });
 });

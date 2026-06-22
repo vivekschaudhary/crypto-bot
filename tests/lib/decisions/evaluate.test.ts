@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { evaluate } from "@/lib/decisions/evaluate";
+import { evaluate, isOpenPositionHold } from "@/lib/decisions/evaluate";
 import type {
   BuySizing,
   PerAssetSignal,
@@ -652,5 +652,103 @@ describe("evaluate — reason-string contract (AC 9 + Engineer DRI Decision #1)"
     expect(result?.reason).toContain("rsi=27.35");
     // entry_threshold is an integer; surfaced verbatim.
     expect(result?.reason).toContain("entry_threshold=30");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Dust floor (fix 2026-06-22) — a sub-$1 residual is treated as FLAT.
+// Regression for the live failed-sell loop: an ETH dust balance (~$0.00002)
+// with RSI overbought + "profit" met produced "sell 90%" → sub-minimum order →
+// failed, every tick. Must now → hold (not exitable) + eligible to buy.
+// ──────────────────────────────────────────────────────────────────────────
+describe("evaluate — dust floor (sub-$1 position treated as flat)", () => {
+  const BTC_ID = "BTC-USD";
+
+  it("DUST + overbought + profit → hold (NOT sell); reason names dust", () => {
+    // value = 0.00000001 * 42000 = $0.00042 (< $1 floor)
+    const signals = makeSignals([
+      [BTC_ID, makeSignal({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.00000001, avgCostUsd: 40000 } })],
+    ]);
+    const [r] = evaluate(makeStrategy(), signals, ZERO_TOTALS);
+    expect(r?.decision).toBe("hold"); // load-bearing: NOT a sell
+    expect(r?.reason).toContain("dust");
+    expect(r?.reason).toContain("not exitable");
+    expect(r?.sizing).toBeUndefined(); // no sell sizing emitted
+  });
+
+  it("REAL position (>= $1) + overbought + profit → sell (no regression)", () => {
+    // value = 0.01 * 42000 = $420 (>= $1); profit (42000 vs 40000) = 5% >= 1.5
+    const signals = makeSignals([
+      [BTC_ID, makeSignal({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.01, avgCostUsd: 40000 } })],
+    ]);
+    const [r] = evaluate(makeStrategy(), signals, ZERO_TOTALS);
+    expect(r?.decision).toBe("sell");
+  });
+
+  it("DUST + oversold (rsi < entry) → BUY (dust is flat → eligible to enter)", () => {
+    const signals = makeSignals([
+      [BTC_ID, makeSignal({ rsi: 25, ma: 42000, lastClose: 41800, currentPosition: { quantity: 0.00000001, avgCostUsd: 40000 } })],
+    ]);
+    const [r] = evaluate(makeStrategy(), signals, ZERO_TOTALS);
+    expect(r?.decision).toBe("buy");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// isOpenPositionHold — EXHAUSTIVE: must classify every evaluateExit() hold path
+// as open-position (so the cockpit shows HOLDING, not WAITING TO BUY, and never
+// hides a real position's audit reason). Codex BLOCKER 2026-06-22 round 3:
+// the prefix-only classifier missed cost-basis-zero + NaN-profit holds.
+// Drives each path through evaluate() so a NEW exit hold reason that forgets to
+// extend OPEN_POSITION_HOLD_MARKERS fails here.
+// ──────────────────────────────────────────────────────────────────────────
+describe("isOpenPositionHold — covers every evaluateExit hold path", () => {
+  const ID = "BTC-USD";
+  function holdReasonFor(over: Partial<PerAssetSignal>): string {
+    const [r] = evaluate(makeStrategy(), makeSignals([[ID, makeSignal(over)]]), ZERO_TOTALS);
+    expect(r?.decision).toBe("hold"); // these are all hold paths
+    return r?.reason ?? "";
+  }
+
+  it("OPEN: position open + rsi <= exit (no exit signal) → true", () => {
+    // value 0.01*42000=$420 (real); rsi 50 <= exit 70
+    const reason = holdReasonFor({ rsi: 50, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.01, avgCostUsd: 40000 } });
+    expect(reason).toContain("position open");
+    expect(isOpenPositionHold(reason)).toBe(true);
+  });
+
+  it("OPEN: position open + rsi > exit BUT profit < min → true", () => {
+    // rsi 75 > exit 70; profit (42000 vs 41900) = 0.24% < 1.5 min
+    const reason = holdReasonFor({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.01, avgCostUsd: 41900 } });
+    expect(reason).toContain("position open");
+    expect(isOpenPositionHold(reason)).toBe(true);
+  });
+
+  it("OPEN: cost basis is zero → true", () => {
+    const reason = holdReasonFor({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.01, avgCostUsd: 0 } });
+    expect(reason).toContain("cost basis is zero");
+    expect(isOpenPositionHold(reason)).toBe(true);
+  });
+
+  it("OPEN: profit computation produced NaN → true", () => {
+    // non-finite lastClose keeps the position "real" (evaluate's finite-price guard)
+    const reason = holdReasonFor({ rsi: 75, ma: 41000, lastClose: NaN, currentPosition: { quantity: 0.01, avgCostUsd: 40000 } });
+    expect(reason).toContain("profit computation produced NaN");
+    expect(isOpenPositionHold(reason)).toBe(true);
+  });
+
+  it("FLAT: dust / no open position / no-buy-signal / insufficient → false", () => {
+    const dust = holdReasonFor({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: { quantity: 0.00000001, avgCostUsd: 40000 } });
+    expect(isOpenPositionHold(dust)).toBe(false); // "...but position is dust..."
+
+    const noPos = holdReasonFor({ rsi: 75, ma: 41000, lastClose: 42000, currentPosition: null });
+    expect(noPos).toContain("no open position"); // word order ≠ "position open"
+    expect(isOpenPositionHold(noPos)).toBe(false);
+
+    const noBuy = holdReasonFor({ rsi: 50, ma: 41000, lastClose: 42000, currentPosition: null });
+    expect(isOpenPositionHold(noBuy)).toBe(false);
+
+    const insufficient = holdReasonFor({ rsi: null, ma: null, lastClose: 42000, currentPosition: null });
+    expect(isOpenPositionHold(insufficient)).toBe(false);
   });
 });

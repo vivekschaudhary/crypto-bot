@@ -10,6 +10,7 @@
 
 import type { JSX } from "react";
 
+import { isOpenPositionHold } from "@/lib/decisions/evaluate";
 import type { CockpitSignal } from "@/lib/dashboard/cockpit-signals";
 import type { Decision } from "@/lib/dashboard/decision-trace";
 
@@ -61,6 +62,44 @@ function priceVsMa(lastClose: number, ma: number): { glyph: string; word: string
   return { glyph: "=", word: "At" };
 }
 
+/**
+ * Derive the operator-facing NEXT ACTION from the PERSISTED signal alone — the
+ * decision the engine made (DB-only; NO Coinbase re-read, per the CB-6.3
+ * contract). Fix 2026-06-22: a `hold` for a flat / dust / no-buy-signal state
+ * (NOT an open position) renders as a forward-looking buy-watch
+ * ("WAITING TO BUY · Enters when RSI < entry"), never a confusing bare HOLD or a
+ * phantom SELL. The engine's dust floor (`MIN_SELLABLE_POSITION_USD`) already
+ * ensures a dust position is decided as a (flat) hold — so the persisted
+ * decision IS the source of truth here; the display never overrides it with a
+ * transport-dependent guess. `tone` picks the badge color. Pure — unit-tested.
+ *
+ * (A `sell`/`buy` decision renders verbatim; a stale pre-fix dust `sell` will
+ * show SELL until the next tick overwrites it with the corrected hold — the
+ * DB-only contract: the card reflects the latest persisted decision.)
+ */
+export function nextAction(
+  signal: Pick<CockpitSignal, "decision" | "rsi" | "reason">,
+  entryRsiThreshold: number,
+  exitRsiThreshold: number,
+): { label: string; detail: string; tone: Decision } {
+  if (signal.decision === "buy") return { label: "BUY", detail: signal.reason, tone: "buy" };
+  if (signal.decision === "sell") return { label: "SELL", detail: signal.reason, tone: "sell" };
+  // hold — open position (HOLDING) vs flat (WAITING TO BUY), from the engine's
+  // own persisted reason (no Coinbase).
+  if (isOpenPositionHold(signal.reason)) {
+    return { label: "HOLDING", detail: signal.reason, tone: "hold" };
+  }
+  const zone =
+    signal.rsi === null
+      ? ""
+      : ` (currently ${signal.rsi.toFixed(1)}, ${rsiZone(signal.rsi, entryRsiThreshold, exitRsiThreshold)})`;
+  return {
+    label: "WAITING TO BUY",
+    detail: `Enters when RSI < ${entryRsiThreshold}${zone}`,
+    tone: "buy",
+  };
+}
+
 export function SignalsCard({
   signal,
   entryRsiThreshold,
@@ -72,6 +111,7 @@ export function SignalsCard({
   exitRsiThreshold: number;
   maPeriod: number;
 }): JSX.Element {
+  const action = nextAction(signal, entryRsiThreshold, exitRsiThreshold);
   const rsiCell =
     signal.rsi === null
       ? "—"
@@ -99,10 +139,8 @@ export function SignalsCard({
 
       <div style={{ marginTop: "0.75rem" }}>
         <div style={rowLabelStyle}>{COPY.nextAction}</div>
-        <span style={{ ...badgeStyle, color: decisionColor[signal.decision] }}>
-          {signal.decision.toUpperCase()}
-        </span>
-        <p style={reasonStyle}>{signal.reason}</p>
+        <span style={{ ...badgeStyle, color: decisionColor[action.tone] }}>{action.label}</span>
+        <p style={reasonStyle}>{action.detail}</p>
       </div>
     </section>
   );
